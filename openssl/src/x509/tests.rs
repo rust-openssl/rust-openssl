@@ -756,6 +756,16 @@ fn test_crl_revoke() {
             crl.entry_count(),
             "clr's entry count should have incremented by one after revoking a cert"
         );
+
+        let revoked = match crl.get_by_cert(&cert) {
+            CrlStatus::Revoked(revoked) => revoked,
+            _ => panic!("cert should be revoked"),
+        };
+        assert_eq!(
+            revoked.serial_number().to_bn().unwrap(),
+            cert.serial_number().to_bn().unwrap(),
+            "revoked and cert serial numbers should match"
+        );
     }
 }
 
