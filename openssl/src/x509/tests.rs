@@ -757,6 +757,7 @@ fn test_crl_revoke() {
             "clr's entry count should have incremented by one after revoking a cert"
         );
     }
+}
 
 #[cfg(any(ossl102, libressl261))]
 fn test_verify_crl() {
