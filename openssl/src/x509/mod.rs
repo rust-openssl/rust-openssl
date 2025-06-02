@@ -1951,6 +1951,7 @@ foreign_type_and_impl_send_sync! {
 /// Corresponds to the return value from the [`X509_CRL_get0_by_*`] methods.
 ///
 /// [`X509_CRL_get0_by_*`]: https://www.openssl.org/docs/man1.1.0/man3/X509_CRL_get0_by_serial.html
+#[derive(Debug)]
 pub enum CrlStatus<'a> {
     /// The certificate is not present in the list
     NotRevoked,
@@ -1961,6 +1962,16 @@ pub enum CrlStatus<'a> {
     /// This can occur if the certificate was revoked with the "CertificateHold"
     /// reason, and has since been unrevoked.
     RemoveFromCrl(&'a X509RevokedRef),
+}
+
+impl fmt::Debug for X509RevokedRef {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
+        fmt.debug_struct("X509RevokedRef")
+            .field("der", &self.to_der())
+            .field("revocation_date", &self.revocation_date())
+            .field("serial_number", &self.serial_number().to_bn())
+            .finish()
+    }
 }
 
 impl<'a> CrlStatus<'a> {
