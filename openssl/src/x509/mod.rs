@@ -8,6 +8,7 @@
 //! the secure protocol for browsing the web.
 
 use cfg_if::cfg_if;
+use ffi::X509_CRL_up_ref;
 use foreign_types::{ForeignType, ForeignTypeRef, Opaque};
 use libc::{c_int, c_long, c_uint, c_void};
 use std::cmp::{self, Ordering};
@@ -2248,6 +2249,12 @@ impl X509Crl {
     }
 }
 
+impl Clone for X509Crl {
+    fn clone(&self) -> X509Crl {
+        X509CrlRef::to_owned(self)
+    }
+}
+
 impl X509CrlRef {
     to_pem! {
         /// Serializes the certificate request to a PEM-encoded Certificate Revocation List.
@@ -2371,6 +2378,17 @@ impl X509CrlRef {
             // was returned so something went wrong.
             (0 | 1, None) => Err(ErrorStack::get()),
             (c_int::MIN..=-2 | 2.., _) => panic!("OpenSSL should only return -2, -1, 0, or 1 for an extension's criticality but it returned {}", critical),
+        }
+    }
+}
+
+impl ToOwned for X509CrlRef {
+    type Owned = X509Crl;
+
+    fn to_owned(&self) -> Self::Owned {
+        unsafe {
+            X509_CRL_up_ref(self.as_ptr());
+            X509Crl::from_ptr(self.as_ptr())
         }
     }
 }
