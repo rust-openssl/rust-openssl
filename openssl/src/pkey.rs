@@ -281,12 +281,18 @@ pub trait KeyCheck {
 
 impl<T> PKeyRef<T> {
     /// Returns a copy of the internal RSA key.
-    #[corresponds(EVP_PKEY_get1_RSA)]
     pub fn rsa(&self) -> Result<Rsa<T>, ErrorStack> {
-        unsafe {
-            let rsa = cvt_p(ffi::EVP_PKEY_get1_RSA(self.as_ptr()))?;
-            Ok(Rsa::from_ptr(rsa))
+        if self.id() != Id::RSA {
+            return Err(ErrorStack::get());
         }
+
+        let rsa = self.as_ptr();
+        #[cfg(ossl300)]
+        cvt(unsafe { ffi::EVP_PKEY_up_ref(rsa) })?;
+        #[cfg(not(ossl300))]
+        let rsa = cvt_p(unsafe { ffi::EVP_PKEY_get1_RSA(rsa) })?;
+
+        Ok(unsafe { Rsa::from_ptr(rsa) })
     }
 
     /// Returns a copy of the internal DSA key.
@@ -325,6 +331,8 @@ impl<T> PKeyRef<T> {
     /// Returns the maximum size of a signature in bytes.
     #[corresponds(EVP_PKEY_size)]
     pub fn size(&self) -> usize {
+        // TODO: Next time we make backwards incompatible changes, the return type should be unified
+        //  with the Rsa, Dsa, etc APIs. u32 or usize?
         unsafe { ffi::EVP_PKEY_size(self.as_ptr()) as usize }
     }
 
@@ -616,16 +624,24 @@ impl<T> Clone for PKey<T> {
 
 impl<T> PKey<T> {
     /// Creates a new `PKey` containing an RSA key.
-    #[corresponds(EVP_PKEY_set1_RSA)]
     pub fn from_rsa(rsa: Rsa<T>) -> Result<PKey<T>, ErrorStack> {
         // TODO: Next time we make backwards incompatible changes, this could
         // become an `&RsaRef<T>`. Same for all the other `from_*` methods.
+        let pkey: PKey<T>;
+
+        #[cfg(ossl300)]
+        unsafe {
+            EVP_PKEY_up_ref(rsa.as_ptr());
+            pkey = PKey::from_ptr(rsa.as_ptr());
+        }
+
+        #[cfg(not(ossl300))]
         unsafe {
             let evp = cvt_p(ffi::EVP_PKEY_new())?;
-            let pkey = PKey::from_ptr(evp);
+            pkey = PKey::from_ptr(evp);
             cvt(ffi::EVP_PKEY_set1_RSA(pkey.0, rsa.as_ptr()))?;
-            Ok(pkey)
         }
+        Ok(pkey)
     }
 
     /// Creates a new `PKey` containing a DSA key.
@@ -1120,6 +1136,21 @@ cfg_if! {
         cstr_const!(pub(crate) OSSL_PKEY_PARAM_RSA_N, b"n\0");
         cstr_const!(pub(crate) OSSL_PKEY_PARAM_RSA_E, b"e\0");
         cstr_const!(pub(crate) OSSL_PKEY_PARAM_RSA_D, b"d\0");
+        cstr_const!(
+            /// rsa-factor1 (p)
+            pub(crate) OSSL_PKEY_PARAM_RSA_FACTOR1, b"rsa-factor1\0");
+        cstr_const!(
+            /// rsa-factor2 (q)
+            pub(crate) OSSL_PKEY_PARAM_RSA_FACTOR2, b"rsa-factor2\0");
+        cstr_const!(
+            /// rsa-exponent1 (dmp1)
+            pub(crate) OSSL_PKEY_PARAM_RSA_EXPONENT1, b"rsa-exponent1\0");
+        cstr_const!(
+            /// rsa-exponent2 (dmq1)
+            pub(crate) OSSL_PKEY_PARAM_RSA_EXPONENT2, b"rsa-exponent2\0");
+        cstr_const!(
+            /// rsa-coefficient1 (iqmp)
+            pub(crate) OSSL_PKEY_PARAM_RSA_COEFFICIENT1, b"rsa-coefficient1\0");
 
         cstr_const!(pub(crate) OSSL_SIGNATURE_PARAM_NONCE_TYPE, b"nonce-type\0");
     }
