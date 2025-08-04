@@ -479,8 +479,8 @@ mod test {
         let good_data = b"Some Crypto Text";
 
         // try to verify using only public components of the key
-        let n = rsa.n().to_owned().unwrap();
-        let e = rsa.e().to_owned().unwrap();
+        let n = rsa.n();
+        let e = rsa.e();
 
         let rsa = Rsa::from_public_components(n, e).unwrap();
         let key1 = PKey::from_rsa(rsa).unwrap();

@@ -1409,8 +1409,8 @@ mxJ7imIrEg9nIQ==
 
         let rsa = pkey.rsa().unwrap();
 
-        assert_eq!(rsa.n(), &n);
-        assert_eq!(rsa.e(), &e);
-        assert_eq!(rsa.d(), &d);
+        assert_eq!(rsa.n(), n);
+        assert_eq!(rsa.e(), e);
+        assert_eq!(rsa.d(), d);
     }
 }
