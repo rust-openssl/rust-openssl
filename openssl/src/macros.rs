@@ -567,7 +567,8 @@ macro_rules! cstr_const {
     // Safety: these all have null terminators.
     // We cen remove these CStr::from_bytes_with_nul_unchecked calls
     // when we upgrade to Rust 1.77+ with literal c"" syntax.
-    ($vis:vis $name:ident, $key:literal) => {
+    ($(#[$doc:meta])* $vis:vis $name:ident, $key:literal) => {
+        $(#[$doc])*
         #[allow(dead_code)]
         $vis const $name: &std::ffi::CStr = unsafe { std::ffi::CStr::from_bytes_with_nul_unchecked($key) };
     }

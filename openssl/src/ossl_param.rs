@@ -127,7 +127,6 @@ impl<'a> OsslParamBuilder<'a> {
     ///
     /// The array is initially empty.
     #[corresponds(OSSL_PARAM_BLD_new)]
-    #[cfg_attr(any(not(ossl320), osslconf = "OPENSSL_NO_ARGON2"), allow(dead_code))]
     pub(crate) fn new() -> Result<OsslParamBuilder<'a>, ErrorStack> {
         unsafe {
             ffi::init();
@@ -141,7 +140,6 @@ impl<'a> OsslParamBuilder<'a> {
 
     /// Constructs the `OsslParamArray` and clears this builder.
     #[corresponds(OSSL_PARAM_BLD_to_param)]
-    #[cfg_attr(any(not(ossl320), osslconf = "OPENSSL_NO_ARGON2"), allow(dead_code))]
     #[allow(clippy::wrong_self_convention)]
     pub(crate) fn to_param(&'a mut self) -> Result<OsslParamArray, ErrorStack> {
         unsafe {
@@ -185,7 +183,6 @@ impl<'a> OsslParamBuilder<'a> {
 
     /// Adds a `BigNum` to `OsslParamBuilder`.
     #[corresponds(OSSL_PARAM_BLD_push_BN)]
-    #[allow(dead_code)] // TODO: remove when when used by EVP_KEY.from_data
     pub(crate) fn add_bn(&mut self, key: &'a CStr, bn: &'a BigNumRef) -> Result<(), ErrorStack> {
         cvt(unsafe { ffi::OSSL_PARAM_BLD_push_BN(self.as_ptr(), key.as_ptr(), bn.as_ptr()) })
             .map(|_| ())
