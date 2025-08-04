@@ -41,6 +41,8 @@
 //! ```
 #![allow(clippy::missing_safety_doc)]
 use crate::bio::{MemBio, MemBioSlice};
+#[cfg(ossl300)]
+use crate::bn::BigNumRef;
 #[cfg(ossl110)]
 use crate::cipher::CipherRef;
 use crate::dh::Dh;
@@ -59,9 +61,13 @@ use crate::util::{invoke_passwd_cb, CallbackState};
 use crate::{cvt, cvt_p};
 use cfg_if::cfg_if;
 use foreign_types::{ForeignType, ForeignTypeRef};
+#[cfg(ossl300)]
+use libc::c_char;
 use libc::{c_int, c_long};
 use openssl_macros::corresponds;
 use std::convert::{TryFrom, TryInto};
+#[cfg(ossl300)]
+use std::ffi::c_uchar;
 use std::ffi::{CStr, CString};
 use std::fmt;
 #[cfg(all(not(any(boringssl, awslc)), ossl110))]
@@ -312,6 +318,64 @@ impl<T> PKeyRef<T> {
     #[corresponds(EVP_PKEY_size)]
     pub fn size(&self) -> usize {
         unsafe { ffi::EVP_PKEY_size(self.as_ptr()) as usize }
+    }
+
+    /// Returns the BigNum value associated with the given key name.
+    #[corresponds(EVP_PKEY_get_bn_param)]
+    #[cfg(ossl300)]
+    #[allow(dead_code)]
+    pub(crate) fn get_bn_param(&self, key: &CStr) -> Result<&BigNumRef, ErrorStack> {
+        let mut value = ptr::null_mut();
+        unsafe {
+            cvt(ffi::EVP_PKEY_get_bn_param(
+                self.as_ptr(),
+                key.as_ptr(),
+                &mut value,
+            ))?;
+            Ok(BigNumRef::from_ptr(value))
+        }
+    }
+
+    /// Returns the byte string value associated with the given key name.
+    #[corresponds(EVP_PKEY_get_octet_string_param)]
+    #[cfg(ossl300)]
+    #[allow(dead_code)]
+    pub(crate) fn get_byte_string_param(&self, key: &CStr) -> Result<Vec<u8>, ErrorStack> {
+        const VALUE_LEN: usize = 4096;
+        let mut value_buf: Vec<u8> = vec![0; VALUE_LEN];
+        let mut out_len: usize = 0;
+        unsafe {
+            cvt(ffi::EVP_PKEY_get_octet_string_param(
+                self.as_ptr(),
+                key.as_ptr(),
+                value_buf.as_mut_ptr().cast::<c_uchar>(),
+                VALUE_LEN,
+                &mut out_len,
+            ))?;
+        }
+        value_buf.truncate(out_len);
+        Ok(value_buf)
+    }
+
+    /// Returns the String value associated with the given key name.
+    #[corresponds(EVP_PKEY_get_utf8_string_param)]
+    #[cfg(ossl300)]
+    #[allow(dead_code)]
+    pub(crate) fn get_utf8_string_param(&self, key: &CStr) -> Result<String, ErrorStack> {
+        const VALUE_LEN: usize = 4096;
+        let mut value_buf: Vec<u8> = vec![0; VALUE_LEN];
+        let mut out_len: usize = 0;
+        unsafe {
+            cvt(ffi::EVP_PKEY_get_utf8_string_param(
+                self.as_ptr(),
+                key.as_ptr(),
+                value_buf.as_mut_ptr().cast::<c_char>(),
+                VALUE_LEN,
+                &mut out_len,
+            ))?;
+        }
+        value_buf.truncate(out_len);
+        Ok(String::from_utf8(value_buf).unwrap())
     }
 
     /// Converts the `PKey` to an `OsslParamArray`.
@@ -1060,6 +1124,8 @@ mod tests {
     #[cfg(not(boringssl))]
     use crate::dh::Dh;
     use crate::dsa::Dsa;
+    #[cfg(ossl300)]
+    use crate::ec::EcGroup;
     use crate::ec::EcKey;
     #[cfg(ossl300)]
     use crate::encrypt::{Decrypter, Encrypter};
@@ -1361,6 +1427,29 @@ mod tests {
 
         assert!(!pkey1.public_eq(&pkey2));
         assert!(Error::get().is_none());
+    }
+
+    #[cfg(ossl300)]
+    #[test]
+    fn test_get_bn_param() {
+        let rsa = Rsa::generate(2048).unwrap();
+        let pkey = PKey::from_rsa(rsa.clone()).unwrap();
+        assert_eq!(pkey.get_bn_param(OSSL_PKEY_PARAM_RSA_N).unwrap(), rsa.n());
+        assert_eq!(pkey.get_bn_param(OSSL_PKEY_PARAM_RSA_D).unwrap(), rsa.d());
+    }
+
+    #[cfg(ossl300)]
+    #[test]
+    fn test_get_utf8_string_param() {
+        let group = EcGroup::from_curve_name(Nid::X9_62_PRIME256V1).unwrap();
+        let ec = EcKey::generate(&group).unwrap();
+        let pkey = PKey::from_ec_key(ec.clone()).unwrap();
+
+        assert_eq!(
+            pkey.get_utf8_string_param(OSSL_PKEY_PARAM_GROUP_NAME)
+                .unwrap(),
+            String::from("prime256v1")
+        );
     }
 
     #[cfg(ossl300)]
