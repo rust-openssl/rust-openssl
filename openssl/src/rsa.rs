@@ -950,6 +950,32 @@ mod test {
     }
 
     #[test]
+    fn test_private_key_builder() {
+        let key = include_bytes!("../test/rsa.pem");
+        let rsa = Rsa::private_key_from_pem_passphrase(key, b"mypass").unwrap();
+
+        let rsa2 = Rsa::from_private_components(
+            rsa.n().to_owned().unwrap(),
+            rsa.e().to_owned().unwrap(),
+            rsa.d().to_owned().unwrap(),
+            rsa.p().unwrap().to_owned().unwrap(),
+            rsa.q().unwrap().to_owned().unwrap(),
+            rsa.dmp1().unwrap().to_owned().unwrap(),
+            rsa.dmq1().unwrap().to_owned().unwrap(),
+            rsa.iqmp().unwrap().to_owned().unwrap(),
+        )
+        .unwrap();
+        assert_eq!(rsa.n(), rsa2.n(), "n");
+        assert_eq!(rsa.e(), rsa2.e(), "e");
+        assert_eq!(rsa.d(), rsa2.d(), "d");
+        assert_eq!(rsa.p(), rsa2.p(), "p");
+        assert_eq!(rsa.q(), rsa2.q(), "q");
+        assert_eq!(rsa.dmp1(), rsa2.dmp1(), "dmp1");
+        assert_eq!(rsa.dmq1(), rsa2.dmq1(), "dmq1");
+        assert_eq!(rsa.iqmp(), rsa2.iqmp(), "iqmp");
+    }
+
+    #[test]
     fn generate_with_e() {
         let e = BigNum::from_u32(0x10001).unwrap();
         Rsa::generate_with_e(2048, &e).unwrap();
