@@ -176,11 +176,17 @@ impl<'a> OsslParamBuilder<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::bn::BigNum;
+    use crate::pkey::{
+        OSSL_PKEY_PARAM_GROUP_NAME, OSSL_PKEY_PARAM_PUB_KEY, OSSL_PKEY_PARAM_RSA_D,
+        OSSL_PKEY_PARAM_RSA_E, OSSL_PKEY_PARAM_RSA_N, OSSL_SIGNATURE_PARAM_NONCE_TYPE,
+    };
+
     #[test]
     fn test_builder_locate_octet_string() {
         let mut builder = OsslParamBuilder::new().unwrap();
         builder
-            .add_octet_string(CStr::from_bytes_with_nul(b"key1\0").unwrap(), b"value1")
+            .add_octet_string(OSSL_PKEY_PARAM_PUB_KEY, b"value1")
             .unwrap();
         let params = builder.to_param().unwrap();
 
@@ -188,10 +194,76 @@ mod tests {
             .locate_octet_string(CStr::from_bytes_with_nul(b"invalid\0").unwrap())
             .is_err());
         assert_eq!(
-            params
-                .locate_octet_string(CStr::from_bytes_with_nul(b"key1\0").unwrap())
-                .unwrap(),
+            params.locate_octet_string(OSSL_PKEY_PARAM_PUB_KEY).unwrap(),
             b"value1"
         );
+    }
+
+    fn assert_param(params: &OsslParamArray, key: &CStr, is_null: bool) {
+        let param = unsafe { ffi::OSSL_PARAM_locate_const(params.as_ptr(), key.as_ptr()) };
+        if is_null {
+            assert!(param.is_null(), "Unexpectedly found param: {key:?}");
+        } else {
+            assert!(!param.is_null(), "Failed to find param: {key:?}");
+        }
+    }
+
+    #[test]
+    fn test_param_builder_uint() {
+        let mut builder = OsslParamBuilder::new().unwrap();
+        builder
+            .add_uint(OSSL_SIGNATURE_PARAM_NONCE_TYPE, 42)
+            .unwrap();
+        let params = builder.to_param().unwrap();
+
+        assert_param(&params, OSSL_SIGNATURE_PARAM_NONCE_TYPE, false);
+        assert_param(&params, OSSL_PKEY_PARAM_GROUP_NAME, true);
+    }
+
+    #[test]
+    fn test_param_builder_bignum() {
+        let n = BigNum::from_u32(0xbc747fc5).unwrap();
+        let e = BigNum::from_u32(0x10001).unwrap();
+        let d = BigNum::from_u32(0x7b133399).unwrap();
+
+        let mut builder = OsslParamBuilder::new().unwrap();
+        builder.add_bn(OSSL_PKEY_PARAM_RSA_N, &n).unwrap();
+        builder.add_bn(OSSL_PKEY_PARAM_RSA_E, &e).unwrap();
+        builder.add_bn(OSSL_PKEY_PARAM_RSA_D, &d).unwrap();
+        let params = builder.to_param().unwrap();
+
+        for param in [
+            OSSL_PKEY_PARAM_RSA_N,
+            OSSL_PKEY_PARAM_RSA_E,
+            OSSL_PKEY_PARAM_RSA_D,
+        ] {
+            assert_param(&params, param, false);
+        }
+
+        assert_param(&params, OSSL_PKEY_PARAM_GROUP_NAME, true);
+    }
+
+    #[test]
+    fn test_param_builder_string() {
+        let mut builder = OsslParamBuilder::new().unwrap();
+        builder
+            .add_utf8_string(OSSL_PKEY_PARAM_GROUP_NAME, "primve256v1")
+            .unwrap();
+        let params = builder.to_param().unwrap();
+
+        assert_param(&params, OSSL_PKEY_PARAM_GROUP_NAME, false);
+        assert_param(&params, OSSL_PKEY_PARAM_RSA_N, true);
+    }
+
+    #[test]
+    fn test_param_builder_octet_string() {
+        let mut builder = OsslParamBuilder::new().unwrap();
+        builder
+            .add_octet_string(OSSL_PKEY_PARAM_PUB_KEY, b"foobar")
+            .unwrap();
+        let params = builder.to_param().unwrap();
+
+        assert_param(&params, OSSL_PKEY_PARAM_PUB_KEY, false);
+        assert_param(&params, OSSL_PKEY_PARAM_GROUP_NAME, true);
     }
 }
