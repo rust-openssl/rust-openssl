@@ -70,7 +70,7 @@ use crate::cipher::CipherRef;
 use crate::error::ErrorStack;
 use crate::md::MdRef;
 use crate::nid::Nid;
-#[cfg(ossl320)]
+#[cfg(ossl300)]
 use crate::ossl_param::OsslParamArrayRef;
 #[cfg(ossl320)]
 use crate::ossl_param::OsslParamBuilder;
@@ -479,6 +479,35 @@ impl<T> PkeyCtxRef<T> {
         }
 
         Ok(())
+    }
+
+    /// Prepares the context for creating a key from user data.
+    #[corresponds(EVP_PKEY_fromdata_init)]
+    #[inline]
+    #[cfg(ossl300)]
+    pub(crate) fn fromdata_init(&mut self) -> Result<(), ErrorStack> {
+        cvt(unsafe { ffi::EVP_PKEY_fromdata_init(self.as_ptr()) }).map(|_| ())
+    }
+
+    /// Convert a stack of Params into a PKey.
+    #[corresponds(EVP_PKEY_fromdata)]
+    #[inline]
+    #[cfg(ossl300)]
+    pub(crate) fn fromdata<K>(
+        &mut self,
+        params: &OsslParamArrayRef,
+        selection: Selection,
+    ) -> Result<PKey<K>, ErrorStack> {
+        let mut key_ptr = ptr::null_mut();
+        cvt(unsafe {
+            ffi::EVP_PKEY_fromdata(
+                self.as_ptr(),
+                &mut key_ptr,
+                selection.into(),
+                params.as_ptr(),
+            )
+        })?;
+        Ok(unsafe { PKey::from_ptr(key_ptr) })
     }
 
     /// Sets which algorithm was used to compute the digest used in a
@@ -962,6 +991,18 @@ impl<T> PkeyCtxRef<T> {
     }
 }
 
+/// Creates a new `PKey` from the given ID and parameters.
+#[cfg(ossl300)]
+#[allow(dead_code)] // TODO: remove when used by pkey creation
+pub(crate) fn pkey_from_params<K: SelectionT>(
+    id: Id,
+    params: &OsslParamArrayRef,
+) -> Result<PKey<K>, ErrorStack> {
+    let mut ctx = PkeyCtx::new_id(id)?;
+    ctx.fromdata_init()?;
+    ctx.fromdata(params, K::SELECTION)
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
@@ -972,7 +1013,11 @@ mod test {
     use crate::hash::{hash, MessageDigest};
     use crate::md::Md;
     use crate::nid::Nid;
+    #[cfg(ossl300)]
+    use crate::ossl_param::OsslParamBuilder;
     use crate::pkey::PKey;
+    #[cfg(ossl300)]
+    use crate::pkey::{OSSL_PKEY_PARAM_RSA_D, OSSL_PKEY_PARAM_RSA_E, OSSL_PKEY_PARAM_RSA_N};
     use crate::rsa::Rsa;
     use crate::sign::Verifier;
     #[cfg(not(boringssl))]
@@ -1345,5 +1390,27 @@ mxJ7imIrEg9nIQ==
         ctx.sign_to_vec(&hashed_input, &mut output).unwrap();
         assert_eq!(output, expected_output);
         assert!(ErrorStack::get().errors().is_empty());
+    }
+
+    #[test]
+    #[cfg(ossl300)]
+    fn test_pkey_from_params() {
+        let n = BigNum::from_u32(0xbc747fc5).unwrap();
+        let e = BigNum::from_u32(0x10001).unwrap();
+        let d = BigNum::from_u32(0x7b133399).unwrap();
+
+        let mut builder = OsslParamBuilder::new().unwrap();
+        builder.add_bn(OSSL_PKEY_PARAM_RSA_N, &n).unwrap();
+        builder.add_bn(OSSL_PKEY_PARAM_RSA_E, &e).unwrap();
+        builder.add_bn(OSSL_PKEY_PARAM_RSA_D, &d).unwrap();
+        let params = builder.to_param().unwrap();
+
+        let pkey: PKey<Private> = pkey_from_params(Id::RSA, &params).unwrap();
+
+        let rsa = pkey.rsa().unwrap();
+
+        assert_eq!(rsa.n(), &n);
+        assert_eq!(rsa.e(), &e);
+        assert_eq!(rsa.d(), &d);
     }
 }
