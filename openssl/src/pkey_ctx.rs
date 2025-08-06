@@ -70,10 +70,12 @@ use crate::cipher::CipherRef;
 use crate::error::ErrorStack;
 use crate::md::MdRef;
 use crate::nid::Nid;
-#[cfg(ossl300)]
+#[cfg(ossl320)]
 use crate::ossl_param::OsslParamArrayRef;
 #[cfg(ossl320)]
 use crate::ossl_param::OsslParamBuilder;
+#[cfg(ossl300)]
+use crate::pkey::Public;
 #[cfg(ossl320)]
 use crate::pkey::OSSL_SIGNATURE_PARAM_NONCE_TYPE;
 use crate::pkey::{HasPrivate, HasPublic, Id, PKey, PKeyRef, Params, Private};
@@ -129,6 +131,47 @@ impl NonceType {
 
     /// Uses a deterministic value for the nonce k as defined in RFC #6979 (See Section 3.2 “Generation of k”).
     pub const DETERMINISTIC_K: Self = NonceType(1);
+}
+
+cfg_if! {
+    if #[cfg(ossl300)] {
+        #[derive(Debug, PartialEq)]
+        pub(crate) enum Selection {
+            /// Key parameters
+            KeyParameters,
+            /// Public key (including parameters, if applicable).
+            PublicKey,
+            /// Keypair, which includes private key, public key, and parameters (if available).
+            Keypair,
+        }
+
+        impl From<Selection> for i32 {
+            fn from(value: Selection) -> Self {
+                match value {
+                    Selection::KeyParameters => ffi::EVP_PKEY_KEY_PARAMETERS,
+                    Selection::PublicKey => ffi::EVP_PKEY_PUBLIC_KEY,
+                    Selection::Keypair => ffi::EVP_PKEY_KEYPAIR,
+                }
+            }
+        }
+
+        /// Selection for fromdata/todata operation.
+        pub(crate) trait SelectionT {
+            const SELECTION: Selection;
+        }
+
+        impl SelectionT for Params  {
+            const SELECTION: Selection = Selection::KeyParameters;
+        }
+
+        impl SelectionT for Public  {
+            const SELECTION: Selection = Selection::PublicKey;
+        }
+
+        impl SelectionT for Private  {
+            const SELECTION: Selection = Selection::Keypair;
+        }
+    }
 }
 
 generic_foreign_type_and_impl_send_sync! {
