@@ -40,6 +40,17 @@ foreign_type_and_impl_send_sync! {
 }
 
 impl OsslParamArray {
+    /// Locate a parameter by the given key (returning a const reference).
+    #[corresponds(OSSL_PARAM_locate_const)]
+    fn locate_const(&self, key: &CStr) -> Option<*const ffi::OSSL_PARAM> {
+        let param = unsafe { ffi::OSSL_PARAM_locate_const(self.as_ptr(), key.as_ptr()) };
+        if param.is_null() {
+            None
+        } else {
+            Some(param)
+        }
+    }
+
     /// Locates the individual `OSSL_PARAM` element representing an
     /// octet string identified by the key in the `OsslParamArray`
     /// array and returns a reference to it.
@@ -48,8 +59,8 @@ impl OsslParamArray {
     #[corresponds(OSSL_PARAM_get_octet_string)]
     #[allow(dead_code)] // TODO: remove when when used by ML-DSA / ML-KEM
     pub(crate) fn locate_octet_string<'a>(&'a self, key: &CStr) -> Result<&'a [u8], ErrorStack> {
+        let param = self.locate_const(key).ok_or_else(ErrorStack::get)?;
         unsafe {
-            let param = cvt_p(ffi::OSSL_PARAM_locate(self.as_ptr(), key.as_ptr()))?;
             let mut val: *const c_void = ptr::null_mut();
             let mut val_len: usize = 0;
             cvt(ffi::OSSL_PARAM_get_octet_string_ptr(
@@ -200,11 +211,9 @@ mod tests {
     }
 
     fn assert_param(params: &OsslParamArray, key: &CStr, is_null: bool) {
-        let param = unsafe { ffi::OSSL_PARAM_locate_const(params.as_ptr(), key.as_ptr()) };
-        if is_null {
-            assert!(param.is_null(), "Unexpectedly found param: {key:?}");
-        } else {
-            assert!(!param.is_null(), "Failed to find param: {key:?}");
+        match params.locate_const(key) {
+            Some(_) => assert!(!is_null, "Unexpectedly found param: {key:?}"),
+            None => assert!(is_null, "Failed to find param: {key:?}"),
         }
     }
 
