@@ -371,12 +371,8 @@ mod tests {
             "8CF83642A709A097B447997640129DA299B1A47D1EB3750BA308B0FE64F5FBD3",
         )
         .unwrap();
-        let dh = Dh::from_params(
-            prime_p.to_owned().unwrap(),
-            generator.to_owned().unwrap(),
-            prime_q.to_owned().unwrap(),
-        )
-        .unwrap();
+        let dh =
+            Dh::from_params(prime_p.to_owned(), generator.to_owned(), prime_q.to_owned()).unwrap();
         ctx.set_tmp_dh(&dh).unwrap();
 
         assert_eq!(dh.prime_p(), &prime_p);
