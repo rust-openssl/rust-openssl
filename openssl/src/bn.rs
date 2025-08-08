@@ -133,6 +133,7 @@ impl BigNumContext {
 foreign_type_and_impl_send_sync! {
     type CType = ffi::BIGNUM;
     fn drop = ffi::BN_free;
+    fn clone = ffi::BN_dup;
 
     /// Dynamically sized large number implementation
     ///
