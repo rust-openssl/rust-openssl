@@ -178,6 +178,8 @@ pub mod nid;
 #[cfg(not(osslconf = "OPENSSL_NO_OCSP"))]
 pub mod ocsp;
 #[cfg(ossl300)]
+mod ossl_encdec;
+#[cfg(ossl300)]
 mod ossl_param;
 pub mod pkcs12;
 pub mod pkcs5;
