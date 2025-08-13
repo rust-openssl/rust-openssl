@@ -683,17 +683,37 @@ cfg_if! {
 #[cfg(test)]
 mod test {
     use crate::symm::Cipher;
+    use std::str::from_utf8;
 
     use super::*;
 
     #[test]
-    fn test_from_password() {
+    fn test_private_key_from_pem() {
+        Rsa::private_key_from_pem(include_bytes!("../test/rsa.pem")).unwrap();
+    }
+
+    #[test]
+    fn test_private_key_from_pem_pkcs1() {
+        Rsa::private_key_from_pem(include_bytes!("../test/rsa.pkcs1.pem")).unwrap();
+    }
+    #[test]
+    fn test_private_key_from_der() {
+        Rsa::private_key_from_der(include_bytes!("../test/rsa.der")).unwrap();
+    }
+
+    #[test]
+    fn test_private_key_from_der_pkcs1() {
+        Rsa::private_key_from_der(include_bytes!("../test/rsa.pkcs1.der")).unwrap();
+    }
+
+    #[test]
+    fn test_private_key_from_pem_password() {
         let key = include_bytes!("../test/rsa-encrypted.pem");
         Rsa::private_key_from_pem_passphrase(key, b"mypass").unwrap();
     }
 
     #[test]
-    fn test_from_password_callback() {
+    fn test_private_key_from_pem_callback() {
         let mut password_queried = false;
         let key = include_bytes!("../test/rsa-encrypted.pem");
         Rsa::private_key_from_pem_callback(key, |password| {
@@ -707,8 +727,18 @@ mod test {
     }
 
     #[test]
-    fn test_to_password() {
-        let key = Rsa::generate(2048).unwrap();
+    fn test_private_key_to_pem() {
+        let key = Rsa::private_key_from_der(include_bytes!("../test/rsa.der")).unwrap();
+        let pem = key.private_key_to_pem().unwrap();
+        assert_eq!(
+            from_utf8(&pem).unwrap(),
+            include_str!("../test/rsa.pkcs1.pem").replace("\r\n", "\n")
+        );
+    }
+
+    #[test]
+    fn test_private_key_to_pem_password() {
+        let key = Rsa::private_key_from_der(include_bytes!("../test/rsa.der")).unwrap();
         let pem = key
             .private_key_to_pem_passphrase(Cipher::aes_128_cbc(), b"foobar")
             .unwrap();
@@ -717,8 +747,15 @@ mod test {
     }
 
     #[test]
+    fn test_private_key_to_der_pkcs1() {
+        let key = super::Rsa::private_key_from_pem(include_bytes!("../test/rsa.pem")).unwrap();
+        let der = key.private_key_to_der().unwrap();
+        assert_eq!(der, include_bytes!("../test/rsa.pkcs1.der"));
+    }
+
+    #[test]
     fn test_public_encrypt_private_decrypt_with_padding() {
-        let key = include_bytes!("../test/rsa.pem.pub");
+        let key = include_bytes!("../test/rsa.pub.pem");
         let public_key = Rsa::public_key_from_pem(key).unwrap();
 
         let mut result = vec![0; public_key.size() as usize];
@@ -780,25 +817,48 @@ mod test {
     }
 
     #[test]
-    #[should_panic]
     fn test_public_key_from_pem_pkcs1_file_panic() {
         let key = include_bytes!("../test/key.pem.pub");
-        Rsa::public_key_from_pem_pkcs1(key).unwrap();
+        assert!(Rsa::public_key_from_pem_pkcs1(key).is_err());
     }
 
     #[test]
     fn test_public_key_to_pem_pkcs1() {
-        let keypair = super::Rsa::generate(512).unwrap();
+        let keypair = super::Rsa::private_key_from_der(include_bytes!("../test/rsa.der")).unwrap();
         let pubkey_pem = keypair.public_key_to_pem_pkcs1().unwrap();
-        super::Rsa::public_key_from_pem_pkcs1(&pubkey_pem).unwrap();
+        assert_eq!(
+            from_utf8(&pubkey_pem).unwrap(),
+            include_str!("../test/rsa.pub.pkcs1.pem").replace("\r\n", "\n")
+        );
     }
 
     #[test]
-    #[should_panic]
-    fn test_public_key_from_pem_pkcs1_generate_panic() {
-        let keypair = super::Rsa::generate(512).unwrap();
+    fn test_public_key_to_pem() {
+        let keypair = super::Rsa::private_key_from_der(include_bytes!("../test/rsa.der")).unwrap();
         let pubkey_pem = keypair.public_key_to_pem().unwrap();
-        super::Rsa::public_key_from_pem_pkcs1(&pubkey_pem).unwrap();
+        assert_eq!(
+            from_utf8(&pubkey_pem).unwrap(),
+            include_str!("../test/rsa.pub.pem").replace("\r\n", "\n")
+        );
+    }
+
+    #[test]
+    fn test_public_key_to_der() {
+        let keypair = super::Rsa::private_key_from_pem(include_bytes!("../test/rsa.pem")).unwrap();
+        let pubkey_der = keypair.public_key_to_der().unwrap();
+        assert_eq!(pubkey_der, include_bytes!("../test/rsa.pub.der"));
+    }
+
+    #[test]
+    fn test_public_key_to_der_pkcs1() {
+        let keypair = super::Rsa::private_key_from_pem(include_bytes!("../test/rsa.pem")).unwrap();
+        let pubkey_der = keypair.public_key_to_der_pkcs1().unwrap();
+        assert_eq!(pubkey_der, include_bytes!("../test/rsa.pub.pkcs1.der"));
+    }
+
+    #[test]
+    fn test_public_key_from_pem_pkcs1_generate_panic() {
+        assert!(Rsa::public_key_from_der_pkcs1(include_bytes!("../test/rsa.pub.der")).is_err());
     }
 
     #[test]
