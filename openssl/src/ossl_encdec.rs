@@ -1,12 +1,14 @@
-use crate::bio::MemBio;
+use crate::bio::{MemBio, MemBioSlice};
 use crate::error::ErrorStack;
-use crate::pkey::PKeyRef;
-use crate::pkey_ctx::Selection;
+use crate::pkey::{Id, PKey, PKeyRef};
+use crate::pkey_ctx::{Selection, SelectionT};
 use crate::symm::Cipher;
+use crate::util::{invoke_passwd_cb, CallbackState};
 use crate::{cvt, cvt_p};
 use foreign_types::{ForeignType, ForeignTypeRef};
 use openssl_macros::corresponds;
 use std::ffi::{CStr, CString};
+use std::marker::PhantomData;
 use std::ptr;
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
@@ -92,6 +94,206 @@ impl<'a> From<Structure<'a>> for &'a CStr {
             Structure::TypeSpecific => STRUCTURE_TYPE_SPECIFIC,
             Structure::Other(v) => v,
         }
+    }
+}
+
+foreign_type_and_impl_send_sync! {
+    type CType = ffi::OSSL_DECODER_CTX;
+    fn drop = ffi::OSSL_DECODER_CTX_free;
+
+    /// A context object which can perform decode operations.
+    pub struct OsslDecoderCtx;
+    /// A reference to an `OsslDecoderCtx`.
+    pub struct OsslDecoderCtxRef;
+}
+
+impl OsslDecoderCtx {
+    #[corresponds(OSSL_DECODER_CTX_new_for_pkey)]
+    #[inline]
+    #[allow(dead_code)]
+    fn new_for_key(
+        pkey: *mut *mut ffi::EVP_PKEY,
+        selection: Selection,
+        input: Option<KeyFormat>,
+        structure: Option<Structure<'_>>,
+        key_type: Option<Id>,
+    ) -> Result<Self, ErrorStack> {
+        let input_ptr = input
+            .map(|i| {
+                let input: &CStr = i.into();
+                input.as_ptr()
+            })
+            .unwrap_or_else(ptr::null);
+        let structure_ptr = structure
+            .map(|s| {
+                let structure: &CStr = s.into();
+                structure.as_ptr()
+            })
+            .unwrap_or_else(ptr::null);
+        let key_type_ptr = key_type
+            .and_then(|k| k.try_into().ok())
+            .map(|k: &CStr| k.as_ptr())
+            .unwrap_or_else(ptr::null);
+        unsafe {
+            let ptr = cvt_p(ffi::OSSL_DECODER_CTX_new_for_pkey(
+                pkey,
+                input_ptr,
+                structure_ptr,
+                key_type_ptr,
+                selection.into(),
+                ptr::null_mut(),
+                ptr::null(),
+            ))?;
+            Ok(Self::from_ptr(ptr))
+        }
+    }
+}
+
+impl OsslDecoderCtxRef {
+    /// Select which parts of the key to decode.
+    #[corresponds(OSSL_DECODER_CTX_set_selection)]
+    #[allow(dead_code)]
+    fn set_selection(&mut self, selection: Selection) -> Result<(), ErrorStack> {
+        cvt(unsafe { ffi::OSSL_DECODER_CTX_set_selection(self.as_ptr(), selection.into()) })
+            .map(|_| ())
+    }
+
+    /// Set the input type for the encoded data.
+    #[corresponds(OSSL_DECODER_CTX_set_input_type)]
+    #[allow(dead_code)]
+    fn set_input_type(&mut self, input: KeyFormat) -> Result<(), ErrorStack> {
+        let input: &CStr = input.into();
+        cvt(unsafe { ffi::OSSL_DECODER_CTX_set_input_type(self.as_ptr(), input.as_ptr()) })
+            .map(|_| ())
+    }
+
+    /// Set the input structure for the encoded data.
+    #[corresponds(OSSL_DECODER_CTX_set_input_structure)]
+    #[allow(dead_code)]
+    fn set_input_structure(&mut self, structure: Structure<'_>) -> Result<(), ErrorStack> {
+        let structure: &CStr = structure.into();
+        cvt(unsafe { ffi::OSSL_DECODER_CTX_set_input_structure(self.as_ptr(), structure.as_ptr()) })
+            .map(|_| ())
+    }
+
+    /// Set the passphrase to decrypt the encoded data.
+    #[corresponds(OSSL_DECODER_CTX_set_passphrase)]
+    #[allow(dead_code)]
+    fn set_passphrase(&mut self, passphrase: &[u8]) -> Result<(), ErrorStack> {
+        cvt(unsafe {
+            ffi::OSSL_DECODER_CTX_set_passphrase(
+                self.as_ptr(),
+                passphrase.as_ptr().cast(),
+                passphrase.len(),
+            )
+        })
+        .map(|_| ())
+    }
+
+    /// Set the passphrase to decrypt the encoded data.
+    #[corresponds(OSSL_DECODER_CTX_set_passphrase)]
+    #[allow(dead_code)]
+    unsafe fn set_passphrase_callback<F: FnOnce(&mut [u8]) -> Result<usize, ErrorStack>>(
+        &mut self,
+        callback: *mut CallbackState<F>,
+    ) -> Result<(), ErrorStack> {
+        cvt(unsafe {
+            ffi::OSSL_DECODER_CTX_set_pem_password_cb(
+                self.as_ptr(),
+                Some(invoke_passwd_cb::<F>),
+                callback as *mut _,
+            )
+        })
+        .map(|_| ())
+    }
+
+    /// Decode the encoded data
+    #[corresponds(OSSL_DECODER_from_bio)]
+    #[allow(dead_code)]
+    fn decode(&mut self, data: &[u8]) -> Result<(), ErrorStack> {
+        let bio = MemBioSlice::new(data)?;
+
+        cvt(unsafe { ffi::OSSL_DECODER_from_bio(self.as_ptr(), bio.as_ptr()) }).map(|_| ())
+    }
+}
+
+#[allow(dead_code)]
+pub(crate) struct Decoder<'a, T: SelectionT> {
+    selection: PhantomData<T>,
+    key_type: Option<Id>,
+    format: Option<KeyFormat>,
+    structure: Option<Structure<'a>>,
+    passphrase: Option<&'a [u8]>,
+    #[allow(clippy::type_complexity)]
+    passphrase_callback: Option<Box<dyn FnOnce(&mut [u8]) -> Result<usize, ErrorStack> + 'a>>,
+}
+
+impl<'a, T: SelectionT> Decoder<'a, T> {
+    #[allow(dead_code)]
+    pub(crate) fn new() -> Self {
+        Self {
+            selection: PhantomData,
+            key_type: None,
+            format: None,
+            structure: None,
+            passphrase: None,
+            passphrase_callback: None,
+        }
+    }
+
+    #[allow(dead_code)]
+    pub fn set_key_type(mut self, key_type: Id) -> Self {
+        self.key_type = Some(key_type);
+        self
+    }
+
+    #[allow(dead_code)]
+    pub fn set_format(mut self, format: KeyFormat) -> Self {
+        self.format = Some(format);
+        self
+    }
+
+    #[allow(dead_code)]
+    pub fn set_structure(mut self, structure: Structure<'a>) -> Self {
+        self.structure = Some(structure);
+        self
+    }
+
+    #[allow(dead_code)]
+    pub fn set_passphrase(mut self, passphrase: &'a [u8]) -> Self {
+        self.passphrase = Some(passphrase);
+        self
+    }
+
+    #[allow(dead_code)]
+    pub fn set_passphrase_callback<F: FnOnce(&mut [u8]) -> Result<usize, ErrorStack> + 'a>(
+        mut self,
+        callback: F,
+    ) -> Self {
+        self.passphrase_callback = Some(Box::new(callback));
+        self
+    }
+
+    #[allow(dead_code)]
+    pub fn decode(self, data: &[u8]) -> Result<PKey<T>, ErrorStack> {
+        let mut pkey_ptr = ptr::null_mut();
+        let mut passphrase_callback_state;
+        let mut ctx = OsslDecoderCtx::new_for_key(
+            &mut pkey_ptr,
+            T::SELECTION,
+            self.format,
+            self.structure,
+            self.key_type,
+        )?;
+        if let Some(passphrase) = self.passphrase {
+            ctx.set_passphrase(passphrase)?;
+        }
+        if let Some(passphrase_callback) = self.passphrase_callback {
+            passphrase_callback_state = CallbackState::new(passphrase_callback);
+            unsafe { ctx.set_passphrase_callback(&mut passphrase_callback_state)? };
+        }
+        ctx.decode(data)?;
+        Ok(unsafe { PKey::from_ptr(pkey_ptr) })
     }
 }
 
@@ -305,6 +507,149 @@ mod test {
             assert_eq!(text.to_bytes(), b"TEXT");
             assert_eq!(der.to_bytes(), b"DER");
             assert_eq!(pem.to_bytes(), b"PEM");
+        }
+    }
+
+    mod decoder {
+        use super::*;
+
+        mod params {
+            use super::*;
+            use crate::pkey::Params;
+
+            #[test]
+            fn test_dh_pem() {
+                Decoder::<Params>::new()
+                    .set_key_type(Id::DH)
+                    .set_format(KeyFormat::Pem)
+                    .set_structure(Structure::TypeSpecific)
+                    .decode(include_bytes!("../test/dhparams.pem"))
+                    .unwrap()
+                    .dh()
+                    .unwrap();
+            }
+
+            #[test]
+            fn test_dh_der() {
+                Decoder::<Params>::new()
+                    .set_key_type(Id::DH)
+                    .set_format(KeyFormat::Der)
+                    .set_structure(Structure::TypeSpecific)
+                    .decode(include_bytes!("../test/dhparams.der"))
+                    .unwrap()
+                    .dh()
+                    .unwrap();
+            }
+        }
+        mod public {
+            use super::*;
+            use crate::pkey::Public;
+
+            #[test]
+            fn test_rsa_pem() {
+                Decoder::<Public>::new()
+                    .set_key_type(Id::RSA)
+                    .set_format(KeyFormat::Pem)
+                    .set_structure(Structure::SubjectPublicKeyInfo)
+                    .decode(include_bytes!("../test/rsa.pem.pub"))
+                    .unwrap()
+                    .rsa()
+                    .unwrap();
+            }
+
+            #[test]
+            fn test_rsa_pem_pkcs1() {
+                Decoder::<Public>::new()
+                    .set_key_type(Id::RSA)
+                    .set_format(KeyFormat::Pem)
+                    .set_structure(Structure::PKCS1)
+                    .decode(include_bytes!("../test/pkcs1.pem.pub"))
+                    .unwrap()
+                    .rsa()
+                    .unwrap();
+            }
+
+            #[test]
+            fn test_rsa_der() {
+                Decoder::<Public>::new()
+                    .set_key_type(Id::RSA)
+                    .set_format(KeyFormat::Der)
+                    .set_structure(Structure::SubjectPublicKeyInfo)
+                    .decode(include_bytes!("../test/key.der.pub"))
+                    .unwrap()
+                    .rsa()
+                    .unwrap();
+            }
+
+            #[test]
+            fn test_rsa_der_pkcs1() {
+                Decoder::<Public>::new()
+                    .set_key_type(Id::RSA)
+                    .set_format(KeyFormat::Der)
+                    .set_structure(Structure::PKCS1)
+                    .decode(include_bytes!("../test/pkcs1.der.pub"))
+                    .unwrap()
+                    .rsa()
+                    .unwrap();
+            }
+        }
+        mod private {
+            use super::*;
+            use crate::pkey::Private;
+
+            #[test]
+            fn test_rsa_pem() {
+                Decoder::<Private>::new()
+                    .set_key_type(Id::RSA)
+                    .set_format(KeyFormat::Pem)
+                    .set_structure(Structure::PKCS1)
+                    .decode(include_bytes!("../test/rsa.pem"))
+                    .unwrap()
+                    .rsa()
+                    .unwrap();
+            }
+
+            #[test]
+            fn test_rsa_pem_passphrase() {
+                Decoder::<Private>::new()
+                    .set_key_type(Id::RSA)
+                    .set_format(KeyFormat::Pem)
+                    .set_structure(Structure::PKCS1)
+                    .set_passphrase(b"mypass")
+                    .decode(include_bytes!("../test/rsa-encrypted.pem"))
+                    .unwrap()
+                    .rsa()
+                    .unwrap();
+            }
+
+            #[test]
+            fn test_rsa_pem_callback() {
+                let mut password_queried = false;
+                Decoder::<Private>::new()
+                    .set_key_type(Id::RSA)
+                    .set_format(KeyFormat::Pem)
+                    .set_structure(Structure::PKCS1)
+                    .set_passphrase_callback(|password| {
+                        password_queried = true;
+                        password[..6].copy_from_slice(b"mypass");
+                        Ok(6)
+                    })
+                    .decode(include_bytes!("../test/rsa-encrypted.pem"))
+                    .unwrap();
+                assert!(password_queried);
+            }
+
+            #[test]
+            fn test_rsa_der() {
+                Decoder::<Private>::new()
+                    .set_key_type(Id::RSA)
+                    .set_format(KeyFormat::Der)
+                    .set_structure(Structure::PKCS1)
+                    .decode(include_bytes!("../test/key.der"))
+                    .unwrap()
+                    .rsa()
+                    .unwrap();
+            }
         }
     }
 
