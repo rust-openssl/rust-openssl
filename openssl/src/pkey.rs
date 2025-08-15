@@ -62,7 +62,7 @@ use foreign_types::{ForeignType, ForeignTypeRef};
 use libc::{c_int, c_long};
 use openssl_macros::corresponds;
 use std::convert::{TryFrom, TryInto};
-use std::ffi::CString;
+use std::ffi::{CStr, CString};
 use std::fmt;
 #[cfg(all(not(any(boringssl, awslc)), ossl110))]
 use std::mem;
@@ -153,6 +153,68 @@ impl TryFrom<Id> for &'static str {
             Id::X448 => Ok("X448"),
             #[cfg(ossl111)]
             Id::POLY1305 => Ok("POLY1305"),
+            _ => Err(()),
+        }
+    }
+}
+
+cstr_const!(ID_RSA, b"RSA\0");
+#[cfg(any(ossl111, libressl310, boringssl, awslc))]
+cstr_const!(ID_RSA_PSS, b"RSA-PSS\0");
+#[cfg(not(boringssl))]
+cstr_const!(ID_HMAC, b"HMAC\0");
+#[cfg(not(any(boringssl, awslc)))]
+cstr_const!(ID_CMAC, b"CMAC\0");
+cstr_const!(ID_DSA, b"DSA\0");
+cstr_const!(ID_DH, b"DH\0");
+#[cfg(ossl110)]
+cstr_const!(ID_DHX, b"DHX\0");
+cstr_const!(ID_EC, b"EC\0");
+#[cfg(ossl111)]
+cstr_const!(ID_SM2, b"SM2\0");
+#[cfg(any(ossl110, boringssl, libressl360, awslc))]
+cstr_const!(ID_HKDF, b"HKDF\0");
+#[cfg(any(ossl111, boringssl, libressl370, awslc))]
+cstr_const!(ID_ED25519, b"Ed25519\0");
+#[cfg(ossl111)]
+cstr_const!(ID_ED448, b"Ed448\0");
+#[cfg(any(ossl111, boringssl, libressl370, awslc))]
+cstr_const!(ID_X25519, b"X25519\0");
+#[cfg(ossl111)]
+cstr_const!(ID_X448, b"X448\0");
+#[cfg(ossl111)]
+cstr_const!(ID_POLY1305, b"POLY1305\0");
+
+impl TryFrom<Id> for &'static CStr {
+    type Error = ();
+    fn try_from(id: Id) -> Result<Self, Self::Error> {
+        match id {
+            Id::RSA => Ok(ID_RSA),
+            #[cfg(any(ossl111, libressl310, boringssl, awslc))]
+            Id::RSA_PSS => Ok(ID_RSA_PSS),
+            #[cfg(not(boringssl))]
+            Id::HMAC => Ok(ID_HMAC),
+            #[cfg(not(any(boringssl, awslc)))]
+            Id::CMAC => Ok(ID_CMAC),
+            Id::DSA => Ok(ID_DSA),
+            Id::DH => Ok(ID_DH),
+            #[cfg(ossl110)]
+            Id::DHX => Ok(ID_DHX),
+            Id::EC => Ok(ID_EC),
+            #[cfg(ossl111)]
+            Id::SM2 => Ok(ID_SM2),
+            #[cfg(any(ossl110, boringssl, libressl360, awslc))]
+            Id::HKDF => Ok(ID_HKDF),
+            #[cfg(any(ossl111, boringssl, libressl370, awslc))]
+            Id::ED25519 => Ok(ID_ED25519),
+            #[cfg(ossl111)]
+            Id::ED448 => Ok(ID_ED448),
+            #[cfg(any(ossl111, boringssl, libressl370, awslc))]
+            Id::X25519 => Ok(ID_X25519),
+            #[cfg(ossl111)]
+            Id::X448 => Ok(ID_X448),
+            #[cfg(ossl111)]
+            Id::POLY1305 => Ok(ID_POLY1305),
             _ => Err(()),
         }
     }
