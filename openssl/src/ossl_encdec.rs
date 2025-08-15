@@ -314,7 +314,7 @@ mod test {
         mod params {
             use super::*;
             use crate::dh::Dh;
-            use crate::pkey::Params;
+            use crate::pkey::{Id, Params};
             use crate::pkey_ctx::PkeyCtx;
 
             fn generate_dh_params() -> Result<PKey<Params>, ErrorStack> {
