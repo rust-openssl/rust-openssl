@@ -267,6 +267,124 @@ macro_rules! generic_foreign_type_and_impl_send_sync {
         unsafe impl<T> Sync for $owned<T>{}
         unsafe impl<T> Sync for $borrowed<T>{}
     };
+    (
+        $(#[$impl_attr:meta])*
+        type CType = $ctype:ty;
+        fn drop = $drop:expr;
+        $(fn clone = $clone:expr;)*
+
+        $(#[$owned_attr:meta])*
+        pub struct $owned:ident<T>;
+        $(#[$borrowed_attr:meta])*
+        pub struct $borrowed:ident<T>;
+        key_id = $key_id:path;
+        pkey_type = $pkey_type:ident;
+    ) => {
+        cfg_if::cfg_if!{
+            if #[cfg(ossl300)] {
+                use crate::pkey::KeyID;
+
+                $(#[$owned_attr])*
+                pub struct $owned<T>(crate::pkey::PKey<T>);
+
+                impl<T> crate::pkey::KeyID for $owned<T>{
+                    const ID: crate::pkey::Id = $key_id;
+                }
+
+                $(#[$impl_attr])*
+                impl<T> ForeignType for $owned<T> {
+                    type CType = ffi::EVP_PKEY;
+                    type Ref = $borrowed<T>;
+
+                    #[inline]
+                    unsafe fn from_ptr(ptr: *mut ffi::EVP_PKEY) -> $owned<T> {
+                        Self(crate::pkey::PKey::from_ptr(ptr))
+                    }
+
+                    #[inline]
+                    fn as_ptr(&self) -> *mut ffi::EVP_PKEY {
+                        self.0.as_ptr()
+                    }
+                }
+
+                impl<T> Clone for $owned<T> {
+                    #[inline]
+                    fn clone(&self) -> $owned<T> {
+                        Self(self.0.clone())
+                    }
+                }
+
+                impl<T> ToOwned for $borrowed<T> {
+                    type Owned = $owned<T>;
+
+                    #[inline]
+                    fn to_owned(&self) -> $owned<T> {
+                        self.0.$pkey_type().unwrap()
+                    }
+                }
+
+                impl<T> std::ops::Deref for $owned<T> {
+                    type Target = $borrowed<T>;
+
+                    #[inline]
+                    fn deref(&self) -> &$borrowed<T> {
+                        unsafe { $borrowed::from_ptr(self.as_ptr()) }
+                    }
+                }
+
+                impl<T> std::ops::DerefMut for $owned<T> {
+                    #[inline]
+                    fn deref_mut(&mut self) -> &mut $borrowed<T> {
+                        unsafe { $borrowed::from_ptr_mut(self.as_ptr()) }
+                    }
+                }
+
+                impl<T> std::borrow::Borrow<$borrowed<T>> for $owned<T> {
+                    #[inline]
+                    fn borrow(&self) -> &$borrowed<T> {
+                        self
+                    }
+                }
+
+                impl<T> AsRef<$borrowed<T>> for $owned<T> {
+                    #[inline]
+                    fn as_ref(&self) -> &$borrowed<T> {
+                        self
+                    }
+                }
+
+                $(#[$borrowed_attr])*
+                pub struct $borrowed<T>(crate::pkey::PKeyRef<T>);
+
+                impl<T> ForeignTypeRef for $borrowed<T> {
+                    type CType = ffi::EVP_PKEY;
+                }
+
+                unsafe impl<T> Send for $owned<T>{}
+                unsafe impl<T> Send for $borrowed<T>{}
+                unsafe impl<T> Sync for $owned<T>{}
+                unsafe impl<T> Sync for $borrowed<T>{}
+
+                impl<T> From<&$borrowed<T>> for crate::pkey::PKey<T> {
+                    fn from(value: &$borrowed<T>) -> Self {
+                        value.0.to_owned()
+                    }
+                }
+            } else {
+                generic_foreign_type_and_impl_send_sync!{
+                    $(#[$impl_attr])*
+                    type CType = $ctype;
+                    fn drop = $drop;
+                    $(fn clone = $clone;)*
+
+                    $(#[$owned_attr])*
+                    pub struct $owned<T>;
+                    $(#[$borrowed_attr])*
+                    pub struct $borrowed<T>;
+                }
+            }
+        }
+    }
 }
 
 #[cfg_attr(not(ossl300), allow(unused_macros))]
