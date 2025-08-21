@@ -260,6 +260,11 @@ impl<T> ToOwned for PKeyRef<T> {
     }
 }
 
+#[cfg(ossl110)]
+pub trait KeyCheck {
+    fn check_key(&self) -> Result<(), ErrorStack>;
+}
+
 impl<T> PKeyRef<T> {
     /// Returns a copy of the internal RSA key.
     #[corresponds(EVP_PKEY_get1_RSA)]
@@ -319,6 +324,16 @@ impl<T> PKeyRef<T> {
         let mut params = ptr::null_mut();
         cvt(unsafe { ffi::EVP_PKEY_todata(self.as_ptr(), selection.into(), &mut params) })?;
         Ok(unsafe { OsslParamArray::from_ptr(params) })
+    }
+}
+
+#[cfg(ossl111)]
+impl KeyCheck for PKeyRef<Params> {
+    /// Validates the key parameters.
+    #[corresponds(EVP_PKEY_param_check)]
+    fn check_key(&self) -> Result<(), ErrorStack> {
+        let ctx = PkeyCtx::new(self)?;
+        cvt(unsafe { ffi::EVP_PKEY_param_check(ctx.as_ptr()) }).map(|_| ())
     }
 }
 
@@ -396,6 +411,16 @@ where
             buf.truncate(len);
             Ok(buf)
         }
+    }
+}
+
+#[cfg(ossl111)]
+impl KeyCheck for PKeyRef<Public> {
+    /// Validates the public key parameters.
+    #[corresponds(EVP_PKEY_public_check)]
+    fn check_key(&self) -> Result<(), ErrorStack> {
+        let ctx = PkeyCtx::new(self)?;
+        cvt(unsafe { ffi::EVP_PKEY_public_check(ctx.as_ptr()) }).map(|_| ())
     }
 }
 
@@ -490,6 +515,16 @@ where
 
             Ok(bio.get_buf().to_owned())
         }
+    }
+}
+
+#[cfg(ossl111)]
+impl KeyCheck for PKeyRef<Private> {
+    /// Validates the private key parameters.
+    #[corresponds(EVP_PKEY_check)]
+    fn check_key(&self) -> Result<(), ErrorStack> {
+        let ctx = PkeyCtx::new(self)?;
+        cvt(unsafe { ffi::EVP_PKEY_check(ctx.as_ptr()) }).map(|_| ())
     }
 }
 
