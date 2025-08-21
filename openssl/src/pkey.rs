@@ -298,10 +298,17 @@ impl<T> PKeyRef<T> {
     /// Returns a copy of the internal DSA key.
     #[corresponds(EVP_PKEY_get1_DSA)]
     pub fn dsa(&self) -> Result<Dsa<T>, ErrorStack> {
-        unsafe {
-            let dsa = cvt_p(ffi::EVP_PKEY_get1_DSA(self.as_ptr()))?;
-            Ok(Dsa::from_ptr(dsa))
+        if self.id() != Id::DSA {
+            return Err(ErrorStack::get());
         }
+
+        let dsa = self.as_ptr();
+        #[cfg(ossl300)]
+        cvt(unsafe { ffi::EVP_PKEY_up_ref(dsa) })?;
+        #[cfg(not(ossl300))]
+        let dsa = cvt_p(unsafe { ffi::EVP_PKEY_get1_DSA(dsa) })?;
+
+        Ok(unsafe { Dsa::from_ptr(dsa) })
     }
 
     /// Returns a copy of the internal DH key.
@@ -647,12 +654,21 @@ impl<T> PKey<T> {
     /// Creates a new `PKey` containing a DSA key.
     #[corresponds(EVP_PKEY_set1_DSA)]
     pub fn from_dsa(dsa: Dsa<T>) -> Result<PKey<T>, ErrorStack> {
+        let pkey: PKey<T>;
+
+        #[cfg(ossl300)]
+        unsafe {
+            ffi::EVP_PKEY_up_ref(dsa.as_ptr());
+            pkey = PKey::from_ptr(dsa.as_ptr());
+        }
+
+        #[cfg(not(ossl300))]
         unsafe {
             let evp = cvt_p(ffi::EVP_PKEY_new())?;
-            let pkey = PKey::from_ptr(evp);
+            pkey = PKey::from_ptr(evp);
             cvt(ffi::EVP_PKEY_set1_DSA(pkey.0, dsa.as_ptr()))?;
-            Ok(pkey)
         }
+        Ok(pkey)
     }
 
     /// Creates a new `PKey` containing a Diffie-Hellman key.

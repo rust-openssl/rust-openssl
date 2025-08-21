@@ -7,17 +7,34 @@
 
 use cfg_if::cfg_if;
 use foreign_types::{ForeignType, ForeignTypeRef};
-#[cfg(not(any(boringssl, awslc)))]
+#[cfg(not(any(ossl110, libressl273, boringssl, awslc)))]
 use libc::c_int;
 use std::fmt;
 use std::mem;
 use std::ptr;
 
 use crate::bn::{BigNum, BigNumRef};
+#[cfg(not(ossl300))]
+use crate::cvt;
+use crate::cvt_p;
 use crate::error::ErrorStack;
+#[cfg(ossl300)]
+use crate::ossl_encdec::Structure;
+#[cfg(ossl300)]
+use crate::ossl_param::OsslParamBuilder;
+#[cfg(not(boringssl))]
+use crate::pkey::Id;
 use crate::pkey::{HasParams, HasPrivate, HasPublic, Params, Private, Public};
+#[cfg(ossl300)]
+use crate::pkey::{
+    OSSL_PKEY_PARAM_FFC_G, OSSL_PKEY_PARAM_FFC_P, OSSL_PKEY_PARAM_FFC_Q, OSSL_PKEY_PARAM_PRIV_KEY,
+    OSSL_PKEY_PARAM_PUB_KEY,
+};
+#[cfg(not(boringssl))]
+use crate::pkey_ctx::PkeyCtx;
+#[cfg(ossl300)]
+use crate::pkey_ctx::{pkey_from_params, Selection};
 use crate::util::ForeignTypeRefExt;
-use crate::{cvt, cvt_p};
 use openssl_macros::corresponds;
 
 generic_foreign_type_and_impl_send_sync! {
@@ -60,14 +77,19 @@ generic_foreign_type_and_impl_send_sync! {
     ///
     /// [`Dsa`]: struct.Dsa.html
     pub struct DsaRef<T>;
+
+    key_id = Id::DSA;
+    pkey_type = dsa;
 }
 
+#[cfg(not(ossl300))]
 impl<T> Clone for Dsa<T> {
     fn clone(&self) -> Dsa<T> {
         (**self).to_owned()
     }
 }
 
+#[cfg(not(ossl300))]
 impl<T> ToOwned for DsaRef<T> {
     type Owned = Dsa<T>;
 
@@ -87,25 +109,34 @@ where
         /// Serializes the public key into a PEM-encoded SubjectPublicKeyInfo structure.
         ///
         /// The output will have a header of `-----BEGIN PUBLIC KEY-----`.
-        #[corresponds(PEM_write_bio_DSA_PUBKEY)]
+        #[cfg_attr(not(ossl300), corresponds(PEM_write_bio_DSA_PUBKEY))]
         public_key_to_pem,
+        Selection::PublicKey,
+        Structure::SubjectPublicKeyInfo,
         ffi::PEM_write_bio_DSA_PUBKEY
     }
 
     to_der! {
         /// Serializes the public key into a DER-encoded SubjectPublicKeyInfo structure.
-        #[corresponds(i2d_DSA_PUBKEY)]
+        #[cfg_attr(not(ossl300), corresponds(i2d_DSA_PUBKEY))]
         public_key_to_der,
+        Selection::PublicKey,
+        Structure::SubjectPublicKeyInfo,
         ffi::i2d_DSA_PUBKEY
     }
 
     /// Returns a reference to the public key component of `self`.
-    #[corresponds(DSA_get0_key)]
-    pub fn pub_key(&self) -> &BigNumRef {
+    #[cfg_attr(not(ossl300), corresponds(DSA_get0_key))]
+    pub fn pub_key(&self) -> BigNum {
+        #[cfg(ossl300)]
+        return self.0.get_bn_param(OSSL_PKEY_PARAM_PUB_KEY).unwrap();
+
+        #[cfg(not(ossl300))]
         unsafe {
             let mut pub_key = ptr::null();
             DSA_get0_key(self.as_ptr(), &mut pub_key, ptr::null_mut());
-            BigNumRef::from_const_ptr(pub_key)
+            pub_key = ffi::BN_dup(pub_key);
+            BigNum::from_const_ptr(pub_key)
         }
     }
 }
@@ -118,30 +149,39 @@ where
         /// Serializes the private key to a PEM-encoded DSAPrivateKey structure.
         ///
         /// The output will have a header of `-----BEGIN DSA PRIVATE KEY-----`.
-        #[corresponds(PEM_write_bio_DSAPrivateKey)]
+        #[cfg_attr(not(ossl300), corresponds(PEM_write_bio_DSAPrivateKey))]
         private_key_to_pem,
         /// Serializes the private key to a PEM-encoded encrypted DSAPrivateKey structure.
         ///
         /// The output will have a header of `-----BEGIN DSA PRIVATE KEY-----`.
-        #[corresponds(PEM_write_bio_DSAPrivateKey)]
+        #[cfg_attr(not(ossl300), corresponds(PEM_write_bio_DSAPrivateKey))]
         private_key_to_pem_passphrase,
+        Selection::Keypair,
+        Structure::TypeSpecific,
         ffi::PEM_write_bio_DSAPrivateKey
     }
 
     to_der! {
         /// Serializes the private_key to a DER-encoded `DSAPrivateKey` structure.
-        #[corresponds(i2d_DSAPrivateKey)]
+        #[cfg_attr(not(ossl300), corresponds(i2d_DSAPrivateKey))]
         private_key_to_der,
+        Selection::Keypair,
+        Structure::TypeSpecific,
         ffi::i2d_DSAPrivateKey
     }
 
     /// Returns a reference to the private key component of `self`.
-    #[corresponds(DSA_get0_key)]
-    pub fn priv_key(&self) -> &BigNumRef {
+    #[cfg_attr(not(ossl300), corresponds(DSA_get0_key))]
+    pub fn priv_key(&self) -> BigNum {
+        #[cfg(ossl300)]
+        return self.0.get_bn_param(OSSL_PKEY_PARAM_PRIV_KEY).unwrap();
+
+        #[cfg(not(ossl300))]
         unsafe {
             let mut priv_key = ptr::null();
             DSA_get0_key(self.as_ptr(), ptr::null_mut(), &mut priv_key);
-            BigNumRef::from_const_ptr(priv_key)
+            priv_key = ffi::BN_dup(priv_key);
+            BigNum::from_const_ptr(priv_key)
         }
     }
 }
@@ -151,50 +191,78 @@ where
     T: HasParams,
 {
     /// Returns the maximum size of the signature output by `self` in bytes.
-    #[corresponds(DSA_size)]
+    #[cfg_attr(not(ossl300), corresponds(DSA_size))]
     pub fn size(&self) -> u32 {
-        unsafe { ffi::DSA_size(self.as_ptr()) as u32 }
+        #[cfg(ossl300)]
+        return self.0.size() as u32;
+
+        #[cfg(not(ossl300))]
+        unsafe {
+            ffi::DSA_size(self.as_ptr()) as u32
+        }
     }
 
     /// Returns the DSA prime parameter of `self`.
-    #[corresponds(DSA_get0_pqg)]
-    pub fn p(&self) -> &BigNumRef {
+    #[cfg_attr(not(ossl300), corresponds(DSA_get0_pqg))]
+    pub fn p(&self) -> BigNum {
+        #[cfg(ossl300)]
+        return self.0.get_bn_param(OSSL_PKEY_PARAM_FFC_P).unwrap();
+
+        #[cfg(not(ossl300))]
         unsafe {
             let mut p = ptr::null();
             DSA_get0_pqg(self.as_ptr(), &mut p, ptr::null_mut(), ptr::null_mut());
-            BigNumRef::from_const_ptr(p)
+            p = ffi::BN_dup(p);
+            BigNum::from_const_ptr(p)
         }
     }
 
     /// Returns the DSA sub-prime parameter of `self`.
-    #[corresponds(DSA_get0_pqg)]
-    pub fn q(&self) -> &BigNumRef {
+    #[cfg_attr(not(ossl300), corresponds(DSA_get0_pqg))]
+    pub fn q(&self) -> BigNum {
+        #[cfg(ossl300)]
+        return self.0.get_bn_param(OSSL_PKEY_PARAM_FFC_Q).unwrap();
+
+        #[cfg(not(ossl300))]
         unsafe {
             let mut q = ptr::null();
             DSA_get0_pqg(self.as_ptr(), ptr::null_mut(), &mut q, ptr::null_mut());
-            BigNumRef::from_const_ptr(q)
+            q = ffi::BN_dup(q);
+            BigNum::from_const_ptr(q)
         }
     }
 
     /// Returns the DSA base parameter of `self`.
-    #[corresponds(DSA_get0_pqg)]
-    pub fn g(&self) -> &BigNumRef {
+    #[cfg_attr(not(ossl300), corresponds(DSA_get0_pqg))]
+    pub fn g(&self) -> BigNum {
+        #[cfg(ossl300)]
+        return self.0.get_bn_param(OSSL_PKEY_PARAM_FFC_G).unwrap();
+
+        #[cfg(not(ossl300))]
         unsafe {
             let mut g = ptr::null();
             DSA_get0_pqg(self.as_ptr(), ptr::null_mut(), ptr::null_mut(), &mut g);
-            BigNumRef::from_const_ptr(g)
+            g = ffi::BN_dup(g);
+            BigNum::from_const_ptr(g)
         }
     }
 }
-#[cfg(any(boringssl, awslc))]
-type BitType = libc::c_uint;
-#[cfg(not(any(boringssl, awslc)))]
-type BitType = c_int;
 
 impl Dsa<Params> {
     /// Creates a DSA params based upon the given parameters.
-    #[corresponds(DSA_set0_pqg)]
+    #[cfg_attr(not(ossl300), corresponds(DSA_set0_pqg))]
     pub fn from_pqg(p: BigNum, q: BigNum, g: BigNum) -> Result<Dsa<Params>, ErrorStack> {
+        #[cfg(ossl300)]
+        return {
+            let mut builder = OsslParamBuilder::new()?;
+            builder.add_bn(OSSL_PKEY_PARAM_FFC_P, &p)?;
+            builder.add_bn(OSSL_PKEY_PARAM_FFC_Q, &q)?;
+            builder.add_bn(OSSL_PKEY_PARAM_FFC_G, &g)?;
+            let params = builder.to_param()?;
+            pkey_from_params(Id::DSA, &params)?.dsa()
+        };
+
+        #[cfg(not(ossl300))]
         unsafe {
             let dsa = Dsa::from_ptr(cvt_p(ffi::DSA_new())?);
             cvt(DSA_set0_pqg(dsa.0, p.as_ptr(), q.as_ptr(), g.as_ptr()))?;
@@ -204,14 +272,23 @@ impl Dsa<Params> {
     }
 
     /// Generates DSA params based on the given number of bits.
-    #[corresponds(DSA_generate_parameters_ex)]
+    #[cfg_attr(not(ossl300), corresponds(DSA_generate_parameters_ex))]
+    #[cfg(not(boringssl))]
     pub fn generate_params(bits: u32) -> Result<Dsa<Params>, ErrorStack> {
-        ffi::init();
+        let mut ctx = PkeyCtx::new_id(Id::DSA)?;
+        ctx.paramgen_init()?;
+        ctx.set_dsa_paramgen_bits(bits)?;
+        ctx.paramgen()?.dsa()
+    }
+
+    /// Generates DSA params based on the given number of bits.
+    #[cfg(boringssl)]
+    pub fn generate_params(bits: u32) -> Result<Dsa<Params>, ErrorStack> {
         unsafe {
             let dsa = Dsa::from_ptr(cvt_p(ffi::DSA_new())?);
             cvt(ffi::DSA_generate_parameters_ex(
                 dsa.0,
-                bits as BitType,
+                bits as libc::c_uint,
                 ptr::null(),
                 0,
                 ptr::null_mut(),
@@ -223,8 +300,16 @@ impl Dsa<Params> {
     }
 
     /// Generates a private key based on the DSA params.
-    #[corresponds(DSA_generate_key)]
+    #[cfg_attr(not(ossl300), corresponds(DSA_generate_key))]
     pub fn generate_key(self) -> Result<Dsa<Private>, ErrorStack> {
+        #[cfg(ossl300)]
+        return {
+            let mut ctx = PkeyCtx::new(&self.0)?;
+            ctx.keygen_init()?;
+            ctx.keygen()?.dsa()
+        };
+
+        #[cfg(not(ossl300))]
         unsafe {
             let dsa_ptr = self.0;
             cvt(ffi::DSA_generate_key(dsa_ptr))?;
@@ -255,7 +340,19 @@ impl Dsa<Private> {
         priv_key: BigNum,
         pub_key: BigNum,
     ) -> Result<Dsa<Private>, ErrorStack> {
-        ffi::init();
+        #[cfg(ossl300)]
+        return {
+            let mut builder = OsslParamBuilder::new()?;
+            builder.add_bn(OSSL_PKEY_PARAM_FFC_P, &p)?;
+            builder.add_bn(OSSL_PKEY_PARAM_FFC_Q, &q)?;
+            builder.add_bn(OSSL_PKEY_PARAM_FFC_G, &g)?;
+            builder.add_bn(OSSL_PKEY_PARAM_PRIV_KEY, &priv_key)?;
+            builder.add_bn(OSSL_PKEY_PARAM_PUB_KEY, &pub_key)?;
+            let params = builder.to_param()?;
+            pkey_from_params(Id::DSA, &params)?.dsa()
+        };
+
+        #[cfg(not(ossl300))]
         unsafe {
             let dsa = Dsa::from_ptr(cvt_p(ffi::DSA_new())?);
             cvt(DSA_set0_pqg(dsa.0, p.as_ptr(), q.as_ptr(), g.as_ptr()))?;
@@ -272,17 +369,19 @@ impl Dsa<Public> {
         /// Decodes a PEM-encoded SubjectPublicKeyInfo structure containing a DSA key.
         ///
         /// The input should have a header of `-----BEGIN PUBLIC KEY-----`.
-        #[corresponds(PEM_read_bio_DSA_PUBKEY)]
+        #[cfg_attr(not(ossl300), corresponds(PEM_read_bio_DSA_PUBKEY))]
         public_key_from_pem,
         Dsa<Public>,
+        Structure::SubjectPublicKeyInfo,
         ffi::PEM_read_bio_DSA_PUBKEY
     }
 
     from_der! {
         /// Decodes a DER-encoded SubjectPublicKeyInfo structure containing a DSA key.
-        #[corresponds(d2i_DSA_PUBKEY)]
+        #[cfg_attr(not(ossl300), corresponds(d2i_DSA_PUBKEY))]
         public_key_from_der,
         Dsa<Public>,
+        Structure::SubjectPublicKeyInfo,
         ffi::d2i_DSA_PUBKEY
     }
 
@@ -296,7 +395,18 @@ impl Dsa<Public> {
         g: BigNum,
         pub_key: BigNum,
     ) -> Result<Dsa<Public>, ErrorStack> {
-        ffi::init();
+        #[cfg(ossl300)]
+        return {
+            let mut builder = OsslParamBuilder::new()?;
+            builder.add_bn(OSSL_PKEY_PARAM_FFC_P, &p)?;
+            builder.add_bn(OSSL_PKEY_PARAM_FFC_Q, &q)?;
+            builder.add_bn(OSSL_PKEY_PARAM_FFC_G, &g)?;
+            builder.add_bn(OSSL_PKEY_PARAM_PUB_KEY, &pub_key)?;
+            let params = builder.to_param()?;
+            pkey_from_params(Id::DSA, &params)?.dsa()
+        };
+
+        #[cfg(not(ossl300))]
         unsafe {
             let dsa = Dsa::from_ptr(cvt_p(ffi::DSA_new())?);
             cvt(DSA_set0_pqg(dsa.0, p.as_ptr(), q.as_ptr(), g.as_ptr()))?;
@@ -314,6 +424,7 @@ impl<T> fmt::Debug for Dsa<T> {
     }
 }
 
+#[cfg(not(ossl300))]
 cfg_if! {
     if #[cfg(any(ossl110, libressl, boringssl, awslc))] {
         use ffi::{DSA_get0_key, DSA_get0_pqg, DSA_set0_key, DSA_set0_pqg};
@@ -556,8 +667,8 @@ mod test {
         let pub_key = dsa.pub_key();
         let mut ctx = BigNumContext::new().unwrap();
         let mut calc = BigNum::new().unwrap();
-        calc.mod_exp(g, priv_key, p, &mut ctx).unwrap();
-        assert_eq!(&calc, pub_key)
+        calc.mod_exp(&g, &priv_key, &p, &mut ctx).unwrap();
+        assert_eq!(&calc, &pub_key)
     }
 
     #[test]
@@ -569,11 +680,11 @@ mod test {
         let pub_key = BigNum::from_u32(207).unwrap();
 
         let dsa = Dsa::from_private_components(p, q, g, priv_key, pub_key).unwrap();
-        assert_eq!(dsa.pub_key(), &BigNum::from_u32(207).unwrap());
-        assert_eq!(dsa.priv_key(), &BigNum::from_u32(15).unwrap());
-        assert_eq!(dsa.p(), &BigNum::from_u32(283).unwrap());
-        assert_eq!(dsa.q(), &BigNum::from_u32(47).unwrap());
-        assert_eq!(dsa.g(), &BigNum::from_u32(60).unwrap());
+        assert_eq!(dsa.pub_key(), BigNum::from_u32(207).unwrap());
+        assert_eq!(dsa.priv_key(), BigNum::from_u32(15).unwrap());
+        assert_eq!(dsa.p(), BigNum::from_u32(283).unwrap());
+        assert_eq!(dsa.q(), BigNum::from_u32(47).unwrap());
+        assert_eq!(dsa.g(), BigNum::from_u32(60).unwrap());
     }
 
     #[test]
@@ -584,25 +695,20 @@ mod test {
         let pub_key = BigNum::from_u32(207).unwrap();
 
         let dsa = Dsa::from_public_components(p, q, g, pub_key).unwrap();
-        assert_eq!(dsa.pub_key(), &BigNum::from_u32(207).unwrap());
-        assert_eq!(dsa.p(), &BigNum::from_u32(283).unwrap());
-        assert_eq!(dsa.q(), &BigNum::from_u32(47).unwrap());
-        assert_eq!(dsa.g(), &BigNum::from_u32(60).unwrap());
+        assert_eq!(dsa.pub_key(), BigNum::from_u32(207).unwrap());
+        assert_eq!(dsa.p(), BigNum::from_u32(283).unwrap());
+        assert_eq!(dsa.q(), BigNum::from_u32(47).unwrap());
+        assert_eq!(dsa.g(), BigNum::from_u32(60).unwrap());
     }
 
     #[test]
     fn test_params() {
         let params = Dsa::generate_params(1024).unwrap();
-        let p = params.p().to_owned().unwrap();
-        let q = params.q().to_owned().unwrap();
-        let g = params.g().to_owned().unwrap();
+        let p = params.p();
+        let q = params.q();
+        let g = params.g();
         let key = params.generate_key().unwrap();
-        let params2 = Dsa::from_pqg(
-            key.p().to_owned().unwrap(),
-            key.q().to_owned().unwrap(),
-            key.g().to_owned().unwrap(),
-        )
-        .unwrap();
+        let params2 = Dsa::from_pqg(key.p(), key.q(), key.g()).unwrap();
         assert_eq!(p, *params2.p());
         assert_eq!(q, *params2.q());
         assert_eq!(g, *params2.g());
@@ -622,22 +728,17 @@ mod test {
         let priv_key = dsa_ref.priv_key();
 
         let priv_key = Dsa::from_private_components(
-            BigNumRef::to_owned(p).unwrap(),
-            BigNumRef::to_owned(q).unwrap(),
-            BigNumRef::to_owned(g).unwrap(),
-            BigNumRef::to_owned(priv_key).unwrap(),
-            BigNumRef::to_owned(pub_key).unwrap(),
+            p.clone(),
+            q.clone(),
+            g.clone(),
+            priv_key.clone(),
+            pub_key.clone(),
         )
         .unwrap();
         let priv_key = PKey::from_dsa(priv_key).unwrap();
 
-        let pub_key = Dsa::from_public_components(
-            BigNumRef::to_owned(p).unwrap(),
-            BigNumRef::to_owned(q).unwrap(),
-            BigNumRef::to_owned(g).unwrap(),
-            BigNumRef::to_owned(pub_key).unwrap(),
-        )
-        .unwrap();
+        let pub_key =
+            Dsa::from_public_components(p.clone(), q.clone(), g.clone(), pub_key.clone()).unwrap();
         let pub_key = PKey::from_dsa(pub_key).unwrap();
 
         let mut signer = Signer::new(MessageDigest::sha256(), &priv_key).unwrap();
@@ -699,7 +800,7 @@ mod test {
 
     #[test]
     fn test_private_key_to_pem() {
-        let key = Dsa::generate(512).unwrap();
+        let key = Dsa::generate(1024).unwrap();
         let pem = key.private_key_to_pem().unwrap();
         let pem_str = from_utf8(&pem).unwrap();
         assert!(
@@ -710,7 +811,7 @@ mod test {
 
     #[test]
     fn test_private_key_to_pem_password() {
-        let key = Dsa::generate(512).unwrap();
+        let key = Dsa::generate(1024).unwrap();
         let pem = key
             .private_key_to_pem_passphrase(Cipher::aes_128_cbc(), b"foobar")
             .unwrap();
@@ -725,7 +826,7 @@ mod test {
 
     #[test]
     fn test_private_key_to_der() {
-        let key = Dsa::generate(512).unwrap();
+        let key = Dsa::generate(1024).unwrap();
         key.private_key_to_der().unwrap();
     }
 
