@@ -579,3 +579,35 @@ macro_rules! cstr_const {
         $vis const $name: &std::ffi::CStr = unsafe { std::ffi::CStr::from_bytes_with_nul_unchecked($key) };
     }
 }
+
+macro_rules! key_check {
+    ($ktype:ident, $f:ident) => {
+        key_check!($ktype, $f, crate::pkey::Params, crate::pkey::Public, crate::pkey::Private);
+    };
+
+    (
+        $ktype:ident,
+        $f:ident,
+        $($part:path), +
+    ) => {
+        #[cfg(ossl300)]
+        use crate::pkey::KeyCheck;
+
+        $(
+            impl $ktype<$part> {
+                /// Checks the key for validity.
+                #[cfg(ossl300)]
+                pub fn check_key(&self) -> Result<(), ErrorStack> {
+                    self.0.check_key()
+                }
+
+                /// Checks the key for validity.
+                #[corresponds($f)]
+                #[cfg(not(ossl300))]
+                pub fn check_key(&self) -> Result<(), ErrorStack> {
+                    cvt(unsafe {ffi::$f(self.as_ptr())}).map(|_| ())
+                }
+            }
+        )+
+    };
+}
