@@ -891,7 +891,13 @@ impl SslContextBuilder {
     /// Sets the parameters to be used during ephemeral elliptic curve Diffie-Hellman key exchange.
     #[corresponds(SSL_CTX_set_tmp_ecdh)]
     pub fn set_tmp_ecdh(&mut self, key: &EcKeyRef<Params>) -> Result<(), ErrorStack> {
-        unsafe { cvt(ffi::SSL_CTX_set_tmp_ecdh(self.as_ptr(), key.as_ptr()) as c_int).map(|_| ()) }
+        #[cfg(ossl300)]
+        return self.set_groups_list(key.group().curve_name().unwrap().short_name()?);
+
+        #[cfg(not(ossl300))]
+        unsafe {
+            cvt(ffi::SSL_CTX_set_tmp_ecdh(self.as_ptr(), key.as_ptr()) as c_int).map(|_| ())
+        }
     }
 
     /// Sets the callback which will generate parameters to be used during ephemeral elliptic curve
@@ -2466,7 +2472,18 @@ impl SslRef {
     /// [`SslContextBuilder::set_tmp_ecdh`]: struct.SslContextBuilder.html#method.set_tmp_ecdh
     #[corresponds(SSL_set_tmp_ecdh)]
     pub fn set_tmp_ecdh(&mut self, key: &EcKeyRef<Params>) -> Result<(), ErrorStack> {
-        unsafe { cvt(ffi::SSL_set_tmp_ecdh(self.as_ptr(), key.as_ptr()) as c_int).map(|_| ()) }
+        #[cfg(ossl300)]
+        return {
+            let group_name = key.group().curve_name().unwrap().short_name()?;
+            let c_group_name = CString::new(group_name).unwrap();
+            cvt_long(unsafe { ffi::SSL_set1_groups_list(self.as_ptr(), c_group_name.as_ptr()) })
+                .map(|_| ())
+        };
+
+        #[cfg(not(ossl300))]
+        unsafe {
+            cvt(ffi::SSL_set_tmp_ecdh(self.as_ptr(), key.as_ptr()) as c_int).map(|_| ())
+        }
     }
 
     /// Like [`SslContextBuilder::set_tmp_ecdh_callback`].
