@@ -164,7 +164,7 @@ mod test {
     use crate::pkey::{Private, Public};
 
     fn get_public_key(group: &EcGroup, x: &EcKey<Private>) -> Result<EcKey<Public>, ErrorStack> {
-        EcKey::from_public_key(group, x.public_key())
+        EcKey::from_public_key(group, &x.public_key())
     }
 
     #[test]

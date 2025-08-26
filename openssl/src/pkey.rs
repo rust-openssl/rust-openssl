@@ -323,10 +323,17 @@ impl<T> PKeyRef<T> {
     /// Returns a copy of the internal elliptic curve key.
     #[corresponds(EVP_PKEY_get1_EC_KEY)]
     pub fn ec_key(&self) -> Result<EcKey<T>, ErrorStack> {
-        unsafe {
-            let ec_key = cvt_p(ffi::EVP_PKEY_get1_EC_KEY(self.as_ptr()))?;
-            Ok(EcKey::from_ptr(ec_key))
+        if self.id() != Id::EC {
+            return Err(ErrorStack::get());
         }
+
+        let ec_key = self.as_ptr();
+        #[cfg(ossl300)]
+        cvt(unsafe { ffi::EVP_PKEY_up_ref(ec_key) })?;
+        #[cfg(not(ossl300))]
+        let ec_key = cvt_p(unsafe { ffi::EVP_PKEY_get1_EC_KEY(ec_key) })?;
+
+        Ok(unsafe { EcKey::from_ptr(ec_key) })
     }
 
     /// Returns the `Id` that represents the type of this key.
@@ -702,12 +709,21 @@ impl<T> PKey<T> {
     /// Creates a new `PKey` containing an elliptic curve key.
     #[corresponds(EVP_PKEY_set1_EC_KEY)]
     pub fn from_ec_key(ec_key: EcKey<T>) -> Result<PKey<T>, ErrorStack> {
+        let pkey: PKey<T>;
+
+        #[cfg(ossl300)]
+        unsafe {
+            ffi::EVP_PKEY_up_ref(ec_key.as_ptr());
+            pkey = PKey::from_ptr(ec_key.as_ptr());
+        }
+
+        #[cfg(not(ossl300))]
         unsafe {
             let evp = cvt_p(ffi::EVP_PKEY_new())?;
-            let pkey = PKey::from_ptr(evp);
+            pkey = PKey::from_ptr(evp);
             cvt(ffi::EVP_PKEY_set1_EC_KEY(pkey.0, ec_key.as_ptr()))?;
-            Ok(pkey)
         }
+        Ok(pkey)
     }
 }
 
