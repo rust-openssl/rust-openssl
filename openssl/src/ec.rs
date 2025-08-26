@@ -24,7 +24,7 @@ use std::ptr;
 use crate::bn::{BigNum, BigNumContextRef, BigNumRef};
 use crate::error::ErrorStack;
 use crate::nid::Nid;
-use crate::pkey::{HasParams, HasPrivate, HasPublic, Params, Private, Public};
+use crate::pkey::{HasParams, HasPrivate, HasPublic, PKey, Params, Private, Public};
 use crate::util::ForeignTypeRefExt;
 use crate::{cvt, cvt_n, cvt_p, init};
 use openssl_macros::corresponds;
@@ -713,6 +713,12 @@ generic_foreign_type_and_impl_send_sync! {
     pub struct EcKey<T>;
     /// A reference to an [`EcKey`].
     pub struct EcKeyRef<T>;
+}
+
+impl<T> From<&EcKeyRef<T>> for PKey<T> {
+    fn from(value: &EcKeyRef<T>) -> Self {
+        PKey::from_ec_key(value.to_owned()).unwrap()
+    }
 }
 
 impl<T> EcKeyRef<T>
