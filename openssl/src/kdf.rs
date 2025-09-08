@@ -44,6 +44,9 @@ cfg_if::cfg_if! {
         cstr_const!(OSSL_KDF_PARAM_ARGON2_LANES, b"lanes\0");
         cstr_const!(OSSL_KDF_PARAM_ARGON2_MEMCOST, b"memcost\0");
 
+        cstr_const!(KDF_ARGON2D, b"ARGON2D\0");
+        cstr_const!(KDF_ARGON2I, b"ARGON2I\0");
+        cstr_const!(KDF_ARGON2ID, b"ARGON2ID\0");
 
         #[allow(clippy::too_many_arguments)]
         pub fn argon2d(
@@ -57,7 +60,7 @@ cfg_if::cfg_if! {
             memcost: u32,
             out: &mut [u8],
         ) -> Result<(), ErrorStack> {
-            argon2_helper(CStr::from_bytes_with_nul(b"ARGON2D\0").unwrap(), ctx, pass, salt, ad, secret, iter, lanes, memcost, out)
+            argon2_helper(KDF_ARGON2D, ctx, pass, salt, ad, secret, iter, lanes, memcost, out)
         }
 
         #[allow(clippy::too_many_arguments)]
@@ -72,7 +75,7 @@ cfg_if::cfg_if! {
             memcost: u32,
             out: &mut [u8],
         ) -> Result<(), ErrorStack> {
-            argon2_helper(CStr::from_bytes_with_nul(b"ARGON2I\0").unwrap(), ctx, pass, salt, ad, secret, iter, lanes, memcost, out)
+            argon2_helper(KDF_ARGON2I, ctx, pass, salt, ad, secret, iter, lanes, memcost, out)
         }
 
         #[allow(clippy::too_many_arguments)]
@@ -87,7 +90,7 @@ cfg_if::cfg_if! {
             memcost: u32,
             out: &mut [u8],
         ) -> Result<(), ErrorStack> {
-            argon2_helper(CStr::from_bytes_with_nul(b"ARGON2ID\0").unwrap(), ctx, pass, salt, ad, secret, iter, lanes, memcost, out)
+            argon2_helper(KDF_ARGON2ID, ctx, pass, salt, ad, secret, iter, lanes, memcost, out)
         }
 
         /// Derives a key using the argon2* algorithms.
