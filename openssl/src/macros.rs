@@ -557,6 +557,12 @@ macro_rules! generic_foreign_type_and_impl_send_sync {
                     $(#[$borrowed_attr])*
                     pub struct $borrowed<T>;
                 }
+
+                impl<T> From<&$borrowed<T>> for crate::pkey::PKey<T> {
+                    fn from(value: &$borrowed<T>) -> Self {
+                        crate::pkey::PKey::try_from(value.to_owned()).unwrap()
+                    }
+                }
             }
         }
     }
