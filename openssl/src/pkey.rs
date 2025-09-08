@@ -914,6 +914,25 @@ impl<T> TryFrom<PKey<T>> for Dh<T> {
     }
 }
 
+cfg_if! {
+    if #[cfg(ossl300)] {
+        cstr_const!(pub(crate) OSSL_PKEY_PARAM_GROUP_NAME, b"group\0");
+
+        cstr_const!(pub(crate) OSSL_PKEY_PARAM_PUB_KEY, b"pub\0");
+        cstr_const!(pub(crate) OSSL_PKEY_PARAM_PRIV_KEY, b"priv\0");
+
+        cstr_const!(pub(crate) OSSL_PKEY_PARAM_FFC_P, b"p\0");
+        cstr_const!(pub(crate) OSSL_PKEY_PARAM_FFC_G, b"g\0");
+        cstr_const!(pub(crate) OSSL_PKEY_PARAM_FFC_Q, b"q\0");
+
+        cstr_const!(pub(crate) OSSL_PKEY_PARAM_RSA_N, b"n\0");
+        cstr_const!(pub(crate) OSSL_PKEY_PARAM_RSA_E, b"e\0");
+        cstr_const!(pub(crate) OSSL_PKEY_PARAM_RSA_D, b"d\0");
+
+        cstr_const!(pub(crate) OSSL_SIGNATURE_PARAM_NONCE_TYPE, b"nonce-type\0");
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::convert::TryInto;
