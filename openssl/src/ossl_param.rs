@@ -13,11 +13,12 @@
 //! Note, that this module is available only in OpenSSL 3.* and
 //! only internally for this crate.
 
+use crate::bn::BigNumRef;
 use crate::error::ErrorStack;
 use crate::util;
 use crate::{cvt, cvt_p};
-use foreign_types::ForeignType;
-use libc::{c_uint, c_void};
+use foreign_types::{ForeignType, ForeignTypeRef};
+use libc::{c_char, c_void};
 use openssl_macros::corresponds;
 use std::ffi::CStr;
 use std::marker::PhantomData;
@@ -106,7 +107,7 @@ impl<'a> OsslParamBuilder<'a> {
         }
     }
 
-    /// Adds a octet string to `OsslParamBuilder`.
+    /// Adds an octet string to `OsslParamBuilder`.
     #[corresponds(OSSL_PARAM_BLD_push_octet_string)]
     #[cfg_attr(any(not(ossl320), osslconf = "OPENSSL_NO_ARGON2"), allow(dead_code))]
     pub(crate) fn add_octet_string(
@@ -125,7 +126,7 @@ impl<'a> OsslParamBuilder<'a> {
         }
     }
 
-    /// Adds a unsigned int to `OsslParamBuilder`.
+    /// Adds an unsigned int to `OsslParamBuilder`.
     #[corresponds(OSSL_PARAM_BLD_push_uint)]
     #[cfg_attr(any(not(ossl320), osslconf = "OPENSSL_NO_ARGON2"), allow(dead_code))]
     pub(crate) fn add_uint(&mut self, key: &'a CStr, val: u32) -> Result<(), ErrorStack> {
@@ -133,10 +134,37 @@ impl<'a> OsslParamBuilder<'a> {
             cvt(ffi::OSSL_PARAM_BLD_push_uint(
                 self.as_ptr(),
                 key.as_ptr(),
-                val as c_uint,
+                val,
             ))
             .map(|_| ())
         }
+    }
+
+    /// Adds a `BigNum` to `OsslParamBuilder`.
+    #[corresponds(OSSL_PARAM_BLD_push_BN)]
+    #[allow(dead_code)] // TODO: remove when when used by EVP_KEY.from_data
+    pub(crate) fn add_bn(&mut self, key: &'a CStr, bn: &'a BigNumRef) -> Result<(), ErrorStack> {
+        cvt(unsafe { ffi::OSSL_PARAM_BLD_push_BN(self.as_ptr(), key.as_ptr(), bn.as_ptr()) })
+            .map(|_| ())
+    }
+
+    /// Adds a utf8 string to `OsslParamBuilder`.
+    #[corresponds(OSSL_PARAM_BLD_push_utf8_string)]
+    #[allow(dead_code)] // TODO: remove when when used by EVP_KEY.from_data
+    pub(crate) fn add_utf8_string(
+        &mut self,
+        key: &'a CStr,
+        value: &'a str,
+    ) -> Result<(), ErrorStack> {
+        cvt(unsafe {
+            ffi::OSSL_PARAM_BLD_push_utf8_string(
+                self.as_ptr(),
+                key.as_ptr(),
+                value.as_ptr().cast::<c_char>(),
+                value.len(),
+            )
+        })
+        .map(|_| ())
     }
 
     /// Returns a raw pointer to the underlying `OSSL_PARAM_BLD` structure.
