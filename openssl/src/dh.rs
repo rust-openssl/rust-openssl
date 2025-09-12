@@ -1,14 +1,32 @@
 //! Diffie-Hellman key agreement.
 
+#[cfg(not(ossl300))]
 use cfg_if::cfg_if;
 use foreign_types::{ForeignType, ForeignTypeRef};
+#[cfg(not(ossl300))]
 use std::mem;
+#[cfg(not(ossl300))]
 use std::ptr;
 
 use crate::bn::{BigNum, BigNumRef};
+#[cfg(not(ossl300))]
+use crate::cvt;
+use crate::cvt_p;
 use crate::error::ErrorStack;
+#[cfg(ossl300)]
+use crate::ossl_encdec::Structure;
+#[cfg(ossl300)]
+use crate::ossl_param::OsslParamBuilder;
+#[cfg(ossl300)]
+use crate::pkey::Id;
 use crate::pkey::{HasParams, HasPrivate, HasPublic, Params, Private, Public};
-use crate::{cvt, cvt_p};
+#[cfg(ossl300)]
+use crate::pkey::{
+    KeyCheck, PKey, OSSL_PKEY_PARAM_FFC_G, OSSL_PKEY_PARAM_FFC_P, OSSL_PKEY_PARAM_FFC_Q,
+    OSSL_PKEY_PARAM_GROUP_NAME, OSSL_PKEY_PARAM_PRIV_KEY, OSSL_PKEY_PARAM_PUB_KEY,
+};
+#[cfg(ossl300)]
+use crate::pkey_ctx::{pkey_from_params, PkeyCtx, Selection};
 use openssl_macros::corresponds;
 
 generic_foreign_type_and_impl_send_sync! {
@@ -18,6 +36,9 @@ generic_foreign_type_and_impl_send_sync! {
     pub struct Dh<T>;
 
     pub struct DhRef<T>;
+
+    key_id = Id::DH;
+    pkey_type = dh;
 }
 
 impl<T> DhRef<T>
@@ -28,28 +49,55 @@ where
         /// Serializes the parameters into a PEM-encoded PKCS#3 DHparameter structure.
         ///
         /// The output will have a header of `-----BEGIN DH PARAMETERS-----`.
-        #[corresponds(PEM_write_bio_DHparams)]
+        #[cfg_attr(not(ossl300), corresponds(PEM_write_bio_DHparams))]
         params_to_pem,
+        Selection::KeyParameters,
+        Structure::TypeSpecific,
         ffi::PEM_write_bio_DHparams
     }
 
     to_der! {
         /// Serializes the parameters into a DER-encoded PKCS#3 DHparameter structure.
-        #[corresponds(i2d_DHparams)]
+        #[cfg_attr(not(ossl300), corresponds(i2d_DHparams))]
         params_to_der,
+        Selection::KeyParameters,
+        Structure::TypeSpecific,
         ffi::i2d_DHparams
     }
-
-    /// Validates DH parameters for correctness
-    #[corresponds(DH_check_key)]
-    pub fn check_key(&self) -> Result<bool, ErrorStack> {
-        unsafe {
-            let mut codes = 0;
-            cvt(ffi::DH_check(self.as_ptr(), &mut codes))?;
-            Ok(codes == 0)
-        }
-    }
 }
+
+macro_rules! key_check {
+        (
+        $ktype:ident,
+        $f:ident,
+        $($part:path), +
+    ) => {
+        $(
+            impl $ktype<$part> {
+                /// Validates DH parameters for correctness
+                #[cfg(ossl300)]
+                pub fn check_key(&self) -> Result<bool, ErrorStack> {
+                     return match self.0.check_key() {
+                        Ok(_) => Ok(true),
+                        Err(e) if e.errors().is_empty() => Ok(false),
+                        Err(e) => Err(e),
+                    };
+                }
+
+                /// Validates DH parameters for correctness
+                #[corresponds($f)]
+                #[cfg(not(ossl300))]
+                pub fn check_key(&self) -> Result<bool, ErrorStack> {
+                    let mut codes = 0;
+                    cvt(unsafe { ffi::DH_check(self.as_ptr(), &mut codes) })?;
+                    Ok(codes == 0)
+                }
+            }
+        )+
+    };
+}
+
+key_check!(Dh, DH_check, Params);
 
 impl Dh<Params> {
     pub fn from_params(p: BigNum, g: BigNum, q: BigNum) -> Result<Dh<Params>, ErrorStack> {
@@ -63,6 +111,20 @@ impl Dh<Params> {
         prime_q: Option<BigNum>,
         generator: BigNum,
     ) -> Result<Dh<Params>, ErrorStack> {
+        #[cfg(ossl300)]
+        return {
+            let mut builder = OsslParamBuilder::new()?;
+            builder.add_bn(OSSL_PKEY_PARAM_FFC_P, &prime_p)?;
+            builder.add_bn(OSSL_PKEY_PARAM_FFC_G, &generator)?;
+            if let Some(q) = &prime_q {
+                builder.add_bn(OSSL_PKEY_PARAM_FFC_Q, q)?;
+            };
+            let params = builder.to_param()?;
+            let pkey = pkey_from_params(Id::DH, &params)?;
+            pkey.dh()
+        };
+
+        #[cfg(not(ossl300))]
         unsafe {
             let dh = Dh::from_ptr(cvt_p(ffi::DH_new())?);
             cvt(DH_set0_pqg(
@@ -78,6 +140,18 @@ impl Dh<Params> {
 
     /// Sets the public key on the DH object.
     pub fn set_public_key(self, pub_key: BigNum) -> Result<Dh<Public>, ErrorStack> {
+        #[cfg(ossl300)]
+        return {
+            let key_params = self.0.to_data(Selection::KeyParameters)?;
+            let mut builder = OsslParamBuilder::new()?;
+            builder.add_bn(OSSL_PKEY_PARAM_PUB_KEY, &pub_key)?;
+            let params = builder.to_param()?;
+            let params = key_params.merge(&params)?;
+            let pkey = pkey_from_params(Id::DH, &params)?;
+            pkey.dh()
+        };
+
+        #[cfg(not(ossl300))]
         unsafe {
             let dh_ptr = self.0;
             cvt(DH_set0_key(dh_ptr, pub_key.as_ptr(), ptr::null_mut()))?;
@@ -88,6 +162,25 @@ impl Dh<Params> {
 
     /// Sets the private key on the DH object and recomputes the public key.
     pub fn set_private_key(self, priv_key: BigNum) -> Result<Dh<Private>, ErrorStack> {
+        #[cfg(ossl300)]
+        return {
+            let key_params = self.0.to_data(Selection::KeyParameters)?;
+            let mut builder = OsslParamBuilder::new()?;
+            builder.add_bn(OSSL_PKEY_PARAM_PRIV_KEY, &priv_key)?;
+            let params = builder.to_param()?;
+            let params = key_params.merge(&params)?;
+            let pkey: PKey<Private> = pkey_from_params(Id::DH, &params)?;
+            // In lieu of a non-deprecated way to recompute the public key, bounce through PKCS8 as
+            // this causes the public key to be re-computed.
+            // See: https://github.com/openssl/openssl/issues/21315#issuecomment-1618314607
+            let pkcs8 = cvt_p(unsafe { ffi::EVP_PKEY2PKCS8(pkey.as_ptr()) })?;
+            let pkey_ptr = cvt_p(unsafe { ffi::EVP_PKCS82PKEY(pkcs8) })?;
+            unsafe { ffi::PKCS8_PRIV_KEY_INFO_free(pkcs8) };
+            let pkey = unsafe { PKey::from_ptr(pkey_ptr) };
+            pkey.dh()
+        };
+
+        #[cfg(not(ossl300))]
         unsafe {
             let dh_ptr = self.0;
             cvt(DH_set0_key(dh_ptr, ptr::null_mut(), priv_key.as_ptr()))?;
@@ -101,6 +194,19 @@ impl Dh<Params> {
 
     /// Sets the public and private keys on the DH object.
     pub fn set_key(self, pub_key: BigNum, priv_key: BigNum) -> Result<Dh<Private>, ErrorStack> {
+        #[cfg(ossl300)]
+        return {
+            let key_params = self.0.to_data(Selection::KeyParameters)?;
+            let mut builder = OsslParamBuilder::new()?;
+            builder.add_bn(OSSL_PKEY_PARAM_PUB_KEY, &pub_key)?;
+            builder.add_bn(OSSL_PKEY_PARAM_PRIV_KEY, &priv_key)?;
+            let params = builder.to_param()?;
+            let params = key_params.merge(&params)?;
+            let pkey = pkey_from_params(Id::DH, &params)?;
+            pkey.dh()
+        };
+
+        #[cfg(not(ossl300))]
         unsafe {
             let dh_ptr = self.0;
             cvt(DH_set0_key(dh_ptr, pub_key.as_ptr(), priv_key.as_ptr()))?;
@@ -112,6 +218,17 @@ impl Dh<Params> {
     /// Generates DH params based on the given `prime_len` and a fixed `generator` value.
     #[corresponds(DH_generate_parameters_ex)]
     pub fn generate_params(prime_len: u32, generator: u32) -> Result<Dh<Params>, ErrorStack> {
+        #[cfg(ossl300)]
+        return {
+            let mut ctx = PkeyCtx::new_id(Id::DH)?;
+            ctx.paramgen_init()?;
+            ctx.set_dh_paramgen_prime_len(prime_len)?;
+            ctx.set_dh_paramgen_generator(generator)?;
+            let pkey = ctx.paramgen()?;
+            pkey.dh()
+        };
+
+        #[cfg(not(ossl300))]
         unsafe {
             let dh = Dh::from_ptr(cvt_p(ffi::DH_new())?);
             cvt(ffi::DH_generate_parameters_ex(
@@ -127,6 +244,15 @@ impl Dh<Params> {
     /// Generates a public and a private key based on the DH params.
     #[corresponds(DH_generate_key)]
     pub fn generate_key(self) -> Result<Dh<Private>, ErrorStack> {
+        #[cfg(ossl300)]
+        return {
+            let mut ctx = PkeyCtx::new(&self.0)?;
+            ctx.keygen_init()?;
+            let pkey = ctx.keygen()?;
+            pkey.dh()
+        };
+
+        #[cfg(not(ossl300))]
         unsafe {
             let dh_ptr = self.0;
             cvt(ffi::DH_generate_key(dh_ptr))?;
@@ -139,24 +265,39 @@ impl Dh<Params> {
         /// Deserializes a PEM-encoded PKCS#3 DHpararameters structure.
         ///
         /// The input should have a header of `-----BEGIN DH PARAMETERS-----`.
-        #[corresponds(PEM_read_bio_DHparams)]
+        #[cfg_attr(not(ossl300), corresponds(PEM_read_bio_DHparams))]
         params_from_pem,
         Dh<Params>,
+        Structure::TypeSpecific,
         ffi::PEM_read_bio_DHparams
     }
 
     from_der! {
         /// Deserializes a DER-encoded PKCS#3 DHparameters structure.
-        #[corresponds(d2i_DHparams)]
+        #[cfg_attr(not(ossl300), corresponds(d2i_DHparams))]
         params_from_der,
         Dh<Params>,
+        Structure::TypeSpecific,
         ffi::d2i_DHparams
+    }
+
+    #[cfg(ossl300)]
+    fn get_group(group: &str) -> Result<Dh<Params>, ErrorStack> {
+        let mut builder = OsslParamBuilder::new()?;
+        builder.add_utf8_string(OSSL_PKEY_PARAM_GROUP_NAME, group)?;
+        let params = builder.to_param()?;
+        let pkey = pkey_from_params(Id::DH, &params)?;
+        pkey.dh()
     }
 
     /// Requires OpenSSL 1.0.2 or newer.
     #[corresponds(DH_get_1024_160)]
     #[cfg(any(ossl102, ossl110))]
     pub fn get_1024_160() -> Result<Dh<Params>, ErrorStack> {
+        #[cfg(ossl300)]
+        return Self::get_group("dh_1024_160");
+
+        #[cfg(not(ossl300))]
         unsafe {
             ffi::init();
             cvt_p(ffi::DH_get_1024_160()).map(|p| Dh::from_ptr(p))
@@ -167,6 +308,10 @@ impl Dh<Params> {
     #[corresponds(DH_get_2048_224)]
     #[cfg(any(ossl102, ossl110))]
     pub fn get_2048_224() -> Result<Dh<Params>, ErrorStack> {
+        #[cfg(ossl300)]
+        return Self::get_group("dh_2048_224");
+
+        #[cfg(not(ossl300))]
         unsafe {
             ffi::init();
             cvt_p(ffi::DH_get_2048_224()).map(|p| Dh::from_ptr(p))
@@ -177,6 +322,10 @@ impl Dh<Params> {
     #[corresponds(DH_get_2048_256)]
     #[cfg(any(ossl102, ossl110))]
     pub fn get_2048_256() -> Result<Dh<Params>, ErrorStack> {
+        #[cfg(ossl300)]
+        return Self::get_group("dh_2048_256");
+
+        #[cfg(not(ossl300))]
         unsafe {
             ffi::init();
             cvt_p(ffi::DH_get_2048_256()).map(|p| Dh::from_ptr(p))
@@ -189,20 +338,26 @@ where
     T: HasParams,
 {
     /// Returns the prime `p` from the DH instance.
-    #[corresponds(DH_get0_pqg)]
     pub fn prime_p(&self) -> &BigNumRef {
-        let mut p = ptr::null();
+        #[cfg(ossl300)]
+        return self.0.get_bn_param(OSSL_PKEY_PARAM_FFC_P).unwrap();
+
+        #[cfg(not(ossl300))]
         unsafe {
+            let mut p = ptr::null();
             DH_get0_pqg(self.as_ptr(), &mut p, ptr::null_mut(), ptr::null_mut());
             BigNumRef::from_ptr(p as *mut _)
         }
     }
 
     /// Returns the prime `q` from the DH instance.
-    #[corresponds(DH_get0_pqg)]
     pub fn prime_q(&self) -> Option<&BigNumRef> {
-        let mut q = ptr::null();
+        #[cfg(ossl300)]
+        return self.0.get_bn_param(OSSL_PKEY_PARAM_FFC_Q).ok();
+
+        #[cfg(not(ossl300))]
         unsafe {
+            let mut q = ptr::null();
             DH_get0_pqg(self.as_ptr(), ptr::null_mut(), &mut q, ptr::null_mut());
             if q.is_null() {
                 None
@@ -213,10 +368,13 @@ where
     }
 
     /// Returns the generator from the DH instance.
-    #[corresponds(DH_get0_pqg)]
     pub fn generator(&self) -> &BigNumRef {
-        let mut g = ptr::null();
+        #[cfg(ossl300)]
+        return self.0.get_bn_param(OSSL_PKEY_PARAM_FFC_G).unwrap();
+
+        #[cfg(not(ossl300))]
         unsafe {
+            let mut g = ptr::null();
             DH_get0_pqg(self.as_ptr(), ptr::null_mut(), ptr::null_mut(), &mut g);
             BigNumRef::from_ptr(g as *mut _)
         }
@@ -228,15 +386,20 @@ where
     T: HasPublic,
 {
     /// Returns the public key from the DH instance.
-    #[corresponds(DH_get0_key)]
     pub fn public_key(&self) -> &BigNumRef {
-        let mut pub_key = ptr::null();
+        #[cfg(ossl300)]
+        return self.0.get_bn_param(OSSL_PKEY_PARAM_PUB_KEY).unwrap();
+
+        #[cfg(not(ossl300))]
         unsafe {
+            let mut pub_key = ptr::null();
             DH_get0_key(self.as_ptr(), &mut pub_key, ptr::null_mut());
             BigNumRef::from_ptr(pub_key as *mut _)
         }
     }
 }
+
+key_check!(Dh, DH_check, Public);
 
 impl<T> DhRef<T>
 where
@@ -245,6 +408,29 @@ where
     /// Computes a shared secret from the own private key and the given `public_key`.
     #[corresponds(DH_compute_key)]
     pub fn compute_key(&self, public_key: &BigNumRef) -> Result<Vec<u8>, ErrorStack> {
+        #[cfg(ossl300)]
+        return {
+            // prime_p and generator only exist on Dh<T>, not DhRef<T>
+            let dh_self = self.to_owned();
+
+            // construct a new pkey that shares the params and has the peer's public key
+            let mut builder = OsslParamBuilder::new()?;
+            builder.add_bn(OSSL_PKEY_PARAM_FFC_P, dh_self.prime_p())?;
+            builder.add_bn(OSSL_PKEY_PARAM_FFC_G, dh_self.generator())?;
+            builder.add_bn(OSSL_PKEY_PARAM_PUB_KEY, public_key)?;
+            let params = builder.to_param()?;
+            let peer_key: PKey<Public> = pkey_from_params(Id::DH, &params)?;
+
+            // Derive the shared secret
+            let mut ctx = PkeyCtx::new(&self.0)?;
+            ctx.derive_init()?;
+            ctx.derive_set_peer(&peer_key)?;
+            let mut key = Vec::new();
+            ctx.derive_to_vec(&mut key)?;
+            Ok(key)
+        };
+
+        #[cfg(not(ossl300))]
         unsafe {
             let key_len = ffi::DH_size(self.as_ptr());
             let mut key = vec![0u8; key_len as usize];
@@ -258,16 +444,22 @@ where
     }
 
     /// Returns the private key from the DH instance.
-    #[corresponds(DH_get0_key)]
     pub fn private_key(&self) -> &BigNumRef {
-        let mut priv_key = ptr::null();
+        #[cfg(ossl300)]
+        return self.0.get_bn_param(OSSL_PKEY_PARAM_PRIV_KEY).unwrap();
+
+        #[cfg(not(ossl300))]
         unsafe {
+            let mut priv_key = ptr::null();
             DH_get0_key(self.as_ptr(), ptr::null_mut(), &mut priv_key);
             BigNumRef::from_ptr(priv_key as *mut _)
         }
     }
 }
 
+key_check!(Dh, DH_check, Private);
+
+#[cfg(not(ossl300))]
 cfg_if! {
     if #[cfg(any(ossl110, libressl270, boringssl, awslc))] {
         use ffi::{DH_set0_pqg, DH_get0_pqg, DH_get0_key, DH_set0_key};
@@ -491,5 +683,8 @@ mod tests {
         let dh2 = Dh::from_pqg(p, None, g).unwrap();
         assert!(dh1.check_key().unwrap());
         assert!(matches!(dh2.check_key(), Ok(false) | Err(_)));
+
+        let dh3 = dh1.generate_key().unwrap();
+        assert!(dh3.check_key().unwrap());
     }
 }
