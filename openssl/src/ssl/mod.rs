@@ -59,7 +59,9 @@
 //! ```
 #[cfg(ossl300)]
 use crate::cvt_long;
-use crate::dh::{Dh, DhRef};
+#[cfg(not(osslconf = "OPENSSL_NO_DEPRECATED_3_0"))]
+use crate::dh::Dh;
+use crate::dh::DhRef;
 #[cfg(all(ossl102, not(ossl110)))]
 use crate::ec::EcKey;
 use crate::ec::EcKeyRef;
@@ -862,9 +864,21 @@ impl SslContextBuilder {
     }
 
     /// Sets the parameters to be used during ephemeral Diffie-Hellman key exchange.
-    #[corresponds(SSL_CTX_set_tmp_dh)]
     pub fn set_tmp_dh(&mut self, dh: &DhRef<Params>) -> Result<(), ErrorStack> {
-        unsafe { cvt(ffi::SSL_CTX_set_tmp_dh(self.as_ptr(), dh.as_ptr()) as c_int).map(|_| ()) }
+        #[cfg(ossl300)]
+        return {
+            let pkey: PKey<Params> = dh.into();
+            // Ownership of pkey is passed to our SSL_CTX as a result setting, so we should not free pkey
+            cvt(unsafe { ffi::SSL_CTX_set0_tmp_dh_pkey(self.as_ptr(), pkey.as_ptr()) })?;
+            // But when pkey goes out of scope it will be freed, so up ref to ensure the key is not freed
+            cvt(unsafe { ffi::EVP_PKEY_up_ref(pkey.as_ptr()) })?;
+            Ok(())
+        };
+
+        #[cfg(not(ossl300))]
+        unsafe {
+            cvt(ffi::SSL_CTX_set_tmp_dh(self.as_ptr(), dh.as_ptr()) as c_int).map(|_| ())
+        }
     }
 
     /// Sets the callback which will generate parameters to be used during ephemeral Diffie-Hellman
@@ -874,6 +888,7 @@ impl SslContextBuilder {
     /// indicating if the selected cipher is export-grade, and the key length. The export and key
     /// length options are archaic and should be ignored in almost all cases.
     #[corresponds(SSL_CTX_set_tmp_dh_callback)]
+    #[cfg(not(osslconf = "OPENSSL_NO_DEPRECATED_3_0"))]
     pub fn set_tmp_dh_callback<F>(&mut self, callback: F)
     where
         F: Fn(&mut SslRef, bool, u32) -> Result<Dh<Params>, ErrorStack> + 'static + Sync + Send,
@@ -2444,15 +2459,28 @@ impl SslRef {
     /// Like [`SslContextBuilder::set_tmp_dh`].
     ///
     /// [`SslContextBuilder::set_tmp_dh`]: struct.SslContextBuilder.html#method.set_tmp_dh
-    #[corresponds(SSL_set_tmp_dh)]
     pub fn set_tmp_dh(&mut self, dh: &DhRef<Params>) -> Result<(), ErrorStack> {
-        unsafe { cvt(ffi::SSL_set_tmp_dh(self.as_ptr(), dh.as_ptr()) as c_int).map(|_| ()) }
+        #[cfg(ossl300)]
+        return {
+            let pkey: PKey<Params> = dh.into();
+            // Ownership of pkey is passed to our SSL_CTX as a result setting, so we should not free pkey
+            cvt(unsafe { ffi::SSL_set0_tmp_dh_pkey(self.as_ptr(), pkey.as_ptr()) })?;
+            // But when pkey goes out of scope it will be freed, so up ref to ensure the key is not freed
+            cvt(unsafe { ffi::EVP_PKEY_up_ref(pkey.as_ptr()) })?;
+            Ok(())
+        };
+
+        #[cfg(not(ossl300))]
+        unsafe {
+            cvt(ffi::SSL_set_tmp_dh(self.as_ptr(), dh.as_ptr()) as c_int).map(|_| ())
+        }
     }
 
     /// Like [`SslContextBuilder::set_tmp_dh_callback`].
     ///
     /// [`SslContextBuilder::set_tmp_dh_callback`]: struct.SslContextBuilder.html#method.set_tmp_dh_callback
     #[corresponds(SSL_set_tmp_dh_callback)]
+    #[cfg(not(osslconf = "OPENSSL_NO_DEPRECATED_3_0"))]
     pub fn set_tmp_dh_callback<F>(&mut self, callback: F)
     where
         F: Fn(&mut SslRef, bool, u32) -> Result<Dh<Params>, ErrorStack> + 'static + Sync + Send,

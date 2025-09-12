@@ -474,6 +474,7 @@ const_ptr_api! {
         pub fn EVP_PKEY_get1_RSA(k: #[const_ptr_if(libressl420)] EVP_PKEY) -> *mut RSA;
         pub fn EVP_PKEY_get1_DSA(k: #[const_ptr_if(libressl420)] EVP_PKEY) -> *mut DSA;
         pub fn EVP_PKEY_get1_DH(k: #[const_ptr_if(libressl420)] EVP_PKEY) -> *mut DH;
+        pub fn EVP_PKEY_get0_DH(k: #[const_ptr_if(libressl420)] EVP_PKEY) -> *mut DH;
         pub fn EVP_PKEY_get1_EC_KEY(k: #[const_ptr_if(libressl420)] EVP_PKEY) -> *mut EC_KEY;
     }
 }
