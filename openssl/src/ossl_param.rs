@@ -13,7 +13,7 @@
 //! Note, that this module is available only in OpenSSL 3.* and
 //! only internally for this crate.
 
-use crate::bn::BigNumRef;
+use crate::bn::{BigNum, BigNumRef};
 use crate::error::ErrorStack;
 use crate::util;
 use crate::{cvt, cvt_p};
@@ -70,6 +70,19 @@ impl OsslParamArray {
             ))?;
             Ok(util::from_raw_parts(val as *const u8, val_len))
         }
+    }
+
+    /// Locates the individual `OSSL_PARAM` element representing a BigNum identified by the key in
+    /// the `OsslParamArray` array and returns a reference to it.
+    ///
+    /// Combines OSSL_PARAM_locate and OSSL_PARAM_get_BN.
+    #[corresponds(OSSL_PARAM_get_BN)]
+    #[allow(dead_code)]
+    fn locate_bn(&self, key: &CStr) -> Result<BigNum, ErrorStack> {
+        let param = self.locate_const(key).ok_or_else(ErrorStack::get)?;
+        let mut bn_ptr = ptr::null_mut();
+        cvt(unsafe { ffi::OSSL_PARAM_get_BN(param, &mut bn_ptr) })?;
+        Ok(unsafe { BigNum::from_ptr(bn_ptr) })
     }
 }
 
@@ -217,6 +230,11 @@ mod tests {
         }
     }
 
+    fn assert_bn_equal(params: &OsslParamArray, key: &CStr, expected: &BigNum) {
+        let bn = params.locate_bn(key).unwrap();
+        assert_eq!(bn, *expected);
+    }
+
     #[test]
     fn test_param_builder_uint() {
         let mut builder = OsslParamBuilder::new().unwrap();
@@ -241,12 +259,12 @@ mod tests {
         builder.add_bn(OSSL_PKEY_PARAM_RSA_D, &d).unwrap();
         let params = builder.to_param().unwrap();
 
-        for param in [
-            OSSL_PKEY_PARAM_RSA_N,
-            OSSL_PKEY_PARAM_RSA_E,
-            OSSL_PKEY_PARAM_RSA_D,
+        for (param, expected) in [
+            (OSSL_PKEY_PARAM_RSA_N, n),
+            (OSSL_PKEY_PARAM_RSA_E, e),
+            (OSSL_PKEY_PARAM_RSA_D, d),
         ] {
-            assert_param(&params, param, false);
+            assert_bn_equal(&params, param, &expected);
         }
 
         assert_param(&params, OSSL_PKEY_PARAM_GROUP_NAME, true);
