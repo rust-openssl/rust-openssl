@@ -47,8 +47,12 @@ use crate::dh::Dh;
 use crate::dsa::Dsa;
 use crate::ec::EcKey;
 use crate::error::ErrorStack;
+#[cfg(ossl300)]
+use crate::ossl_param::OsslParamArray;
 #[cfg(any(ossl110, boringssl, libressl370, awslc))]
 use crate::pkey_ctx::PkeyCtx;
+#[cfg(ossl300)]
+use crate::pkey_ctx::Selection;
 use crate::rsa::Rsa;
 use crate::symm::Cipher;
 use crate::util::{invoke_passwd_cb, CallbackState};
@@ -206,6 +210,18 @@ impl<T> PKeyRef<T> {
     #[corresponds(EVP_PKEY_size)]
     pub fn size(&self) -> usize {
         unsafe { ffi::EVP_PKEY_size(self.as_ptr()) as usize }
+    }
+
+    /// Converts the `PKey` to an `OsslParamArray`.
+    ///
+    /// Use `selection` to control what parameters are included.
+    #[corresponds(EVP_PKEY_todata)]
+    #[cfg(ossl300)]
+    #[allow(dead_code)] // TODO: remove when used by non-deprecated key wrappers
+    pub(crate) fn to_data(&self, selection: Selection) -> Result<OsslParamArray, ErrorStack> {
+        let mut params = ptr::null_mut();
+        cvt(unsafe { ffi::EVP_PKEY_todata(self.as_ptr(), selection.into(), &mut params) })?;
+        Ok(unsafe { OsslParamArray::from_ptr(params) })
     }
 }
 
