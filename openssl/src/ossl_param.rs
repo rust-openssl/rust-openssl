@@ -86,6 +86,25 @@ impl OsslParamArray {
     }
 }
 
+impl OsslParamArrayRef {
+    /// Merges two `ParamsRef` objects into a new `Params` object.
+    #[corresponds(OSSL_PARAM_merge)]
+    #[allow(dead_code)]
+    pub fn merge(&self, other: &OsslParamArrayRef) -> Result<OsslParamArray, ErrorStack> {
+        // OSSL_PARAM_merge shallow copies the params
+        // OSSL_PARAM_free  deep frees (so the params and values will be freed)
+        // OSSL_PARAM_dup   deep copies
+        // Dupe both params[] so we don't end up pointing to freed memory.
+        cvt_p(unsafe {
+            ffi::OSSL_PARAM_merge(
+                ffi::OSSL_PARAM_dup(self.as_ptr()),
+                ffi::OSSL_PARAM_dup(other.as_ptr()),
+            )
+        })
+        .map(|p| unsafe { OsslParamArray::from_ptr(p) })
+    }
+}
+
 foreign_type_and_impl_send_sync! {
     type CType = ffi::OSSL_PARAM_BLD;
     fn drop = ffi::OSSL_PARAM_BLD_free;
@@ -292,5 +311,55 @@ mod tests {
 
         assert_param(&params, OSSL_PKEY_PARAM_PUB_KEY, false);
         assert_param(&params, OSSL_PKEY_PARAM_GROUP_NAME, true);
+    }
+
+    #[test]
+    fn test_merge() {
+        let (n, e, d) = (0xbc747fc5, 0x10001, 0x7b133399);
+        let mut merged_params: OsslParamArray;
+
+        // Create a param array with just n in a scoped block so that bn_n, and the builder are dropped
+        {
+            let bn_n = BigNum::from_u32(n).unwrap();
+            let mut builder = OsslParamBuilder::new().unwrap();
+            builder.add_bn(OSSL_PKEY_PARAM_RSA_N, &bn_n).unwrap();
+            merged_params = builder.to_param().unwrap();
+        }
+
+        // We should still be able to pull back n and get the correct value, but not e or d (yet)
+        let bn_n = BigNum::from_u32(n).unwrap();
+        assert_bn_equal(&merged_params, OSSL_PKEY_PARAM_RSA_N, &bn_n);
+        assert_param(&merged_params, OSSL_PKEY_PARAM_RSA_E, true);
+        assert_param(&merged_params, OSSL_PKEY_PARAM_RSA_D, true);
+
+        // Create a new param array with just e and merge it in
+        {
+            let bn_e = BigNum::from_u32(e).unwrap();
+            let mut builder = OsslParamBuilder::new().unwrap();
+            builder.add_bn(OSSL_PKEY_PARAM_RSA_E, &bn_e).unwrap();
+            let params = builder.to_param().unwrap();
+            merged_params = merged_params.merge(&params).unwrap();
+        }
+
+        // We should still be able to pull back n & e and get the correct value, but not d (yet)
+        let bn_e = BigNum::from_u32(e).unwrap();
+        assert_bn_equal(&merged_params, OSSL_PKEY_PARAM_RSA_N, &bn_n);
+        assert_bn_equal(&merged_params, OSSL_PKEY_PARAM_RSA_E, &bn_e);
+        assert_param(&merged_params, OSSL_PKEY_PARAM_RSA_D, true);
+
+        // Again, create a new param array with just d and merge it in
+        {
+            let bn_d = BigNum::from_u32(d).unwrap();
+            let mut builder = OsslParamBuilder::new().unwrap();
+            builder.add_bn(OSSL_PKEY_PARAM_RSA_D, &bn_d).unwrap();
+            let params = builder.to_param().unwrap();
+            merged_params = merged_params.merge(&params).unwrap();
+        }
+
+        // We should be able to pull all of n, e & d out and get the correct values
+        let bn_d = BigNum::from_u32(d).unwrap();
+        assert_bn_equal(&merged_params, OSSL_PKEY_PARAM_RSA_N, &bn_n);
+        assert_bn_equal(&merged_params, OSSL_PKEY_PARAM_RSA_E, &bn_e);
+        assert_bn_equal(&merged_params, OSSL_PKEY_PARAM_RSA_D, &bn_d);
     }
 }
