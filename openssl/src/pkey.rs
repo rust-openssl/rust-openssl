@@ -957,8 +957,12 @@ mod tests {
     use crate::dh::Dh;
     use crate::dsa::Dsa;
     use crate::ec::EcKey;
+    #[cfg(ossl300)]
+    use crate::encrypt::{Decrypter, Encrypter};
     use crate::error::Error;
     use crate::nid::Nid;
+    #[cfg(ossl300)]
+    use crate::pkey_ctx::pkey_from_params;
     use crate::rsa::Rsa;
     use crate::symm::Cipher;
 
@@ -1253,5 +1257,28 @@ mod tests {
 
         assert!(!pkey1.public_eq(&pkey2));
         assert!(Error::get().is_none());
+    }
+
+    #[cfg(ossl300)]
+    #[test]
+    fn test_todata() {
+        let data: &[u8] = b"hello, world";
+        let pkey1 = PKey::from_rsa(Rsa::generate(2048).unwrap()).unwrap();
+
+        // Encrypt some data using the generated pkey
+        let encrypter = Encrypter::new(&pkey1).unwrap();
+        let mut encrypted = vec![0u8; encrypter.encrypt_len(data).unwrap()];
+        encrypter.encrypt(data, &mut encrypted).unwrap();
+
+        // Convert the pkey to OSSL_PARAMs and back into a PKey
+        let params = pkey1.to_data(Selection::Keypair).unwrap();
+        let pkey2: PKey<Private> = pkey_from_params(Id::RSA, &params).unwrap();
+
+        // Decrypt the data using the new pkey
+        let decrypter = Decrypter::new(&pkey2).unwrap();
+        let mut decrypted = vec![0u8; decrypter.decrypt_len(&encrypted).unwrap()];
+        let decrypted_len = decrypter.decrypt(&encrypted, &mut decrypted).unwrap();
+        decrypted.truncate(decrypted_len);
+        assert_eq!(data, &decrypted);
     }
 }
