@@ -245,6 +245,14 @@ pub unsafe trait HasPrivate {}
 
 unsafe impl HasPrivate for Private {}
 
+/// KeyID trait that tags the type of key.
+///
+/// Used for decoding PKeys
+#[cfg(ossl300)]
+pub(crate) trait KeyID {
+    const ID: Id;
+}
+
 generic_foreign_type_and_impl_send_sync! {
     type CType = ffi::EVP_PKEY;
     fn drop = ffi::EVP_PKEY_free;
