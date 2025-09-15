@@ -13,7 +13,10 @@
 //! When dealing with data that becomes available in chunks, such as while buffering data from IO,
 //! you can create a hasher that you can repeatedly update to add bytes to.
 //!
-//! ```rust
+//! Code targeting OpenSSL 1.1 or later should use the `EVP_MD` APIs instead as the following
+//! low-level digest functions were deprecated in OpenSSL 3.0. See the `openssl::md` module.
+//!
+//! ```ignore
 //! use openssl::sha;
 //!
 //! let mut hasher = sha::Sha256::new();
@@ -36,6 +39,7 @@
 //! println!("Hash = {}", hex::encode(hash));
 //! ```
 use cfg_if::cfg_if;
+#[cfg(not(osslconf = "OPENSSL_NO_DEPRECATED_3_0"))]
 use libc::c_void;
 use openssl_macros::corresponds;
 use std::mem::MaybeUninit;
