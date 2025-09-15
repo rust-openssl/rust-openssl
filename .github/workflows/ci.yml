@@ -408,7 +408,6 @@ jobs:
             cargo run --manifest-path=systest/Cargo.toml --target ${{ matrix.target }} $features
           if: ${{ !(matrix.library.name == 'boringssl' || matrix.library.name == 'aws-lc') }}
         - name: Test openssl
-          if: ${{ ! endsWith(matrix.library.name, 'no-deprecated') }}
           run: |
             if [[ "${{ matrix.library.name }}" == "boringssl" && "${{ matrix.bindgen }}" != "true" ]]; then
               features="--features unstable_boringssl"
@@ -434,4 +433,4 @@ jobs:
               features="$features --features openssl-sys/bindgen"
             fi
             cargo test --manifest-path=openssl-errors/Cargo.toml --target ${{ matrix.target }} $features
-          if: ${{ !(matrix.library.name == 'boringssl' || matrix.library.name == 'aws-lc' || endsWith(matrix.library.name, 'no-deprecated')) }}
+          if: ${{ !(matrix.library.name == 'boringssl' || matrix.library.name == 'aws-lc') }}
