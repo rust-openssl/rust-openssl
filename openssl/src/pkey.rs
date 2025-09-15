@@ -481,11 +481,14 @@ where
     where
         U: HasPublic,
     {
-        let res = unsafe { ffi::EVP_PKEY_cmp(self.as_ptr(), other.as_ptr()) == 1 };
+        #[cfg(ossl300)]
+        let res = unsafe { ffi::EVP_PKEY_eq(self.as_ptr(), other.as_ptr()) };
+        #[cfg(not(ossl300))]
+        let res = unsafe { ffi::EVP_PKEY_cmp(self.as_ptr(), other.as_ptr()) };
         // Clear the stack. OpenSSL will put an error on the stack when the
         // keys are different types in some situations.
         let _ = ErrorStack::get();
-        res
+        res == 1
     }
 
     /// Raw byte representation of a public key.
