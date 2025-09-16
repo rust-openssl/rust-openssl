@@ -3032,6 +3032,20 @@ pub enum RevocationError {
     Openssl(ErrorStack),
 }
 
+impl fmt::Display for RevocationError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            RevocationError::IssuerMismatch => write!(
+                f,
+                "The certificate to revoke is not issued by the CRL's issuer."
+            ),
+            RevocationError::Openssl(e) => write!(f, "OpenSSL error: {}", e),
+        }
+    }
+}
+
+impl std::error::Error for RevocationError {}
+
 impl From<ErrorStack> for RevocationError {
     fn from(err: ErrorStack) -> Self {
         RevocationError::Openssl(err)
