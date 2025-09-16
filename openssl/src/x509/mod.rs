@@ -8,7 +8,6 @@
 //! the secure protocol for browsing the web.
 
 use cfg_if::cfg_if;
-use ffi::X509_CRL_up_ref;
 use foreign_types::{ForeignType, ForeignTypeRef, Opaque};
 use libc::{c_int, c_long, c_uint, c_void};
 use std::cmp::{self, Ordering};
@@ -1749,8 +1748,7 @@ impl X509Revoked {
             ffi::X509_REVOKED_free(result);
             return Err(ErrorStack::get());
         }
-        if ffi::X509_REVOKED_set_revocationDate(result, crate::asn1::Asn1Time::now()?.as_ptr()) <= 0
-        {
+        if ffi::X509_REVOKED_set_revocationDate(result, Asn1Time::now()?.as_ptr()) <= 0 {
             ffi::X509_REVOKED_free(result);
             return Err(ErrorStack::get());
         }
@@ -2084,11 +2082,16 @@ impl X509Crl {
         unsafe {
             let crl = Self(cvt_p(ffi::X509_CRL_new())?);
 
+            cvt(ffi::X509_CRL_set_issuer_name(
+                crl.as_ptr(),
+                issuer_cert.subject_name().as_ptr(),
+            ))?;
+
             #[cfg(any(ossl110, libressl281))]
             if issuer_cert.version() >= Self::X509_VERSION_3 {
                 use crate::x509::extension::AuthorityKeyIdentifier;
 
-                #[cfg(any(ossl110, libressl251, boringssl))]
+                #[cfg(any(ossl110, libressl251))]
                 {
                     // "if present, MUST be v2" (source: RFC 5280, page 55)
                     cvt(ffi::X509_CRL_set_version(
@@ -2096,11 +2099,6 @@ impl X509Crl {
                         Self::X509_CRL_VERSION_2 as c_long,
                     ))?;
                 }
-
-                cvt(ffi::X509_CRL_set_issuer_name(
-                    crl.as_ptr(),
-                    issuer_cert.subject_name().as_ptr(),
-                ))?;
 
                 let context = {
                     let mut ctx = std::mem::MaybeUninit::<ffi::X509V3_CTX>::zeroed();
@@ -2145,8 +2143,8 @@ impl X509Crl {
     }
 
     /// use a negative value to set a time before 'now'
-    pub fn set_last_update(&mut self, seconds_from_now: Option<i32>) -> Result<(), ErrorStack> {
-        let time = Asn1Time::seconds_from_now(seconds_from_now.unwrap_or(0) as c_long)?;
+    pub fn set_last_update(&mut self, seconds_from_now: i32) -> Result<(), ErrorStack> {
+        let time = Asn1Time::seconds_from_now(seconds_from_now as c_long)?;
         cfg_if!(
         if #[cfg(any(ossl110, libressl270, boringssl, awslc))] {
                 unsafe {
@@ -2277,25 +2275,38 @@ impl X509Crl {
     }
 
     /// Revoke the given certificate.
+    ///
     /// This function won't produce duplicate entries in case the certificate was already revoked.
     /// Sets the CRL's last_updated time to the current time before returning irregardless of the given certificate.
-    pub fn revoke(&mut self, to_revoke: &X509) -> Result<(), ErrorStack> {
+    pub fn revoke(&mut self, to_revoke: &X509) -> Result<(), RevocationError> {
+        #[cfg(any(ossl110, libressl281, boringssl, awslc))]
+        {
+            // when quering the CRL by certificate, the issuer name must match,
+            // i.e. get_by_cert will not return an entry for cert's with a different issuer name even if they are present in the CRL
+            // since openssl does not check this before inserting a new revocation entry, we do this ourselves
+            if to_revoke.issuer_name().try_cmp(self.issuer_name())? != Ordering::Equal {
+                return Err(RevocationError::IssuerMismatch);
+            }
+        }
+
         match self.get_by_serial(to_revoke.serial_number()) {
             CrlStatus::NotRevoked => unsafe {
                 // we are not allowed to drop the revoked after adding it to the crl
                 let revoked = X509Revoked::new_raw(to_revoke)?;
                 if ffi::X509_CRL_add0_revoked(self.as_ptr(), revoked) == 0 {
-                    return Err(ErrorStack::get());
+                    return Err(ErrorStack::get().into());
                 };
             },
 
             _ => { /* do nothing, already revoked */ }
         }
+        self.set_last_update(0)?;
 
-        self.set_last_update(Some(0))
+        Ok(())
     }
 }
 
+#[cfg(any(ossl110, libressl270))]
 impl Clone for X509Crl {
     fn clone(&self) -> X509Crl {
         X509CrlRef::to_owned(self)
@@ -2418,12 +2429,13 @@ impl X509CrlRef {
     }
 }
 
+#[cfg(any(ossl110, libressl270))]
 impl ToOwned for X509CrlRef {
     type Owned = X509Crl;
 
     fn to_owned(&self) -> Self::Owned {
         unsafe {
-            X509_CRL_up_ref(self.as_ptr());
+            ffi::X509_CRL_up_ref(self.as_ptr());
             X509Crl::from_ptr(self.as_ptr())
         }
     }
@@ -3056,5 +3068,19 @@ impl X509PurposeRef {
             }
             X509PurposeId::from_raw(ffi::X509_PURPOSE_get_id(x509_purpose))
         }
+    }
+}
+
+#[derive(Debug)]
+pub enum RevocationError {
+    /// The certificate to revoke is not issued by the CRL's issuer.
+    IssuerMismatch,
+
+    Openssl(ErrorStack),
+}
+
+impl From<ErrorStack> for RevocationError {
+    fn from(err: ErrorStack) -> Self {
+        RevocationError::Openssl(err)
     }
 }
