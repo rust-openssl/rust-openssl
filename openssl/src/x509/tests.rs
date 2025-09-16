@@ -689,7 +689,7 @@ fn test_load_crl() {
     let cert = include_bytes!("../../test/subca.crt");
     let cert = X509::from_pem(cert).unwrap();
 
-    let revoked = match crl.get_by_cert(&cert) {
+    let revoked = match crl.get_by_serial(cert.serial_number()) {
         CrlStatus::Revoked(revoked) => revoked,
         _ => panic!("cert should be revoked"),
     };
@@ -735,7 +735,7 @@ fn test_crl_revoke() {
             "clr's entry count should not change when trying to revoke an already revoked cert"
         );
 
-        let revoked = match crl.get_by_cert(&already_revoked_cert) {
+        let revoked = match crl.get_by_serial(already_revoked_cert.serial_number()) {
             CrlStatus::Revoked(revoked) => revoked,
             _ => panic!("cert should be revoked"),
         };
@@ -759,7 +759,7 @@ fn test_crl_revoke() {
             "clr's entry count should have incremented by one after revoking a cert"
         );
 
-        let revoked = match crl.get_by_cert(&cert) {
+        let revoked = match crl.get_by_serial(cert.serial_number()) {
             CrlStatus::Revoked(revoked) => revoked,
             _ => panic!("cert should be revoked"),
         };
@@ -772,6 +772,7 @@ fn test_crl_revoke() {
 }
 
 #[cfg(any(ossl102, libressl261))]
+#[test]
 fn test_verify_crl() {
     let ca = include_bytes!("../../test/crl-ca.crt");
     let ca = X509::from_pem(ca).unwrap();
@@ -783,7 +784,7 @@ fn test_verify_crl() {
     let cert = include_bytes!("../../test/subca.crt");
     let cert = X509::from_pem(cert).unwrap();
 
-    let revoked = match crl.get_by_cert(&cert) {
+    let revoked = match crl.get_by_serial(cert.serial_number()) {
         CrlStatus::Revoked(revoked) => revoked,
         _ => panic!("cert should be revoked"),
     };

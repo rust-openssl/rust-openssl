@@ -2280,7 +2280,7 @@ impl X509Crl {
     /// This function won't produce duplicate entries in case the certificate was already revoked.
     /// Sets the CRL's last_updated time to the current time before returning irregardless of the given certificate.
     pub fn revoke(&mut self, to_revoke: &X509) -> Result<(), ErrorStack> {
-        match self.get_by_cert(to_revoke) {
+        match self.get_by_serial(to_revoke.serial_number()) {
             CrlStatus::NotRevoked => unsafe {
                 // we are not allowed to drop the revoked after adding it to the crl
                 let revoked = X509Revoked::new_raw(to_revoke)?;
@@ -2359,17 +2359,6 @@ impl X509CrlRef {
             let mut ret = ptr::null_mut::<ffi::X509_REVOKED>();
             let status =
                 ffi::X509_CRL_get0_by_serial(self.as_ptr(), &mut ret as *mut _, serial.as_ptr());
-            CrlStatus::from_ffi_status(status, ret)
-        }
-    }
-
-    /// Get the revocation status of a certificate
-    #[corresponds(X509_CRL_get0_by_cert)]
-    pub fn get_by_cert<'a>(&'a self, cert: &X509) -> CrlStatus<'a> {
-        unsafe {
-            let mut ret = ptr::null_mut::<ffi::X509_REVOKED>();
-            let status =
-                ffi::X509_CRL_get0_by_cert(self.as_ptr(), &mut ret as *mut _, cert.as_ptr());
             CrlStatus::from_ffi_status(status, ret)
         }
     }
