@@ -49,6 +49,7 @@ use crate::pkey::{HasPrivate, HasPublic, PKeyRef};
 use crate::rsa::Padding;
 use crate::{cvt, cvt_p};
 use foreign_types::ForeignTypeRef;
+use openssl_macros::corresponds;
 
 /// A type which encrypts data.
 pub struct Encrypter<'a> {
@@ -69,10 +70,7 @@ impl Drop for Encrypter<'_> {
 
 impl<'a> Encrypter<'a> {
     /// Creates a new `Encrypter`.
-    ///
-    /// OpenSSL documentation at [`EVP_PKEY_encrypt_init`].
-    ///
-    /// [`EVP_PKEY_encrypt_init`]: https://www.openssl.org/docs/manmaster/man3/EVP_PKEY_encrypt_init.html
+    #[corresponds(EVP_PKEY_encrypt_init)]
     pub fn new<T>(pkey: &'a PKeyRef<T>) -> Result<Encrypter<'a>, ErrorStack>
     where
         T: HasPublic,
@@ -110,10 +108,7 @@ impl<'a> Encrypter<'a> {
     /// Sets the RSA padding mode.
     ///
     /// This is only useful for RSA keys.
-    ///
-    /// This corresponds to [`EVP_PKEY_CTX_set_rsa_padding`].
-    ///
-    /// [`EVP_PKEY_CTX_set_rsa_padding`]: https://www.openssl.org/docs/manmaster/crypto/EVP_PKEY_CTX_set_rsa_padding.html
+    #[corresponds(EVP_PKEY_CTX_set_rsa_padding)]
     pub fn set_rsa_padding(&mut self, padding: Padding) -> Result<(), ErrorStack> {
         unsafe {
             cvt(ffi::EVP_PKEY_CTX_set_rsa_padding(
@@ -127,10 +122,7 @@ impl<'a> Encrypter<'a> {
     /// Sets the RSA MGF1 algorithm.
     ///
     /// This is only useful for RSA keys.
-    ///
-    /// This corresponds to [`EVP_PKEY_CTX_set_rsa_mgf1_md`].
-    ///
-    /// [`EVP_PKEY_CTX_set_rsa_mgf1_md`]: https://www.openssl.org/docs/manmaster/man7/RSA-PSS.html
+    #[corresponds(EVP_PKEY_CTX_set_rsa_mgf1_md)]
     pub fn set_rsa_mgf1_md(&mut self, md: MessageDigest) -> Result<(), ErrorStack> {
         unsafe {
             cvt(ffi::EVP_PKEY_CTX_set_rsa_mgf1_md(
@@ -144,10 +136,7 @@ impl<'a> Encrypter<'a> {
     /// Sets the RSA OAEP algorithm.
     ///
     /// This is only useful for RSA keys.
-    ///
-    /// This corresponds to [`EVP_PKEY_CTX_set_rsa_oaep_md`].
-    ///
-    /// [`EVP_PKEY_CTX_set_rsa_oaep_md`]: https://www.openssl.org/docs/manmaster/man3/EVP_PKEY_CTX_set_rsa_oaep_md.html
+    #[corresponds(EVP_PKEY_CTX_set_rsa_oaep_md)]
     #[cfg(any(ossl102, libressl310, boringssl, awslc))]
     pub fn set_rsa_oaep_md(&mut self, md: MessageDigest) -> Result<(), ErrorStack> {
         unsafe {
@@ -162,10 +151,7 @@ impl<'a> Encrypter<'a> {
     /// Sets the RSA OAEP label.
     ///
     /// This is only useful for RSA keys.
-    ///
-    /// This corresponds to [`EVP_PKEY_CTX_set0_rsa_oaep_label`].
-    ///
-    /// [`EVP_PKEY_CTX_set0_rsa_oaep_label`]: https://www.openssl.org/docs/manmaster/man3/EVP_PKEY_CTX_set0_rsa_oaep_label.html
+    #[corresponds(EVP_PKEY_CTX_set0_rsa_oaep_label)]
     #[cfg(any(ossl102, libressl310))]
     pub fn set_rsa_oaep_label(&mut self, label: &[u8]) -> Result<(), ErrorStack> {
         unsafe {
@@ -215,9 +201,7 @@ impl<'a> Encrypter<'a> {
     /// let encoded = &encoded[..encoded_len];
     /// ```
     ///
-    /// This corresponds to [`EVP_PKEY_encrypt`].
-    ///
-    /// [`EVP_PKEY_encrypt`]: https://www.openssl.org/docs/manmaster/man3/EVP_PKEY_encrypt.html
+    #[corresponds(EVP_PKEY_encrypt)]
     pub fn encrypt(&self, from: &[u8], to: &mut [u8]) -> Result<usize, ErrorStack> {
         let mut written = to.len();
         unsafe {
@@ -235,9 +219,8 @@ impl<'a> Encrypter<'a> {
 
     /// Gets the size of the buffer needed to encrypt the input data.
     ///
-    /// This corresponds to [`EVP_PKEY_encrypt`] called with a null pointer as output argument.
-    ///
-    /// [`EVP_PKEY_encrypt`]: https://www.openssl.org/docs/manmaster/man3/EVP_PKEY_encrypt.html
+    /// This corresponds to `EVP_PKEY_encrypt` called with a null pointer as output argument.
+    #[corresponds(EVP_PKEY_encrypt)]
     pub fn encrypt_len(&self, from: &[u8]) -> Result<usize, ErrorStack> {
         let mut written = 0;
         unsafe {
@@ -273,10 +256,7 @@ impl Drop for Decrypter<'_> {
 
 impl<'a> Decrypter<'a> {
     /// Creates a new `Decrypter`.
-    ///
-    /// OpenSSL documentation at [`EVP_PKEY_decrypt_init`].
-    ///
-    /// [`EVP_PKEY_decrypt_init`]: https://www.openssl.org/docs/manmaster/man3/EVP_PKEY_decrypt_init.html
+    #[corresponds(EVP_PKEY_decrypt_init)]
     pub fn new<T>(pkey: &'a PKeyRef<T>) -> Result<Decrypter<'a>, ErrorStack>
     where
         T: HasPrivate,
@@ -314,10 +294,7 @@ impl<'a> Decrypter<'a> {
     /// Sets the RSA padding mode.
     ///
     /// This is only useful for RSA keys.
-    ///
-    /// This corresponds to [`EVP_PKEY_CTX_set_rsa_padding`].
-    ///
-    /// [`EVP_PKEY_CTX_set_rsa_padding`]: https://www.openssl.org/docs/manmaster/crypto/EVP_PKEY_CTX_set_rsa_padding.html
+    #[corresponds(EVP_PKEY_CTX_set_rsa_padding)]
     pub fn set_rsa_padding(&mut self, padding: Padding) -> Result<(), ErrorStack> {
         unsafe {
             cvt(ffi::EVP_PKEY_CTX_set_rsa_padding(
@@ -331,10 +308,7 @@ impl<'a> Decrypter<'a> {
     /// Sets the RSA MGF1 algorithm.
     ///
     /// This is only useful for RSA keys.
-    ///
-    /// This corresponds to [`EVP_PKEY_CTX_set_rsa_mgf1_md`].
-    ///
-    /// [`EVP_PKEY_CTX_set_rsa_mgf1_md`]: https://www.openssl.org/docs/manmaster/man7/RSA-PSS.html
+    #[corresponds(EVP_PKEY_CTX_set_rsa_mgf1_md)]
     pub fn set_rsa_mgf1_md(&mut self, md: MessageDigest) -> Result<(), ErrorStack> {
         unsafe {
             cvt(ffi::EVP_PKEY_CTX_set_rsa_mgf1_md(
@@ -348,10 +322,7 @@ impl<'a> Decrypter<'a> {
     /// Sets the RSA OAEP algorithm.
     ///
     /// This is only useful for RSA keys.
-    ///
-    /// This corresponds to [`EVP_PKEY_CTX_set_rsa_oaep_md`].
-    ///
-    /// [`EVP_PKEY_CTX_set_rsa_oaep_md`]: https://www.openssl.org/docs/manmaster/man3/EVP_PKEY_CTX_set_rsa_oaep_md.html
+    #[corresponds(EVP_PKEY_CTX_set_rsa_oaep_md)]
     #[cfg(any(ossl102, libressl310, boringssl, awslc))]
     pub fn set_rsa_oaep_md(&mut self, md: MessageDigest) -> Result<(), ErrorStack> {
         unsafe {
@@ -366,10 +337,7 @@ impl<'a> Decrypter<'a> {
     /// Sets the RSA OAEP label.
     ///
     /// This is only useful for RSA keys.
-    ///
-    /// This corresponds to [`EVP_PKEY_CTX_set0_rsa_oaep_label`].
-    ///
-    /// [`EVP_PKEY_CTX_set0_rsa_oaep_label`]: https://www.openssl.org/docs/manmaster/man3/EVP_PKEY_CTX_set0_rsa_oaep_label.html
+    #[corresponds(EVP_PKEY_CTX_set0_rsa_oaep_label)]
     #[cfg(any(ossl102, libressl310))]
     pub fn set_rsa_oaep_label(&mut self, label: &[u8]) -> Result<(), ErrorStack> {
         unsafe {
@@ -434,9 +402,7 @@ impl<'a> Decrypter<'a> {
     /// let decoded = &decoded[..decoded_len];
     /// ```
     ///
-    /// This corresponds to [`EVP_PKEY_decrypt`].
-    ///
-    /// [`EVP_PKEY_decrypt`]: https://www.openssl.org/docs/manmaster/man3/EVP_PKEY_decrypt.html
+    #[corresponds(EVP_PKEY_decrypt)]
     pub fn decrypt(&self, from: &[u8], to: &mut [u8]) -> Result<usize, ErrorStack> {
         let mut written = to.len();
         unsafe {
@@ -454,9 +420,8 @@ impl<'a> Decrypter<'a> {
 
     /// Gets the size of the buffer needed to decrypt the input data.
     ///
-    /// This corresponds to [`EVP_PKEY_decrypt`] called with a null pointer as output argument.
-    ///
-    /// [`EVP_PKEY_decrypt`]: https://www.openssl.org/docs/manmaster/man3/EVP_PKEY_decrypt.html
+    /// This corresponds to `EVP_PKEY_decrypt` called with a null pointer as output argument.
+    #[corresponds(EVP_PKEY_decrypt)]
     pub fn decrypt_len(&self, from: &[u8]) -> Result<usize, ErrorStack> {
         let mut written = 0;
         unsafe {

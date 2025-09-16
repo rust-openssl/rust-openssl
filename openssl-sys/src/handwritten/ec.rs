@@ -1,6 +1,11 @@
 use super::super::*;
 use libc::*;
 
+#[cfg(ossl300)]
+extern "C" {
+    pub fn EVP_PKEY_CTX_set_ec_paramgen_curve_nid(ctx: *mut EVP_PKEY_CTX, nid: c_int) -> c_int;
+}
+
 #[repr(C)]
 #[derive(Copy, Clone)]
 pub enum point_conversion_form_t {
@@ -20,6 +25,8 @@ extern "C" {
 
     #[cfg(not(libressl410))]
     pub fn EC_GROUP_new(meth: *const EC_METHOD) -> *mut EC_GROUP;
+
+    pub fn EC_GROUP_dup(group: *const EC_GROUP) -> *mut EC_GROUP;
 
     pub fn EC_GROUP_free(group: *mut EC_GROUP);
 
@@ -109,6 +116,14 @@ extern "C" {
         p: *const EC_POINT,
         x: *mut BIGNUM,
         y: *mut BIGNUM,
+        ctx: *mut BN_CTX,
+    ) -> c_int;
+    #[cfg(any(ossl111, boringssl, libressl350, awslc))]
+    pub fn EC_POINT_set_affine_coordinates(
+        group: *const EC_GROUP,
+        p: *mut EC_POINT,
+        x: *const BIGNUM,
+        y: *const BIGNUM,
         ctx: *mut BN_CTX,
     ) -> c_int;
 

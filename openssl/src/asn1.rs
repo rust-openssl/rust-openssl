@@ -57,7 +57,7 @@ foreign_type_and_impl_send_sync! {
     /// further details of implementation.  Note: these docs are from the master
     /// branch as documentation on the 1.1.0 branch did not include this page.
     ///
-    /// [ASN1_GENERALIZEDTIME_set]: https://www.openssl.org/docs/manmaster/man3/ASN1_GENERALIZEDTIME_set.html
+    /// [ASN1_GENERALIZEDTIME_set]: https://docs.openssl.org/master/man3/ASN1_GENERALIZEDTIME_set/
     pub struct Asn1GeneralizedTime;
     /// Reference to a [`Asn1GeneralizedTime`]
     ///
@@ -187,7 +187,7 @@ foreign_type_and_impl_send_sync! {
     /// [ASN_TIME_set] documentation at OpenSSL explains the ASN.1 implementation
     /// used by OpenSSL.
     ///
-    /// [ASN_TIME_set]: https://www.openssl.org/docs/manmaster/crypto/ASN1_TIME_set.html
+    /// [ASN_TIME_set]: https://docs.openssl.org/master/man3/ASN1_TIME_set/
     pub struct Asn1Time;
     /// Reference to an [`Asn1Time`]
     ///
@@ -433,7 +433,7 @@ foreign_type_and_impl_send_sync! {
     /// structures.  This implementation uses [ASN1_STRING-to_UTF8] to preserve
     /// compatibility with Rust's String.
     ///
-    /// [ASN1_STRING-to_UTF8]: https://www.openssl.org/docs/manmaster/crypto/ASN1_STRING_to_UTF8.html
+    /// [ASN1_STRING-to_UTF8]: https://docs.openssl.org/master/man3/ASN1_STRING_to_UTF8/
     pub struct Asn1String;
     /// A reference to an [`Asn1String`].
     pub struct Asn1StringRef;
@@ -502,7 +502,7 @@ foreign_type_and_impl_send_sync! {
     /// OpenSSL documentation includes [`ASN1_INTEGER_set`].
     ///
     /// [`bn`]: ../bn/index.html
-    /// [`ASN1_INTEGER_set`]: https://www.openssl.org/docs/manmaster/crypto/ASN1_INTEGER_set.html
+    /// [`ASN1_INTEGER_set`]: https://docs.openssl.org/master/man3/ASN1_INTEGER_set/
     pub struct Asn1Integer;
     /// A reference to an [`Asn1Integer`].
     pub struct Asn1IntegerRef;
@@ -514,7 +514,7 @@ impl Asn1Integer {
     /// Corresponds to [`BN_to_ASN1_INTEGER`]. Also see
     /// [`BigNumRef::to_asn1_integer`].
     ///
-    /// [`BN_to_ASN1_INTEGER`]: https://www.openssl.org/docs/manmaster/crypto/BN_to_ASN1_INTEGER.html
+    /// [`BN_to_ASN1_INTEGER`]: https://docs.openssl.org/master/man3/BN_to_ASN1_INTEGER/
     /// [`BigNumRef::to_asn1_integer`]: ../bn/struct.BigNumRef.html#method.to_asn1_integer
     pub fn from_bn(bn: &BigNumRef) -> Result<Self, ErrorStack> {
         bn.to_asn1_integer()
@@ -678,7 +678,7 @@ foreign_type_and_impl_send_sync! {
     ///
     /// [`Nid`]: ../nid/index.html
     /// [`nid::COMMONNAME`]: ../nid/constant.COMMONNAME.html
-    /// [`OBJ_nid2obj`]: https://www.openssl.org/docs/manmaster/crypto/OBJ_obj2nid.html
+    /// [`OBJ_nid2obj`]: https://docs.openssl.org/master/man3/OBJ_obj2nid/
     pub struct Asn1Object;
     /// A reference to an [`Asn1Object`].
     pub struct Asn1ObjectRef;

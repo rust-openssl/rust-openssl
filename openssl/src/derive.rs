@@ -67,10 +67,7 @@ unsafe impl Send for Deriver<'_> {}
 #[allow(clippy::len_without_is_empty)]
 impl<'a> Deriver<'a> {
     /// Creates a new `Deriver` using the provided private key.
-    ///
-    /// This corresponds to [`EVP_PKEY_derive_init`].
-    ///
-    /// [`EVP_PKEY_derive_init`]: https://www.openssl.org/docs/manmaster/crypto/EVP_PKEY_derive_init.html
+    #[corresponds(EVP_PKEY_derive_init)]
     pub fn new<T>(key: &'a PKeyRef<T>) -> Result<Deriver<'a>, ErrorStack>
     where
         T: HasPrivate,
@@ -118,10 +115,10 @@ impl<'a> Deriver<'a> {
     ///
     /// It can be used to size the buffer passed to [`Deriver::derive`].
     ///
-    /// This corresponds to [`EVP_PKEY_derive`].
+    /// It can be used to size the buffer passed to [`Deriver::derive`].
     ///
     /// [`Deriver::derive`]: #method.derive
-    /// [`EVP_PKEY_derive`]: https://www.openssl.org/docs/manmaster/crypto/EVP_PKEY_derive_init.html
+    #[corresponds(EVP_PKEY_derive)]
     pub fn len(&mut self) -> Result<usize, ErrorStack> {
         unsafe {
             let mut len = 0;
@@ -132,10 +129,7 @@ impl<'a> Deriver<'a> {
     /// Derives a shared secret between the two keys, writing it into the buffer.
     ///
     /// Returns the number of bytes written.
-    ///
-    /// This corresponds to [`EVP_PKEY_derive`].
-    ///
-    /// [`EVP_PKEY_derive`]: https://www.openssl.org/docs/manmaster/crypto/EVP_PKEY_derive_init.html
+    #[corresponds(EVP_PKEY_derive)]
     pub fn derive(&mut self, buf: &mut [u8]) -> Result<usize, ErrorStack> {
         let mut len = buf.len();
         unsafe {

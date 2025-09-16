@@ -206,9 +206,6 @@ impl CmsContentInfo {
     /// Given a certificate stack `certs`, data `data`, cipher `cipher` and flags `flags`,
     /// create a CmsContentInfo struct.
     ///
-    /// OpenSSL documentation at [`CMS_encrypt`]
-    ///
-    /// [`CMS_encrypt`]: https://www.openssl.org/docs/manmaster/man3/CMS_encrypt.html
     #[corresponds(CMS_encrypt)]
     pub fn encrypt(
         certs: &StackRef<X509>,

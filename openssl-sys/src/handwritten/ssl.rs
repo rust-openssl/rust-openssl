@@ -478,6 +478,8 @@ const_ptr_api! {
 extern "C" {
     #[cfg(ossl111)]
     pub fn SSL_CIPHER_get_handshake_digest(cipher: *const SSL_CIPHER) -> *const EVP_MD;
+    #[cfg(ossl111)]
+    pub fn SSL_CIPHER_get_protocol_id(cipher: *const SSL_CIPHER) -> u16;
     pub fn SSL_CIPHER_get_name(cipher: *const SSL_CIPHER) -> *const c_char;
     #[cfg(ossl111)]
     pub fn SSL_CIPHER_standard_name(cipher: *const SSL_CIPHER) -> *const c_char;
@@ -1010,4 +1012,10 @@ extern "C" {
     ) -> c_int;
     pub fn SSL_get_value_uint(s: *mut SSL, class_: u32, id: u32, v: *mut u64) -> c_int;
     pub fn SSL_set_value_uint(s: *mut SSL, class_: u32, id: u32, v: u64) -> c_int;
+}
+
+#[cfg(ossl300)]
+extern "C" {
+    pub fn SSL_CTX_set0_tmp_dh_pkey(ctx: *mut SSL_CTX, dhpkey: *mut EVP_PKEY) -> c_int;
+    pub fn SSL_set0_tmp_dh_pkey(s: *mut SSL, dhpkey: *mut EVP_PKEY) -> c_int;
 }

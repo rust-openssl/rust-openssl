@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+## [v0.9.109] - 2025-05-28
+
+### Fixed
+
+* Fixed building with `vcpkg`, a statically linked OpenSSL, and rust 1.87.0.
+* Fixed building on the latest BoringSSL.
+
 ## [v0.9.108] - 2025-04-30
 
 ### Added
@@ -648,7 +655,8 @@ Fixed builds against OpenSSL built with `no-cast`.
 * Added `X509_verify` and `X509_REQ_verify`.
 * Added `EVP_MD_type` and `EVP_GROUP_get_curve_name`.
 
-[Unreleased]: https://github.com/sfackler/rust-openssl/compare/openssl-sys-v0.9.108..master
+[Unreleased]: https://github.com/sfackler/rust-openssl/compare/openssl-sys-v0.9.109..master
+[v0.9.109]: https://github.com/sfackler/rust-openssl/compare/openssl-sys-v0.9.108...openssl-sys-v0.9.109
 [v0.9.108]: https://github.com/sfackler/rust-openssl/compare/openssl-sys-v0.9.107...openssl-sys-v0.9.108
 [v0.9.107]: https://github.com/sfackler/rust-openssl/compare/openssl-sys-v0.9.106...openssl-sys-v0.9.107
 [v0.9.106]: https://github.com/sfackler/rust-openssl/compare/openssl-sys-v0.9.105...openssl-sys-v0.9.106

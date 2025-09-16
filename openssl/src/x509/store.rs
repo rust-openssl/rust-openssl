@@ -161,7 +161,7 @@ generic_foreign_type_and_impl_send_sync! {
 
 /// Marker type corresponding to the [`X509_LOOKUP_hash_dir`] lookup method.
 ///
-/// [`X509_LOOKUP_hash_dir`]: https://www.openssl.org/docs/manmaster/crypto/X509_LOOKUP_hash_dir.html
+/// [`X509_LOOKUP_hash_dir`]: https://docs.openssl.org/master/man3/X509_LOOKUP_hash_dir/
 // FIXME should be an enum
 pub struct HashDir;
 
@@ -196,7 +196,7 @@ impl X509LookupRef<HashDir> {
 
 /// Marker type corresponding to the [`X509_LOOKUP_file`] lookup method.
 ///
-/// [`X509_LOOKUP_file`]: https://www.openssl.org/docs/man1.1.1/man3/X509_LOOKUP_file.html
+/// [`X509_LOOKUP_file`]: https://docs.openssl.org/master/man3/X509_LOOKUP_file/
 pub struct File;
 
 impl X509Lookup<File> {

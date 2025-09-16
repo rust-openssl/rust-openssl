@@ -72,6 +72,7 @@ use crate::nid::Nid;
 use crate::pkey::{HasPrivate, PKeyRef, Params, Private};
 #[cfg(ossl300)]
 use crate::pkey::{PKey, Public};
+#[cfg(not(osslconf = "OPENSSL_NO_SRTP"))]
 use crate::srtp::{SrtpProtectionProfile, SrtpProtectionProfileRef};
 use crate::ssl::bio::BioMethod;
 use crate::ssl::callbacks::*;
@@ -1096,7 +1097,7 @@ impl SslContextBuilder {
     ///
     /// See [`ciphers`] for details on the format.
     ///
-    /// [`ciphers`]: https://www.openssl.org/docs/manmaster/apps/ciphers.html
+    /// [`ciphers`]: https://docs.openssl.org/master/man1/ciphers/
     #[corresponds(SSL_CTX_set_cipher_list)]
     pub fn set_cipher_list(&mut self, cipher_list: &str) -> Result<(), ErrorStack> {
         let cipher_list = CString::new(cipher_list).unwrap();
@@ -1269,6 +1270,7 @@ impl SslContextBuilder {
     }
 
     /// Enables the DTLS extension "use_srtp" as defined in RFC5764.
+    #[cfg(not(osslconf = "OPENSSL_NO_SRTP"))]
     #[corresponds(SSL_CTX_set_tlsext_use_srtp)]
     pub fn set_tlsext_use_srtp(&mut self, protocols: &str) -> Result<(), ErrorStack> {
         unsafe {
@@ -2141,6 +2143,18 @@ impl SslCipherRef {
             Some(Nid::from_raw(n))
         }
     }
+
+    /// Returns the two-byte ID of the cipher
+    ///
+    /// Requires OpenSSL 1.1.1 or newer.
+    #[corresponds(SSL_CIPHER_get_protocol_id)]
+    #[cfg(ossl111)]
+    pub fn protocol_id(&self) -> [u8; 2] {
+        unsafe {
+            let id = ffi::SSL_CIPHER_get_protocol_id(self.as_ptr());
+            id.to_be_bytes()
+        }
+    }
 }
 
 impl fmt::Debug for SslCipherRef {
@@ -2675,6 +2689,7 @@ impl SslRef {
     }
 
     /// Enables the DTLS extension "use_srtp" as defined in RFC5764.
+    #[cfg(not(osslconf = "OPENSSL_NO_SRTP"))]
     #[corresponds(SSL_set_tlsext_use_srtp)]
     pub fn set_tlsext_use_srtp(&mut self, protocols: &str) -> Result<(), ErrorStack> {
         unsafe {
@@ -2693,6 +2708,7 @@ impl SslRef {
     /// Gets all SRTP profiles that are enabled for handshake via set_tlsext_use_srtp
     ///
     /// DTLS extension "use_srtp" as defined in RFC5764 has to be enabled.
+    #[cfg(not(osslconf = "OPENSSL_NO_SRTP"))]
     #[corresponds(SSL_get_srtp_profiles)]
     pub fn srtp_profiles(&self) -> Option<&StackRef<SrtpProtectionProfile>> {
         unsafe {
@@ -2705,6 +2721,7 @@ impl SslRef {
     /// Gets the SRTP profile selected by handshake.
     ///
     /// DTLS extension "use_srtp" as defined in RFC5764 has to be enabled.
+    #[cfg(not(osslconf = "OPENSSL_NO_SRTP"))]
     #[corresponds(SSL_get_selected_srtp_profile)]
     pub fn selected_srtp_profile(&self) -> Option<&SrtpProtectionProfileRef> {
         unsafe {
@@ -2734,7 +2751,7 @@ impl SslRef {
     /// is not valid UTF-8, this function will return `None`. The `servername_raw` method returns
     /// the raw bytes and does not have this restriction.
     ///
-    /// [`SSL_get_servername`]: https://www.openssl.org/docs/manmaster/man3/SSL_get_servername.html
+    /// [`SSL_get_servername`]: https://docs.openssl.org/master/man3/SSL_get_servername/
     #[corresponds(SSL_get_servername)]
     // FIXME maybe rethink in 0.11?
     pub fn servername(&self, type_: NameType) -> Option<&str> {
@@ -3400,7 +3417,7 @@ impl SslRef {
     ///
     /// See [`ciphers`] for details on the format.
     ///
-    /// [`ciphers`]: https://www.openssl.org/docs/manmaster/apps/ciphers.html
+    /// [`ciphers`]: https://docs.openssl.org/master/man1/ciphers/
     #[corresponds(SSL_set_cipher_list)]
     pub fn set_cipher_list(&mut self, cipher_list: &str) -> Result<(), ErrorStack> {
         let cipher_list = CString::new(cipher_list).unwrap();

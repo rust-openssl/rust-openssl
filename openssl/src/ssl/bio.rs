@@ -189,7 +189,7 @@ unsafe extern "C" fn destroy<S>(bio: *mut BIO) -> c_int {
 }
 
 cfg_if! {
-    if #[cfg(any(ossl110, libressl273))] {
+    if #[cfg(any(ossl110, libressl273, boringssl))] {
         use ffi::{BIO_get_data, BIO_set_data, BIO_set_flags, BIO_set_init};
         use crate::cvt;
 
@@ -201,15 +201,34 @@ cfg_if! {
 
         impl BIO_METHOD {
             fn new<S: Read + Write>() -> Result<BIO_METHOD, ErrorStack> {
+                #[cfg(not(boringssl))]
+                use ffi::{
+                    BIO_meth_set_write__fixed_rust as BIO_meth_set_write,
+                    BIO_meth_set_read__fixed_rust as BIO_meth_set_read,
+                    BIO_meth_set_puts__fixed_rust as BIO_meth_set_puts,
+                    BIO_meth_set_ctrl__fixed_rust as BIO_meth_set_ctrl,
+                    BIO_meth_set_create__fixed_rust as BIO_meth_set_create,
+                    BIO_meth_set_destroy__fixed_rust as BIO_meth_set_destroy,
+                };
+                #[cfg(boringssl)]
+                use ffi::{
+                    BIO_meth_set_write,
+                    BIO_meth_set_read,
+                    BIO_meth_set_puts,
+                    BIO_meth_set_ctrl,
+                    BIO_meth_set_create,
+                    BIO_meth_set_destroy,
+                };
+
                 unsafe {
                     let ptr = cvt_p(ffi::BIO_meth_new(ffi::BIO_TYPE_NONE, b"rust\0".as_ptr() as *const _))?;
                     let method = BIO_METHOD(ptr);
-                    cvt(ffi::BIO_meth_set_write__fixed_rust(method.0, Some(bwrite::<S>)))?;
-                    cvt(ffi::BIO_meth_set_read__fixed_rust(method.0, Some(bread::<S>)))?;
-                    cvt(ffi::BIO_meth_set_puts__fixed_rust(method.0, Some(bputs::<S>)))?;
-                    cvt(ffi::BIO_meth_set_ctrl__fixed_rust(method.0, Some(ctrl::<S>)))?;
-                    cvt(ffi::BIO_meth_set_create__fixed_rust(method.0, Some(create)))?;
-                    cvt(ffi::BIO_meth_set_destroy__fixed_rust(method.0, Some(destroy::<S>)))?;
+                    cvt(BIO_meth_set_write(method.0, Some(bwrite::<S>)))?;
+                    cvt(BIO_meth_set_read(method.0, Some(bread::<S>)))?;
+                    cvt(BIO_meth_set_puts(method.0, Some(bputs::<S>)))?;
+                    cvt(BIO_meth_set_ctrl(method.0, Some(ctrl::<S>)))?;
+                    cvt(BIO_meth_set_create(method.0, Some(create)))?;
+                    cvt(BIO_meth_set_destroy(method.0, Some(destroy::<S>)))?;
                     Ok(method)
                 }
             }

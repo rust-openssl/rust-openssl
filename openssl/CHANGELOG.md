@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+## [v0.10.73] - 2025-05-28
+
+### Fixed
+
+* Fixed building on the latest BoringSSL.
+
+### Changed
+
+* Replaced ctest2 with ctest in systest.
+
 ## [v0.10.72] - 2025-04-04
 
 ### Fixed
@@ -969,7 +979,8 @@
 
 Look at the [release tags] for information about older releases.
 
-[Unreleased]: https://github.com/sfackler/rust-openssl/compare/openssl-v0.10.72...master
+[Unreleased]: https://github.com/sfackler/rust-openssl/compare/openssl-v0.10.73...master
+[v0.10.73]: https://github.com/sfackler/rust-openssl/compare/openssl-v0.10.72...openssl-v0.10.73
 [v0.10.72]: https://github.com/sfackler/rust-openssl/compare/openssl-v0.10.71...openssl-v0.10.72
 [v0.10.71]: https://github.com/sfackler/rust-openssl/compare/openssl-v0.10.70...openssl-v0.10.71
 [v0.10.70]: https://github.com/sfackler/rust-openssl/compare/openssl-v0.10.69...openssl-v0.10.70

@@ -24,7 +24,7 @@ jobs:
     name: rustfmt
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: sfackler/actions/rustup@master
       - uses: sfackler/actions/rustfmt@master
 
@@ -32,7 +32,7 @@ jobs:
     name: clippy
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: sfackler/actions/rustup@master
       - run: echo "version=$(rustc --version)" >> $GITHUB_OUTPUT
         id: rust-version
@@ -58,11 +58,11 @@ jobs:
     name: min-version
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       # Remember to also update `--rust-target` in `openssl-sys/build/run_bindgen.rs`
       - uses: sfackler/actions/rustup@master
         with:
-          version: 1.63.0
+          version: 1.70.0
       - run: echo "version=$(rustc --version)" >> $GITHUB_OUTPUT
         id: rust-version
       - uses: actions/cache@v4
@@ -86,15 +86,22 @@ jobs:
       - run: cargo check -p openssl
 
   windows-vcpkg:
-    name: windows-vcpkg
-    runs-on: windows-latest
+    strategy:
+      matrix:
+        os:
+          - runner: windows-latest
+            arch: x64
+          - runner: windows-11-arm
+            arch: arm64
+    name: windows-vcpkg-${{ matrix.os.arch }}
+    runs-on: ${{ matrix.os.runner }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: sfackler/actions/rustup@master
       - run: echo "version=$(rustc --version)" >> $GITHUB_OUTPUT
         id: rust-version
       - run: echo "VCPKG_ROOT=$env:VCPKG_INSTALLATION_ROOT" | Out-File -FilePath $env:GITHUB_ENV -Append
-      - run: vcpkg install openssl:x64-windows-static-md
+      - run: vcpkg install openssl:${{ matrix.os.arch }}-windows-static-md
       - uses: actions/cache@v4
         with:
           path: ~/.cargo/registry/index
@@ -119,7 +126,7 @@ jobs:
     name: macos-homebrew
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: sfackler/actions/rustup@master
       - run: echo "version=$(rustc --version)" >> $GITHUB_OUTPUT
         id: rust-version
@@ -156,7 +163,7 @@ jobs:
             - name: aws-lc
               version: vendored
             - name: boringssl
-              version: e23fe9b6eecc10e4f9ea1f0027fea5eaee7bd6b6
+              version: 71bae60c26549ce1875f07d8c394b934de4b0f7b
             - name: openssl
               version: vendored
             - name: openssl
@@ -231,7 +238,7 @@ jobs:
         CARGO_TARGET_ARM_UNKNOWN_LINUX_GNUEABIHF_AR: arm-linux-gnueabihf-ar
         CARGO_TARGET_ARM_UNKNOWN_LINUX_GNUEABIHF_RUNNER: qemu-arm -L /usr/arm-linux-gnueabihf
       steps:
-        - uses: actions/checkout@v4
+        - uses: actions/checkout@v5
         - uses: sfackler/actions/rustup@master
         - run: echo "version=$(rustc --version)" >> $GITHUB_OUTPUT
           id: rust-version

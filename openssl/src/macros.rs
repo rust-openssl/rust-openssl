@@ -8,8 +8,8 @@ macro_rules! private_key_from_pem {
                 ffi::init();
                 let bio = crate::bio::MemBioSlice::new(pem)?;
                 let passphrase = ::std::ffi::CString::new(passphrase).unwrap();
-                cvt_p($f(bio.as_ptr(),
-                         ptr::null_mut(),
+                crate::cvt_p($f(bio.as_ptr(),
+                         ::std::ptr::null_mut(),
                          None,
                          passphrase.as_ptr() as *const _ as *mut _))
                     .map(|p| ::foreign_types::ForeignType::from_ptr(p))
@@ -24,8 +24,8 @@ macro_rules! private_key_from_pem {
                 ffi::init();
                 let mut cb = crate::util::CallbackState::new(callback);
                 let bio = crate::bio::MemBioSlice::new(pem)?;
-                cvt_p($f(bio.as_ptr(),
-                         ptr::null_mut(),
+                crate::cvt_p($f(bio.as_ptr(),
+                         ::std::ptr::null_mut(),
                          Some(crate::util::invoke_passwd_cb::<F>),
                          &mut cb as *mut _ as *mut _))
                     .map(|p| ::foreign_types::ForeignType::from_ptr(p))
@@ -40,13 +40,13 @@ macro_rules! private_key_to_pem {
         pub fn $n(&self) -> Result<Vec<u8>, crate::error::ErrorStack> {
             unsafe {
                 let bio = crate::bio::MemBio::new()?;
-                cvt($f(bio.as_ptr(),
+                crate::cvt($f(bio.as_ptr(),
                         self.as_ptr(),
-                        ptr::null(),
-                        ptr::null_mut(),
+                        ::std::ptr::null(),
+                        ::std::ptr::null_mut(),
                         -1,
                         None,
-                        ptr::null_mut()))?;
+                        ::std::ptr::null_mut()))?;
                 Ok(bio.get_buf().to_owned())
             }
         }
@@ -60,13 +60,13 @@ macro_rules! private_key_to_pem {
             unsafe {
                 let bio = crate::bio::MemBio::new()?;
                 assert!(passphrase.len() <= ::libc::c_int::MAX as usize);
-                cvt($f(bio.as_ptr(),
+                crate::cvt($f(bio.as_ptr(),
                         self.as_ptr(),
                         cipher.as_ptr(),
                         passphrase.as_ptr() as *const _ as *mut _,
                         passphrase.len() as ::libc::c_int,
                         None,
-                        ptr::null_mut()))?;
+                        ::std::ptr::null_mut()))?;
                 Ok(bio.get_buf().to_owned())
             }
         }
@@ -79,7 +79,7 @@ macro_rules! to_pem {
         pub fn $n(&self) -> Result<Vec<u8>, crate::error::ErrorStack> {
             unsafe {
                 let bio = crate::bio::MemBio::new()?;
-                cvt($f(bio.as_ptr(), self.as_ptr()))?;
+                crate::cvt($f(bio.as_ptr(), self.as_ptr()))?;
                 Ok(bio.get_buf().to_owned())
             }
         }
@@ -92,7 +92,7 @@ macro_rules! to_der {
         pub fn $n(&self) -> Result<Vec<u8>, crate::error::ErrorStack> {
             unsafe {
                 let len = crate::cvt($f(::foreign_types::ForeignTypeRef::as_ptr(self),
-                                        ptr::null_mut()))?;
+                                        ::std::ptr::null_mut()))?;
                 let mut buf = vec![0; len as usize];
                 crate::cvt($f(::foreign_types::ForeignTypeRef::as_ptr(self),
                               &mut buf.as_mut_ptr()))?;
@@ -124,7 +124,7 @@ macro_rules! from_pem {
             unsafe {
                 crate::init();
                 let bio = crate::bio::MemBioSlice::new(pem)?;
-                cvt_p($f(bio.as_ptr(), ::std::ptr::null_mut(), None, ::std::ptr::null_mut()))
+                crate::cvt_p($f(bio.as_ptr(), ::std::ptr::null_mut(), None, ::std::ptr::null_mut()))
                     .map(|p| ::foreign_types::ForeignType::from_ptr(p))
             }
         }
