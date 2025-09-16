@@ -2327,6 +2327,17 @@ impl X509CrlRef {
         }
     }
 
+    /// Get the revocation status of a certificate
+    #[corresponds(X509_CRL_get0_by_cert)]
+    pub fn get_by_cert<'a>(&'a self, cert: &X509) -> CrlStatus<'a> {
+        unsafe {
+            let mut ret = ptr::null_mut::<ffi::X509_REVOKED>();
+            let status =
+                ffi::X509_CRL_get0_by_cert(self.as_ptr(), &mut ret as *mut _, cert.as_ptr());
+            CrlStatus::from_ffi_status(status, ret)
+        }
+    }
+
     /// Get the issuer name from the revocation list.
     #[corresponds(X509_CRL_get_issuer)]
     pub fn issuer_name(&self) -> &X509NameRef {
@@ -2893,7 +2904,7 @@ cfg_if! {
 }
 
 cfg_if! {
-    if #[cfg(any(ossl110, libressl350, boringssl))] {
+    if #[cfg(any(ossl110, libressl350, boringssl, awslc))] {
         use ffi::{
             X509_CRL_get_issuer, X509_CRL_get0_nextUpdate, X509_CRL_get0_lastUpdate,
             X509_CRL_get_REVOKED,

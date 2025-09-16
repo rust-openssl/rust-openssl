@@ -19,9 +19,9 @@ use crate::x509::store::X509StoreBuilder;
 #[cfg(any(ossl102, boringssl, libressl261, awslc))]
 use crate::x509::verify::{X509VerifyFlags, X509VerifyParam};
 
-#[cfg(any(ossl102, boringssl, awslc))]
+#[cfg(ossl110)]
 use crate::x509::X509Builder;
-#[cfg(any(ossl102, boringssl))]
+#[cfg(any(ossl102, boringssl, awslc))]
 use crate::x509::X509PurposeId;
 #[cfg(any(ossl102, boringssl, libressl261, awslc))]
 use crate::x509::X509PurposeRef;
