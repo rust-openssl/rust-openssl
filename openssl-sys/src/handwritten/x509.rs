@@ -285,6 +285,16 @@ extern "C" {
 
     pub fn X509_NAME_new() -> *mut X509_NAME;
     pub fn X509_NAME_cmp(x: *const X509_NAME, y: *const X509_NAME) -> c_int;
+    #[cfg(ossl300)]
+    pub fn X509_NAME_hash_ex(
+        x: *const X509_NAME,
+        ctx: *mut OSSL_LIB_CTX,
+        propq: *const c_char,
+        ok: *mut c_int,
+    ) -> c_ulong;
+
+    #[cfg(not(ossl300))]
+    pub fn X509_NAME_hash(x: *mut X509_NAME) -> c_ulong;
     pub fn X509_NAME_free(x: *mut X509_NAME);
 
     pub fn X509_new() -> *mut X509;

@@ -680,6 +680,8 @@ fn test_load_crl() {
     let crl = include_bytes!("../../test/test.crl");
     let crl = X509Crl::from_der(crl).unwrap();
     assert!(crl.verify(&ca.public_key().unwrap()).unwrap());
+    let issuer = crl.issuer_name();
+    assert_eq!(format!("{:08x}", issuer.hash()), "f88ed8fa");
 
     let cert = include_bytes!("../../test/subca.crt");
     let cert = X509::from_pem(cert).unwrap();
