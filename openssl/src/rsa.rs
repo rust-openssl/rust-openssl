@@ -376,8 +376,8 @@ impl Rsa<Public> {
     ///
     /// This corresponds to [`RSA_new`] and uses [`RSA_set0_key`].
     ///
-    /// [`RSA_new`]: https://www.openssl.org/docs/manmaster/crypto/RSA_new.html
-    /// [`RSA_set0_key`]: https://www.openssl.org/docs/manmaster/crypto/RSA_set0_key.html
+    /// [`RSA_new`]: https://docs.openssl.org/master/man3/RSA_new/
+    /// [`RSA_set0_key`]: https://docs.openssl.org/master/man3/RSA_set0_key/
     pub fn from_public_components(n: BigNum, e: BigNum) -> Result<Rsa<Public>, ErrorStack> {
         unsafe {
             let rsa = cvt_p(ffi::RSA_new())?;
@@ -436,8 +436,8 @@ impl RsaPrivateKeyBuilder {
     ///
     /// This corresponds to [`RSA_new`] and uses [`RSA_set0_key`].
     ///
-    /// [`RSA_new`]: https://www.openssl.org/docs/manmaster/crypto/RSA_new.html
-    /// [`RSA_set0_key`]: https://www.openssl.org/docs/manmaster/crypto/RSA_set0_key.html
+    /// [`RSA_new`]: https://docs.openssl.org/master/man3/RSA_new/
+    /// [`RSA_set0_key`]: https://docs.openssl.org/master/man3/RSA_set0_key/
     pub fn new(n: BigNum, e: BigNum, d: BigNum) -> Result<RsaPrivateKeyBuilder, ErrorStack> {
         unsafe {
             let rsa = cvt_p(ffi::RSA_new())?;

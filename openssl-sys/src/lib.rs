@@ -35,10 +35,13 @@ extern crate aws_lc_sys;
 #[cfg(awslc)]
 #[path = "."]
 mod aws_lc {
-    #[cfg(feature = "aws-lc")]
+    #[cfg(all(feature = "aws-lc", not(feature = "aws-lc-fips")))]
     pub use aws_lc_sys::*;
 
-    #[cfg(not(feature = "aws-lc"))]
+    #[cfg(feature = "aws-lc-fips")]
+    pub use aws_lc_fips_sys::*;
+
+    #[cfg(not(any(feature = "aws-lc", feature = "aws-lc-fips")))]
     include!(concat!(env!("OUT_DIR"), "/bindgen.rs"));
 
     use libc::{c_char, c_long, c_void};
@@ -69,7 +72,11 @@ mod openssl {
     pub use self::bio::*;
     pub use self::bn::*;
     pub use self::cms::*;
+    #[cfg(ossl300)]
+    pub use self::core_dispatch::*;
     pub use self::crypto::*;
+    pub use self::dh::*;
+    pub use self::dsa::*;
     pub use self::dtls1::*;
     pub use self::ec::*;
     pub use self::err::*;
@@ -99,7 +106,11 @@ mod openssl {
     mod bio;
     mod bn;
     mod cms;
+    #[cfg(ossl300)]
+    mod core_dispatch;
     mod crypto;
+    mod dh;
+    mod dsa;
     mod dtls1;
     mod ec;
     mod err;
@@ -164,12 +175,12 @@ mod openssl {
             _file: *const c_char,
             _line: c_int,
         ) {
-            let mutex = &(*MUTEXES)[n as usize];
+            let mutex = &(&(*MUTEXES))[n as usize];
 
             if mode & CRYPTO_LOCK != 0 {
-                (*GUARDS)[n as usize] = Some(mutex.lock().unwrap());
+                (&mut (*GUARDS))[n as usize] = Some(mutex.lock().unwrap());
             } else {
-                if let None = (*GUARDS)[n as usize].take() {
+                if let None = (&mut (*GUARDS))[n as usize].take() {
                     let _ = writeln!(
                         io::stderr(),
                         "BUG: rust-openssl lock {} already unlocked, aborting",

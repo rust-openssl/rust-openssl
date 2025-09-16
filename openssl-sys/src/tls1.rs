@@ -109,6 +109,7 @@ pub unsafe fn SSL_CTX_set_tlsext_status_cb(
     )
 }
 
+#[cfg(not(osslconf = "OPENSSL_NO_SRTP"))]
 pub unsafe fn SSL_CTX_set_tlsext_status_arg(ctx: *mut SSL_CTX, arg: *mut c_void) -> c_long {
     SSL_CTX_ctrl(ctx, SSL_CTRL_SET_TLSEXT_STATUS_REQ_CB_ARG, 0, arg)
 }

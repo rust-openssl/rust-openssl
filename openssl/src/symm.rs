@@ -69,7 +69,7 @@ pub enum Mode {
 ///
 /// See OpenSSL doc at [`EVP_EncryptInit`] for more information on each algorithms.
 ///
-/// [`EVP_EncryptInit`]: https://www.openssl.org/docs/manmaster/crypto/EVP_EncryptInit.html
+/// [`EVP_EncryptInit`]: https://docs.openssl.org/master/man3/EVP_EncryptInit/
 #[derive(Copy, Clone, PartialEq, Eq)]
 pub struct Cipher(*const ffi::EVP_CIPHER);
 
@@ -114,6 +114,7 @@ impl Cipher {
         unsafe { Cipher(ffi::EVP_aes_128_cfb1()) }
     }
 
+    #[cfg(not(boringssl))]
     pub fn aes_128_cfb128() -> Cipher {
         unsafe { Cipher(ffi::EVP_aes_128_cfb128()) }
     }
@@ -159,6 +160,7 @@ impl Cipher {
         unsafe { Cipher(ffi::EVP_aes_192_cfb1()) }
     }
 
+    #[cfg(not(boringssl))]
     pub fn aes_192_cfb128() -> Cipher {
         unsafe { Cipher(ffi::EVP_aes_192_cfb128()) }
     }
@@ -209,6 +211,7 @@ impl Cipher {
         unsafe { Cipher(ffi::EVP_aes_256_cfb1()) }
     }
 
+    #[cfg(not(boringssl))]
     pub fn aes_256_cfb128() -> Cipher {
         unsafe { Cipher(ffi::EVP_aes_256_cfb128()) }
     }

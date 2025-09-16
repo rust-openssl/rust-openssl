@@ -54,7 +54,7 @@ use crate::stack::StackRef;
 use crate::util::ForeignTypeRefExt;
 #[cfg(any(ossl102, boringssl, libressl261, awslc))]
 use crate::x509::verify::{X509VerifyFlags, X509VerifyParamRef};
-use crate::x509::{X509Object, X509PurposeId, X509};
+use crate::x509::{X509CrlRef, X509Object, X509PurposeId, X509};
 use crate::{cvt, cvt_p};
 use openssl_macros::corresponds;
 #[cfg(not(any(boringssl, awslc)))]
@@ -99,6 +99,12 @@ impl X509StoreBuilderRef {
     #[corresponds(X509_STORE_add_cert)]
     pub fn add_cert(&mut self, cert: X509) -> Result<(), ErrorStack> {
         unsafe { cvt(ffi::X509_STORE_add_cert(self.as_ptr(), cert.as_ptr())).map(|_| ()) }
+    }
+
+    /// Add a CRL to the certificate store.
+    #[corresponds(X509_STORE_add_crl)]
+    pub fn add_crl(&mut self, crl: &X509CrlRef) -> Result<(), ErrorStack> {
+        unsafe { cvt(ffi::X509_STORE_add_crl(self.as_ptr(), crl.as_ptr())).map(|_| ()) }
     }
 
     /// Load certificates from their default locations.
@@ -155,7 +161,7 @@ generic_foreign_type_and_impl_send_sync! {
 
 /// Marker type corresponding to the [`X509_LOOKUP_hash_dir`] lookup method.
 ///
-/// [`X509_LOOKUP_hash_dir`]: https://www.openssl.org/docs/manmaster/crypto/X509_LOOKUP_hash_dir.html
+/// [`X509_LOOKUP_hash_dir`]: https://docs.openssl.org/master/man3/X509_LOOKUP_hash_dir/
 // FIXME should be an enum
 pub struct HashDir;
 
@@ -190,7 +196,7 @@ impl X509LookupRef<HashDir> {
 
 /// Marker type corresponding to the [`X509_LOOKUP_file`] lookup method.
 ///
-/// [`X509_LOOKUP_file`]: https://www.openssl.org/docs/man1.1.1/man3/X509_LOOKUP_file.html
+/// [`X509_LOOKUP_file`]: https://docs.openssl.org/master/man3/X509_LOOKUP_file/
 pub struct File;
 
 impl X509Lookup<File> {

@@ -101,7 +101,7 @@ foreign_type_and_impl_send_sync! {
     /// to allocate.  BigNumContext and the OpenSSL [`BN_CTX`] structure are used
     /// internally when passing BigNum values between subroutines.
     ///
-    /// [`BN_CTX`]: https://www.openssl.org/docs/manmaster/crypto/BN_CTX_new.html
+    /// [`BN_CTX`]: https://docs.openssl.org/master/man3/BN_CTX_new/
     pub struct BigNumContext;
     /// Reference to [`BigNumContext`]
     ///
@@ -144,7 +144,7 @@ foreign_type_and_impl_send_sync! {
     ///
     /// [`new`]: struct.BigNum.html#method.new
     /// [`Dref<Target = BigNumRef>`]: struct.BigNum.html#deref-methods
-    /// [`BN_new`]: https://www.openssl.org/docs/manmaster/crypto/BN_new.html
+    /// [`BN_new`]: https://docs.openssl.org/master/man3/BN_new/
     ///
     /// # Examples
     /// ```
@@ -1103,10 +1103,6 @@ impl BigNum {
     }
 
     /// Creates a new `BigNum` from an unsigned, big-endian encoded number of arbitrary length.
-    ///
-    /// OpenSSL documentation at [`BN_bin2bn`]
-    ///
-    /// [`BN_bin2bn`]: https://www.openssl.org/docs/manmaster/crypto/BN_bin2bn.html
     ///
     /// ```
     /// # use openssl::bn::BigNum;

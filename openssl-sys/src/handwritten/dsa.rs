@@ -2,6 +2,11 @@ use libc::*;
 
 use super::super::*;
 
+#[cfg(ossl300)]
+extern "C" {
+    pub fn EVP_PKEY_CTX_set_dsa_paramgen_bits(ctx: *mut EVP_PKEY_CTX, nbits: c_int) -> c_int;
+}
+
 cfg_if! {
     if #[cfg(any(ossl110, libressl280))] {
         pub enum DSA_SIG {}

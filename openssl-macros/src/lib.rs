@@ -12,7 +12,7 @@ pub fn corresponds(attr: TokenStream, item: TokenStream) -> TokenStream {
 
     let function = function.to_string();
     let line = format!(
-        "This corresponds to [`{0}`](https://www.openssl.org/docs/manmaster/man3/{0}.html).",
+        "This corresponds to [`{0}`](https://docs.openssl.org/master/man3/{0}/).",
         function
     );
 

@@ -81,7 +81,7 @@ impl Asn1Flag {
     ///
     /// OpenSSL documentation at [`EC_GROUP`]
     ///
-    /// [`EC_GROUP`]: https://www.openssl.org/docs/manmaster/crypto/EC_GROUP_get_seed_len.html
+    /// [`EC_GROUP`]: https://docs.openssl.org/master/man3/EC_GROUP_get_seed_len/
     pub const EXPLICIT_CURVE: Asn1Flag = Asn1Flag(0);
 
     /// Standard Curves
@@ -91,7 +91,7 @@ impl Asn1Flag {
     ///
     /// OpenSSL documentation at [`EC_GROUP`]
     ///
-    /// [`EC_GROUP`]: https://www.openssl.org/docs/manmaster/man3/EC_GROUP_order_bits.html
+    /// [`EC_GROUP`]: https://docs.openssl.org/master/man3/EC_GROUP_order_bits/
     pub const NAMED_CURVE: Asn1Flag = Asn1Flag(ffi::OPENSSL_EC_NAMED_CURVE);
 }
 
@@ -551,6 +551,29 @@ impl EcPointRef {
     ) -> Result<(), ErrorStack> {
         unsafe {
             cvt(ffi::EC_POINT_get_affine_coordinates_GFp(
+                group.as_ptr(),
+                self.as_ptr(),
+                x.as_ptr(),
+                y.as_ptr(),
+                ctx.as_ptr(),
+            ))
+            .map(|_| ())
+        }
+    }
+
+    /// Sets affine coordinates of a point on an elliptic curve using the provided
+    /// `x` and `y` `BigNum`s
+    #[corresponds(EC_POINT_set_affine_coordinates)]
+    #[cfg(any(ossl111, boringssl, libressl350, awslc))]
+    pub fn set_affine_coordinates(
+        &mut self,
+        group: &EcGroupRef,
+        x: &BigNumRef,
+        y: &BigNumRef,
+        ctx: &mut BigNumContextRef,
+    ) -> Result<(), ErrorStack> {
+        unsafe {
+            cvt(ffi::EC_POINT_set_affine_coordinates(
                 group.as_ptr(),
                 self.as_ptr(),
                 x.as_ptr(),
@@ -1062,8 +1085,15 @@ mod test {
         let _curve = EcGroup::from_components(p, a, b, &mut ctx).unwrap();
     }
 
-    #[test]
-    fn ec_point_set_affine() {
+    fn set_affine_coords_test(
+        set_affine_coords: fn(
+            &mut EcPointRef,
+            &EcGroupRef,
+            &BigNumRef,
+            &BigNumRef,
+            &mut BigNumContextRef,
+        ) -> Result<(), ErrorStack>,
+    ) {
         // parameters are from secp256r1
         let group = EcGroup::from_curve_name(Nid::X9_62_PRIME256V1).unwrap();
         let mut ctx = BigNumContext::new().unwrap();
@@ -1076,10 +1106,20 @@ mod test {
             "4FE342E2FE1A7F9B8EE7EB4A7C0F9E162BCE33576B315ECECBB6406837BF51F5",
         )
         .unwrap();
-        gen_point
-            .set_affine_coordinates_gfp(&group, &gen_x, &gen_y, &mut ctx)
-            .unwrap();
+        set_affine_coords(&mut gen_point, &group, &gen_x, &gen_y, &mut ctx).unwrap();
+
         assert!(gen_point.is_on_curve(&group, &mut ctx).unwrap());
+    }
+
+    #[test]
+    fn ec_point_set_affine_gfp() {
+        set_affine_coords_test(EcPointRef::set_affine_coordinates_gfp)
+    }
+
+    #[test]
+    #[cfg(any(ossl111, boringssl, libressl350, awslc))]
+    fn ec_point_set_affine() {
+        set_affine_coords_test(EcPointRef::set_affine_coordinates)
     }
 
     #[test]

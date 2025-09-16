@@ -1,5 +1,11 @@
 use super::super::*;
 
+#[cfg(ossl300)]
+extern "C" {
+    pub fn EVP_PKEY_CTX_set_dh_paramgen_prime_len(ctx: *mut EVP_PKEY_CTX, len: c_int) -> c_int;
+    pub fn EVP_PKEY_CTX_set_dh_paramgen_generator(ctx: *mut EVP_PKEY_CTX, gen: c_int) -> c_int;
+}
+
 extern "C" {
     pub fn DH_new() -> *mut DH;
     pub fn DH_free(dh: *mut DH);
