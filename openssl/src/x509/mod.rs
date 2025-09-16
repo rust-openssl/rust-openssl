@@ -8,6 +8,7 @@
 //! the secure protocol for browsing the web.
 
 use cfg_if::cfg_if;
+use ffi::X509_CRL_up_ref;
 use foreign_types::{ForeignType, ForeignTypeRef, Opaque};
 use libc::{c_int, c_long, c_uint, c_void};
 use std::cmp::{self, Ordering};
@@ -1647,6 +1648,65 @@ impl CrlReason {
     pub const fn as_raw(&self) -> c_int {
         self.0
     }
+
+    pub fn to_asn1_integer(&self) -> Result<Asn1Integer, ErrorStack> {
+        Asn1Integer::from_bn(BigNum::from_u32(self.0 as u32)?.as_ref())
+    }
+}
+
+/// A builder used to construct `X509Revoked`.
+pub struct X509RevokedBuilder(X509Revoked);
+
+impl X509RevokedBuilder {
+    /// Creates a new X509Revoked builder.
+    pub fn new() -> Result<X509RevokedBuilder, ErrorStack> {
+        unsafe {
+            ffi::init();
+            cvt_p(ffi::X509_REVOKED_new()).map(|p| X509RevokedBuilder(X509Revoked(p)))
+        }
+    }
+
+    /// Set revocation reason.
+    pub fn set_crl_reason(&mut self, crl_reason: &CrlReason) -> Result<(), ErrorStack> {
+        unsafe {
+            cvt(ffi::X509_REVOKED_add1_ext_i2d(
+                self.0.as_ptr(),
+                ffi::NID_crl_reason,
+                crl_reason.to_asn1_integer()?.as_ptr() as *mut c_void,
+                0,
+                0,
+            ))
+            .map(|_| ())
+        }
+    }
+
+    /// Set revocation date.
+    #[corresponds(X509_REVOKED_set_revocationDate)]
+    pub fn set_revocation_date(&mut self, revocation_date: &Asn1TimeRef) -> Result<(), ErrorStack> {
+        unsafe {
+            cvt(ffi::X509_REVOKED_set_revocationDate(
+                self.0.as_ptr(),
+                revocation_date.as_ptr(),
+            ))
+            .map(|_| ())
+        }
+    }
+
+    /// Set serial number.
+    #[corresponds(X509_REVOKED_set_serialNumber)]
+    pub fn set_serial_number(&mut self, serial_number: &Asn1IntegerRef) -> Result<(), ErrorStack> {
+        unsafe {
+            cvt(ffi::X509_REVOKED_set_serialNumber(
+                self.0.as_ptr(),
+                serial_number.as_ptr(),
+            ))
+            .map(|_| ())
+        }
+    }
+
+    pub fn build(self) -> X509Revoked {
+        self.0
+    }
 }
 
 foreign_type_and_impl_send_sync! {
@@ -1664,6 +1724,11 @@ impl Stackable for X509Revoked {
 }
 
 impl X509Revoked {
+    /// Returns a new builder.
+    pub fn builder() -> Result<X509RevokedBuilder, ErrorStack> {
+        X509RevokedBuilder::new()
+    }
+
     from_der! {
         /// Deserializes a DER-encoded certificate revocation status
         #[corresponds(d2i_X509_REVOKED)]
@@ -1795,6 +1860,130 @@ unsafe impl ExtensionType for AuthorityInformationAccess {
     type Output = Stack<AccessDescription>;
 }
 
+/// A builder used to construct `X509Crl`.
+pub struct X509CrlBuilder(X509Crl);
+
+impl X509CrlBuilder {
+    /// Creates a new CRL builder.
+    #[corresponds(X509_CRL_new)]
+    pub fn new() -> Result<X509CrlBuilder, ErrorStack> {
+        unsafe {
+            ffi::init();
+            cvt_p(ffi::X509_CRL_new()).map(|p| X509CrlBuilder(X509Crl(p)))
+        }
+    }
+
+    /// Sets the issuer name of the CRL.
+    #[corresponds(X509_CRL_set_issuer_name)]
+    pub fn set_issuer_name(&mut self, issuer_name: &X509NameRef) -> Result<(), ErrorStack> {
+        unsafe {
+            cvt(ffi::X509_CRL_set_issuer_name(
+                self.0.as_ptr(),
+                issuer_name.as_ptr(),
+            ))
+            .map(|_| ())
+        }
+    }
+
+    /// Sets last update to CRL.
+    #[corresponds(X509_CRL_set1_lastUpdate)]
+    pub fn set_last_update(&mut self, last_update: &Asn1TimeRef) -> Result<(), ErrorStack> {
+        unsafe {
+            cvt(X509_CRL_set1_lastUpdate(
+                self.0.as_ptr(),
+                last_update.as_ptr(),
+            ))
+            .map(|_| ())
+        }
+    }
+
+    /// Sets next update to CRL.
+    #[corresponds(X509_CRL_set1_nextUpdate)]
+    pub fn set_next_update(&mut self, next_update: &Asn1TimeRef) -> Result<(), ErrorStack> {
+        unsafe {
+            cvt(X509_CRL_set1_nextUpdate(
+                self.0.as_ptr(),
+                next_update.as_ptr(),
+            ))
+            .map(|_| ())
+        }
+    }
+
+    /// Adds an X509 extension value to the CRL.
+    #[corresponds(X509_CRL_add_ext)]
+    pub fn append_extension(&mut self, extension: &X509ExtensionRef) -> Result<(), ErrorStack> {
+        unsafe {
+            cvt(ffi::X509_CRL_add_ext(
+                self.0.as_ptr(),
+                extension.as_ptr(),
+                -1,
+            ))
+            .map(|_| ())
+        }
+    }
+
+    /// Return an `X509v3Context`. This context object can be used to construct
+    /// certain `X509Crl` extensions.
+    pub fn x509v3_context<'a>(
+        &'a self,
+        issuer: &X509Ref,
+        conf: Option<&'a ConfRef>,
+    ) -> X509v3Context<'a> {
+        unsafe {
+            let mut ctx = mem::zeroed();
+
+            ffi::X509V3_set_ctx(
+                &mut ctx,
+                issuer.as_ptr(),
+                ptr::null_mut(),
+                ptr::null_mut(),
+                self.0.as_ptr(),
+                0,
+            );
+
+            if let Some(conf) = conf {
+                ffi::X509V3_set_nconf(&mut ctx, conf.as_ptr());
+            }
+
+            X509v3Context(ctx, PhantomData)
+        }
+    }
+
+    /// Add a certificate the CRL.
+    #[corresponds(X509_CRL_add0_revoked)]
+    pub fn add_revoked(&mut self, revoked: X509Revoked) -> Result<(), ErrorStack> {
+        unsafe {
+            cvt(ffi::X509_CRL_add0_revoked(
+                self.0.as_ptr(),
+                revoked.as_ptr(),
+            ))?;
+            mem::forget(revoked);
+            Ok(())
+        }
+    }
+
+    /// Signs the CRL with a private key.
+    #[corresponds(X509_CRL_sign)]
+    pub fn sign<T>(&mut self, key: &PKeyRef<T>, hash: MessageDigest) -> Result<(), ErrorStack>
+    where
+        T: HasPrivate,
+    {
+        unsafe {
+            cvt(ffi::X509_CRL_sign(
+                self.0.as_ptr(),
+                key.as_ptr(),
+                hash.as_ptr(),
+            ))
+            .map(|_| ())
+        }
+    }
+
+    /// Consumes the builder, returning the CRL.
+    pub fn build(self) -> X509Crl {
+        self.0
+    }
+}
+
 foreign_type_and_impl_send_sync! {
     type CType = ffi::X509_CRL;
     fn drop = ffi::X509_CRL_free;
@@ -1810,6 +1999,7 @@ foreign_type_and_impl_send_sync! {
 /// Corresponds to the return value from the [`X509_CRL_get0_by_*`] methods.
 ///
 /// [`X509_CRL_get0_by_*`]: https://docs.openssl.org/master/man3/X509_CRL_get0_by_serial/
+#[derive(Debug)]
 pub enum CrlStatus<'a> {
     /// The certificate is not present in the list
     NotRevoked,
@@ -1820,6 +2010,16 @@ pub enum CrlStatus<'a> {
     /// This can occur if the certificate was revoked with the "CertificateHold"
     /// reason, and has since been unrevoked.
     RemoveFromCrl(&'a X509RevokedRef),
+}
+
+impl fmt::Debug for X509RevokedRef {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
+        fmt.debug_struct("X509RevokedRef")
+            .field("der", &self.to_der())
+            .field("revocation_date", &self.revocation_date())
+            .field("serial_number", &self.serial_number().to_bn())
+            .finish()
+    }
 }
 
 impl<'a> CrlStatus<'a> {
@@ -1850,6 +2050,11 @@ impl<'a> CrlStatus<'a> {
 }
 
 impl X509Crl {
+    /// Returns a new builder.
+    pub fn builder() -> Result<X509CrlBuilder, ErrorStack> {
+        X509CrlBuilder::new()
+    }
+
     from_pem! {
         /// Deserializes a PEM-encoded Certificate Revocation List
         ///
@@ -2091,6 +2296,12 @@ impl X509Crl {
     }
 }
 
+impl Clone for X509Crl {
+    fn clone(&self) -> X509Crl {
+        X509CrlRef::to_owned(self)
+    }
+}
+
 impl X509CrlRef {
     to_pem! {
         /// Serializes the certificate request to a PEM-encoded Certificate Revocation List.
@@ -2214,6 +2425,17 @@ impl X509CrlRef {
             // was returned so something went wrong.
             (0 | 1, None) => Err(ErrorStack::get()),
             (c_int::MIN..=-2 | 2.., _) => panic!("OpenSSL should only return -2, -1, 0, or 1 for an extension's criticality but it returned {}", critical),
+        }
+    }
+}
+
+impl ToOwned for X509CrlRef {
+    type Owned = X509Crl;
+
+    fn to_owned(&self) -> Self::Owned {
+        unsafe {
+            X509_CRL_up_ref(self.as_ptr());
+            X509Crl::from_ptr(self.as_ptr())
         }
     }
 }
@@ -2706,6 +2928,18 @@ cfg_if! {
 
 cfg_if! {
     if #[cfg(any(ossl110, libressl350, boringssl, awslc))] {
+        use ffi::{X509_CRL_set1_nextUpdate, X509_CRL_set1_lastUpdate};
+    } else {
+        use ffi::{
+            X509_CRL_set_nextUpdate as X509_CRL_set1_nextUpdate,
+            X509_CRL_set_lastUpdate as X509_CRL_set1_lastUpdate,
+
+        };
+    }
+}
+
+cfg_if! {
+    if #[cfg(any(ossl110, libressl350, boringssl))] {
         use ffi::{
             X509_CRL_get_issuer, X509_CRL_get0_nextUpdate, X509_CRL_get0_lastUpdate,
             X509_CRL_get_REVOKED,
