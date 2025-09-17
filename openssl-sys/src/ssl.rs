@@ -73,6 +73,8 @@ cfg_if! {
 }
 
 pub const SSL_OP_LEGACY_SERVER_CONNECT: ssl_op_type!() = 0x00000004;
+#[cfg(ossl300)]
+pub const SSL_OP_ENABLE_KTLS: ssl_op_type!() = 0x00000008;
 cfg_if! {
     if #[cfg(libressl261)] {
         pub const SSL_OP_TLSEXT_PADDING: ssl_op_type!() = 0x0;
@@ -168,6 +170,9 @@ cfg_if! {
         pub const SSL_OP_CRYPTOPRO_TLSEXT_BUG: ssl_op_type!() = 0x80000000;
     }
 }
+
+#[cfg(ossl320)]
+pub const SSL_OP_ENABLE_KTLS_TX_ZEROCOPY_SENDFILE: ssl_op_type!() = 0x400000000;
 
 cfg_if! {
     if #[cfg(ossl300)] {

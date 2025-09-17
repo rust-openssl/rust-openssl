@@ -676,6 +676,14 @@ extern "C" {
         num: size_t,
         written: *mut size_t,
     ) -> c_int;
+    #[cfg(ossl300)]
+    pub fn SSL_sendfile(
+        ssl: *mut SSL,
+        fd: c_int,
+        offset: off_t,
+        size: size_t,
+        flags: c_int,
+    ) -> ssize_t;
     #[cfg(any(ossl111, libressl340))]
     pub fn SSL_write_early_data(
         s: *mut SSL,

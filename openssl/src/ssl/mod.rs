@@ -282,6 +282,26 @@ bitflags! {
         /// [`SslOptions::CIPHER_SERVER_PREFERENCE`]: struct.SslOptions.html#associatedconstant.CIPHER_SERVER_PREFERENCE
         #[cfg(ossl111)]
         const PRIORITIZE_CHACHA = ffi::SSL_OP_PRIORITIZE_CHACHA as SslOptionsRepr;
+
+        /// Enable the use of kernel TLS.
+        ///
+        /// In order to benefit from kernel TLS OpenSSL must have been compiled with support for it,
+        /// and it must be supported by the negotiated ciphersuites and extensions.
+        /// The specific ciphersuites and extensions that are supported may vary by platform and kernel version.
+        ///
+        /// Requires OpenSSL 3.0.0 or newer.
+        #[cfg(ossl300)]
+        const ENABLE_KTLS = ffi::SSL_OP_ENABLE_KTLS as SslOptionsRepr;
+
+        /// With this option, sendfile() will use the zerocopy mode, which gives a performance boost when used with KTLS hardware offload.
+        /// Note that invalid TLS records might be transmitted if the file is changed while being sent.
+        ///
+        /// Requires enable [`SslOptions::ENABLE_KTLS`].
+        /// Requires OpenSSL 3.2.0 or newer.
+        ///
+        /// [`SslOptions::ENABLE_KTLS`]: struct.SslOptions.html#associatedconstant.ENABLE_KTLS
+        #[cfg(ossl320)]
+        const ENABLE_KTLS_ZEROCOPY_SENDFILE = ffi::SSL_OP_ENABLE_KTLS_TX_ZEROCOPY_SENDFILE as SslOptionsRepr;
     }
 }
 
