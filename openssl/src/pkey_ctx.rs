@@ -952,9 +952,8 @@ impl<T> PkeyCtxRef<T> {
         Ok(())
     }
 
-    /// Generates a new public/private keypair.
-    ///
-    /// New OpenSSL 3.0 function that should do the same thing as keygen()
+    /// Performs the generation operation and returns the resulting
+    /// key parameters or key.
     #[corresponds(EVP_PKEY_generate)]
     #[cfg(ossl300)]
     #[inline]
