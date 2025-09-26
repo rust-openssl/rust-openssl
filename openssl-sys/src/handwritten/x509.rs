@@ -465,6 +465,9 @@ extern "C" {
     #[cfg(ossl110)]
     pub fn X509_get0_extensions(req: *const X509) -> *const stack_st_X509_EXTENSION;
 
+    #[cfg(any(ossl110, libressl281))]
+    pub fn X509_CRL_get_version(crl: *const X509_CRL) -> c_long;
+
     pub fn X509_CRL_set_version(crl: *mut X509_CRL, version: c_long) -> c_int;
 }
 const_ptr_api! {
