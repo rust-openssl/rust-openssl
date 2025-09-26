@@ -395,6 +395,7 @@ cfg_if! {
 
             let param = ssl.param_mut();
             param.set_hostflags(X509CheckFlags::NO_PARTIAL_WILDCARDS);
+            let domain = domain.strip_prefix("[").and_then(|x| x.strip_suffix("]")).unwrap_or(domain);
             match domain.parse() {
                 Ok(ip) => param.set_ip(ip),
                 Err(_) => param.set_host(domain),
