@@ -251,6 +251,12 @@ pub const EVP_PKEY_CTRL_HKDF_INFO: c_int = EVP_PKEY_ALG_CTRL + 6;
 #[cfg(any(ossl111, libressl360))]
 pub const EVP_PKEY_CTRL_HKDF_MODE: c_int = EVP_PKEY_ALG_CTRL + 7;
 
+#[cfg(all(ossl111, not(ossl300)))]
+pub const EVP_PKEY_CTRL_SET1_ID: c_int = EVP_PKEY_ALG_CTRL + 11;
+
+#[cfg(ossl300)]
+pub const EVP_PKEY_CTRL_SET1_ID: c_int = 15;
+
 #[cfg(any(all(ossl111, not(ossl300)), libressl360))]
 pub unsafe fn EVP_PKEY_CTX_set_hkdf_mode(ctx: *mut EVP_PKEY_CTX, mode: c_int) -> c_int {
     EVP_PKEY_CTX_ctrl(
@@ -320,6 +326,18 @@ pub unsafe fn EVP_PKEY_CTX_add1_hkdf_info(
         EVP_PKEY_CTRL_HKDF_INFO,
         infolen,
         info as *mut c_void,
+    )
+}
+
+#[cfg(all(ossl111, not(ossl300)))]
+pub unsafe fn EVP_PKEY_CTX_set1_id(ctx: *mut EVP_PKEY_CTX, id: *const c_void, len: c_int) -> c_int {
+    EVP_PKEY_CTX_ctrl(
+        ctx,
+        -1,
+        -1,
+        EVP_PKEY_CTRL_SET1_ID,
+        len,
+        id as *mut c_void,
     )
 }
 
