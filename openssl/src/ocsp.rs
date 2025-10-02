@@ -109,6 +109,26 @@ impl OcspRevokedStatus {
     }
 }
 
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub struct OcspCheckNonceStatus(c_int);
+
+impl OcspCheckNonceStatus {
+    pub const REQUEST_ONLY: OcspCheckNonceStatus = OcspCheckNonceStatus(-1);
+    pub const NOT_EQUAL: OcspCheckNonceStatus = OcspCheckNonceStatus(0);
+    pub const EQUAL: OcspCheckNonceStatus = OcspCheckNonceStatus(1);
+    pub const ABSENT: OcspCheckNonceStatus = OcspCheckNonceStatus(2);
+    pub const RESPONSE_ONLY: OcspCheckNonceStatus = OcspCheckNonceStatus(3);
+
+    pub fn from_raw(raw: c_int) -> OcspResponseStatus {
+        OcspResponseStatus(raw)
+    }
+
+    #[allow(clippy::trivially_copy_pass_by_ref)]
+    pub fn as_raw(&self) -> c_int {
+        self.0
+    }
+}
+
 pub struct OcspStatus<'a> {
     /// The overall status of the response.
     pub status: OcspCertStatus,
@@ -207,6 +227,30 @@ impl OcspBasicResponseRef {
             } else {
                 None
             }
+        }
+    }
+
+    /// Add a nonce value to the response.
+    ///
+    /// If `val` is `None`, a random nonce is used.
+    #[corresponds(OCSP_basic_add1_nonce)]
+    pub fn add_nonce(&mut self, val: Option<&[u8]>) -> Result<(), ErrorStack> {
+        unsafe {
+            let (ptr, len) = match val {
+                Some(slice) => (slice.as_ptr() as *mut _, slice.len() as c_int),
+                None => (ptr::null_mut(), 0),
+            };
+            cvt(ffi::OCSP_basic_add1_nonce(self.as_ptr(), ptr, len))?;
+            Ok(())
+        }
+    }
+
+    /// Copy the nonce value from `req` to the response.
+    #[corresponds(OCSP_copy_nonce)]
+    pub fn copy_nonce(&mut self, req: &OcspRequestRef) -> Result<(), ErrorStack> {
+        unsafe {
+            cvt(ffi::OCSP_copy_nonce(self.as_ptr(), req.as_ptr()))?;
+            Ok(())
         }
     }
 }
@@ -341,6 +385,21 @@ impl OcspRequestRef {
             Ok(OcspOneReqRef::from_ptr_mut(ptr))
         }
     }
+
+    /// Add a nonce value to the request.
+    ///
+    /// If `val` is `None`, a random nonce is used.
+    #[corresponds(OCSP_request_add1_nonce)]
+    pub fn add_nonce(&mut self, val: Option<&[u8]>) -> Result<(), ErrorStack> {
+        unsafe {
+            let (ptr, len) = match val {
+                Some(slice) => (slice.as_ptr() as *mut _, slice.len() as c_int),
+                None => (ptr::null_mut(), 0),
+            };
+            cvt(ffi::OCSP_request_add1_nonce(self.as_ptr(), ptr, len))?;
+            Ok(())
+        }
+    }
 }
 
 foreign_type_and_impl_send_sync! {
@@ -349,4 +408,121 @@ foreign_type_and_impl_send_sync! {
 
     pub struct OcspOneReq;
     pub struct OcspOneReqRef;
+}
+
+/// Compares the nonce value in `req` and `resp`.
+#[corresponds(OCSP_check_nonce)]
+pub fn check_nonce(req: &OcspRequestRef, resp: &OcspBasicResponseRef) -> OcspCheckNonceStatus {
+    unsafe {
+        let r = ffi::OCSP_check_nonce(req.as_ptr(), resp.as_ptr());
+        OcspCheckNonceStatus(r)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use hex::FromHex;
+
+    use super::*;
+
+    const TEST_NONCE_HEX_1: &str = "2AE3D741A4112D3A0FD345FE89134AD1"; // nonce in test request
+    const TEST_NONCE_HEX_2: &str = "5E18AA1A113648F054A2F5A396F1636F";
+
+    #[test]
+    fn test_ocsp_create_request_with_nonce() {
+        let req_der = include_bytes!("../test/ocsp_req.der");
+        let req_nonce_der = include_bytes!("../test/ocsp_req_nonce.der");
+        let mut req = OcspRequest::from_der(req_der.as_slice()).unwrap();
+
+        assert_hex_eq(req.to_der().unwrap(), req_der);
+
+        let nonce = Vec::from_hex(TEST_NONCE_HEX_1).unwrap();
+        req.add_nonce(Some(&nonce)).unwrap();
+
+        assert_hex_eq(req.to_der().unwrap(), req_nonce_der);
+    }
+
+    #[test]
+    fn test_ocsp_check_nonce() {
+        let req_der = include_bytes!("../test/ocsp_req.der");
+        let resp_der = include_bytes!("../test/ocsp_resp.der");
+        let mut req = OcspRequest::from_der(req_der.as_slice()).unwrap();
+        let mut resp = OcspResponse::from_der(resp_der.as_slice())
+            .unwrap()
+            .basic()
+            .unwrap();
+        let nonce1 = Vec::from_hex(TEST_NONCE_HEX_1).unwrap();
+        let nonce2 = Vec::from_hex(TEST_NONCE_HEX_2).unwrap();
+
+        assert_eq!(
+            check_nonce(req.as_ref(), resp.as_ref()),
+            OcspCheckNonceStatus::ABSENT
+        );
+
+        req.add_nonce(Some(&nonce1)).unwrap();
+        assert_eq!(
+            check_nonce(req.as_ref(), resp.as_ref()),
+            OcspCheckNonceStatus::REQUEST_ONLY
+        );
+
+        resp.add_nonce(Some(&nonce1)).unwrap();
+        assert_eq!(
+            check_nonce(req.as_ref(), resp.as_ref()),
+            OcspCheckNonceStatus::EQUAL
+        );
+
+        resp.add_nonce(Some(&nonce2)).unwrap();
+        assert_eq!(
+            check_nonce(req.as_ref(), resp.as_ref()),
+            OcspCheckNonceStatus::NOT_EQUAL
+        );
+    }
+
+    #[test]
+    fn test_ocsp_copy_nonce() {
+        let req_der = include_bytes!("../test/ocsp_req_nonce.der");
+        let resp_der = include_bytes!("../test/ocsp_resp.der");
+        let req = OcspRequest::from_der(req_der.as_slice()).unwrap();
+        let mut resp = OcspResponse::from_der(resp_der.as_slice())
+            .unwrap()
+            .basic()
+            .unwrap();
+
+        assert_eq!(
+            check_nonce(req.as_ref(), resp.as_ref()),
+            OcspCheckNonceStatus::REQUEST_ONLY
+        );
+
+        resp.copy_nonce(req.as_ref()).unwrap();
+        assert_eq!(
+            check_nonce(req.as_ref(), resp.as_ref()),
+            OcspCheckNonceStatus::EQUAL
+        );
+    }
+
+    #[test]
+    fn test_ocsp_copy_no_nonce() {
+        let req_der = include_bytes!("../test/ocsp_req.der");
+        let resp_der = include_bytes!("../test/ocsp_resp.der");
+        let req = OcspRequest::from_der(req_der.as_slice()).unwrap();
+        let mut resp = OcspResponse::from_der(resp_der.as_slice())
+            .unwrap()
+            .basic()
+            .unwrap();
+
+        assert_eq!(
+            check_nonce(req.as_ref(), resp.as_ref()),
+            OcspCheckNonceStatus::ABSENT
+        );
+
+        resp.copy_nonce(req.as_ref()).unwrap();
+        assert_eq!(
+            check_nonce(req.as_ref(), resp.as_ref()),
+            OcspCheckNonceStatus::ABSENT
+        );
+    }
+
+    fn assert_hex_eq(left: impl AsRef<[u8]>, right: impl AsRef<[u8]>) {
+        assert_eq!(hex::encode(left.as_ref()), hex::encode(right.as_ref()))
+    }
 }
