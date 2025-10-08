@@ -158,7 +158,7 @@ impl MessageDigest {
         unsafe { MessageDigest(ffi::EVP_ripemd160()) }
     }
 
-    #[cfg(all(any(ossl111, libressl291), not(osslconf = "OPENSSL_NO_SM3")))]
+    #[cfg(all(ossl111, not(osslconf = "OPENSSL_NO_SM3")))]
     pub fn sm3() -> MessageDigest {
         unsafe { MessageDigest(ffi::EVP_sm3()) }
     }
@@ -852,7 +852,7 @@ mod tests {
         );
     }
 
-    #[cfg(all(any(ossl111, libressl291), not(osslconf = "OPENSSL_NO_SM3")))]
+    #[cfg(all(ossl111, not(osslconf = "OPENSSL_NO_SM3")))]
     #[test]
     fn test_sm3() {
         let tests = [(

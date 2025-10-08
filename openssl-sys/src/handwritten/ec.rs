@@ -246,7 +246,7 @@ extern "C" {
 }
 
 cfg_if! {
-    if #[cfg(any(ossl110, libressl280))] {
+    if #[cfg(ossl110)] {
         pub enum ECDSA_SIG {}
     } else {
         #[repr(C)]
@@ -262,10 +262,10 @@ extern "C" {
 
     pub fn ECDSA_SIG_free(sig: *mut ECDSA_SIG);
 
-    #[cfg(any(ossl110, libressl273))]
+    #[cfg(ossl110)]
     pub fn ECDSA_SIG_get0(sig: *const ECDSA_SIG, pr: *mut *const BIGNUM, ps: *mut *const BIGNUM);
 
-    #[cfg(any(ossl110, libressl273))]
+    #[cfg(ossl110)]
     pub fn ECDSA_SIG_set0(sig: *mut ECDSA_SIG, pr: *mut BIGNUM, ps: *mut BIGNUM) -> c_int;
 
     pub fn d2i_ECDSA_SIG(

@@ -74,9 +74,9 @@ cfg_if! {
 
 pub const SSL_OP_LEGACY_SERVER_CONNECT: ssl_op_type!() = 0x00000004;
 cfg_if! {
-    if #[cfg(libressl261)] {
+    if #[cfg(libressl)] {
         pub const SSL_OP_TLSEXT_PADDING: ssl_op_type!() = 0x0;
-    } else if #[cfg(any(ossl102, libressl))] {
+    } else if #[cfg(ossl102)] {
         pub const SSL_OP_TLSEXT_PADDING: ssl_op_type!() = 0x10;
     }
 }
@@ -114,7 +114,7 @@ pub const SSL_OP_PRIORITIZE_CHACHA: ssl_op_type!() = 0x00200000;
 
 pub const SSL_OP_CIPHER_SERVER_PREFERENCE: ssl_op_type!() = 0x00400000;
 cfg_if! {
-    if #[cfg(libressl280)] {
+    if #[cfg(libressl)] {
         pub const SSL_OP_TLS_ROLLBACK_BUG: ssl_op_type!() = 0;
     } else {
         pub const SSL_OP_TLS_ROLLBACK_BUG: ssl_op_type!() = 0x00800000;
@@ -162,7 +162,7 @@ cfg_if! {
 }
 
 cfg_if! {
-    if #[cfg(libressl261)] {
+    if #[cfg(libressl)] {
         pub const SSL_OP_CRYPTOPRO_TLSEXT_BUG: ssl_op_type!() = 0x0;
     } else {
         pub const SSL_OP_CRYPTOPRO_TLSEXT_BUG: ssl_op_type!() = 0x80000000;
@@ -181,10 +181,8 @@ cfg_if! {
             | SSL_OP_LEGACY_SERVER_CONNECT
             | SSL_OP_TLSEXT_PADDING
             | SSL_OP_SAFARI_ECDHE_ECDSA_BUG;
-    } else if #[cfg(libressl261)] {
-        pub const SSL_OP_ALL: ssl_op_type!() = 0x4;
     } else if #[cfg(libressl)] {
-        pub const SSL_OP_ALL: ssl_op_type!() = 0x80000014;
+        pub const SSL_OP_ALL: ssl_op_type!() = 0x4;
     } else {
         pub const SSL_OP_ALL: ssl_op_type!() = 0x80000BFF;
     }
@@ -221,9 +219,9 @@ cfg_if! {
         pub const SSL_OP_SSLEAY_080_CLIENT_DH_BUG: ssl_op_type!() = 0x0;
         pub const SSL_OP_TLS_D5_BUG: ssl_op_type!() = 0x0;
         pub const SSL_OP_TLS_BLOCK_PADDING_BUG: ssl_op_type!() = 0x0;
-        #[cfg(libressl261)]
+        #[cfg(libressl)]
         pub const SSL_OP_SINGLE_ECDH_USE: ssl_op_type!() = 0x0;
-        #[cfg(not(libressl261))]
+        #[cfg(not(libressl))]
         pub const SSL_OP_SINGLE_ECDH_USE: ssl_op_type!() = 0x00080000;
         pub const SSL_OP_SINGLE_DH_USE: ssl_op_type!() = 0x00100000;
         pub const SSL_OP_NO_SSLv2: ssl_op_type!() = 0x0;
@@ -343,7 +341,7 @@ pub const SSL_CTRL_CLEAR_OPTIONS: c_int = 77;
 pub const SSL_CTRL_GET_EXTRA_CHAIN_CERTS: c_int = 82;
 #[cfg(ossl102)]
 pub const SSL_CTRL_CHAIN_CERT: c_int = 89;
-#[cfg(any(ossl111, libressl252))]
+#[cfg(ossl111)]
 pub const SSL_CTRL_SET_GROUPS_LIST: c_int = 92;
 #[cfg(any(libressl, all(ossl102, not(ossl110))))]
 pub const SSL_CTRL_SET_ECDH_AUTO: c_int = 94;
@@ -357,13 +355,13 @@ pub const SSL_CTRL_GET_PEER_TMP_KEY: c_int = 109;
 pub const SSL_CTRL_SET_DH_AUTO: c_int = 118;
 #[cfg(ossl110)]
 pub const SSL_CTRL_GET_EXTMS_SUPPORT: c_int = 122;
-#[cfg(any(ossl110, libressl261))]
+#[cfg(any(ossl110, libressl))]
 pub const SSL_CTRL_SET_MIN_PROTO_VERSION: c_int = 123;
-#[cfg(any(ossl110, libressl261))]
+#[cfg(any(ossl110, libressl))]
 pub const SSL_CTRL_SET_MAX_PROTO_VERSION: c_int = 124;
-#[cfg(any(ossl110g, libressl270))]
+#[cfg(ossl110g)]
 pub const SSL_CTRL_GET_MIN_PROTO_VERSION: c_int = 130;
-#[cfg(any(ossl110g, libressl270))]
+#[cfg(ossl110g)]
 pub const SSL_CTRL_GET_MAX_PROTO_VERSION: c_int = 131;
 #[cfg(ossl300)]
 pub const SSL_CTRL_GET_TMP_KEY: c_int = 133;
@@ -437,7 +435,7 @@ cfg_if! {
                 s as *const c_void as *mut c_void,
             )
         }
-    } else if #[cfg(libressl251)] {
+    } else if #[cfg(libressl)] {
         extern "C" {
             pub fn SSL_set1_groups_list(ctx: *mut SSL, list: *const c_char) -> c_int;
             pub fn SSL_CTX_set1_groups_list(ctx: *mut SSL_CTX, s: *const c_char) -> c_int;
@@ -649,7 +647,7 @@ extern "C" {
     ) -> c_long;
 
     #[deprecated(note = "use SSL_CTX_set_alpn_select_cb__fixed_rust instead")]
-    #[cfg(any(ossl102, libressl261))]
+    #[cfg(ossl102)]
     pub fn SSL_CTX_set_alpn_select_cb(
         ssl: *mut SSL_CTX,
         cb: extern "C" fn(

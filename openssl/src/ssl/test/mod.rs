@@ -22,7 +22,7 @@ use crate::ocsp::{OcspResponse, OcspResponseStatus};
 use crate::pkey::{Id, PKey};
 use crate::srtp::SrtpProfileId;
 use crate::ssl::test::server::Server;
-#[cfg(any(ossl110, ossl111, libressl261))]
+#[cfg(any(ossl110, ossl111))]
 use crate::ssl::SslVersion;
 use crate::ssl::{self, NameType, SslConnectorBuilder};
 #[cfg(ossl111)]
@@ -504,7 +504,7 @@ fn test_connect_with_srtp_ssl() {
 /// Tests that when the `SslStream` is created as a server stream, the protocols
 /// are correctly advertised to the client.
 #[test]
-#[cfg(any(ossl102, libressl261, boringssl, awslc))]
+#[cfg(any(ossl102, boringssl, awslc))]
 fn test_alpn_server_advertise_multiple() {
     let mut server = Server::builder();
     server.ctx().set_alpn_select_callback(|_, client| {
@@ -535,7 +535,7 @@ fn test_alpn_server_select_none_fatal() {
 }
 
 #[test]
-#[cfg(any(ossl102, libressl261, boringssl, awslc))]
+#[cfg(any(ossl102, boringssl, awslc))]
 fn test_alpn_server_select_none() {
     static CALLED_BACK: AtomicBool = AtomicBool::new(false);
 
@@ -554,7 +554,7 @@ fn test_alpn_server_select_none() {
 }
 
 #[test]
-#[cfg(any(boringssl, ossl102, libressl261, awslc))]
+#[cfg(any(boringssl, ossl102, awslc))]
 fn test_alpn_server_unilateral() {
     let server = Server::builder().build();
 
@@ -1242,7 +1242,7 @@ fn keying_export() {
 }
 
 #[test]
-#[cfg(any(ossl110, libressl261))]
+#[cfg(ossl110)]
 fn no_version_overlap() {
     let mut server = Server::builder();
     server.ctx().set_min_proto_version(None).unwrap();
@@ -1250,7 +1250,7 @@ fn no_version_overlap() {
         .ctx()
         .set_max_proto_version(Some(SslVersion::TLS1_1))
         .unwrap();
-    #[cfg(any(ossl110g, libressl270))]
+    #[cfg(ossl110g)]
     assert_eq!(server.ctx().max_proto_version(), Some(SslVersion::TLS1_1));
     server.should_error();
     let server = server.build();

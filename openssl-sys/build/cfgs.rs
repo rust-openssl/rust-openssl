@@ -5,33 +5,16 @@ pub fn get(openssl_version: Option<u64>, libressl_version: Option<u64>) -> Vec<&
     if let Some(libressl_version) = libressl_version {
         cfgs.push("libressl");
 
-        if libressl_version >= 0x2_05_01_00_0 {
-            cfgs.push("libressl251");
-        }
-        if libressl_version >= 0x2_05_02_00_0 {
-            cfgs.push("libressl252");
-        }
-        if libressl_version >= 0x2_06_01_00_0 {
-            cfgs.push("libressl261");
-        }
-        if libressl_version >= 0x2_07_00_00_0 {
-            cfgs.push("libressl270");
-        }
-        if libressl_version >= 0x2_07_01_00_0 {
-            cfgs.push("libressl271");
-        }
-        if libressl_version >= 0x2_07_03_00_0 {
-            cfgs.push("libressl273");
-        }
-        if libressl_version >= 0x2_08_00_00_0 {
-            cfgs.push("libressl280");
-        }
-        if libressl_version >= 0x2_08_01_00_0 {
-            cfgs.push("libressl281");
-        }
-        if libressl_version >= 0x2_09_01_00_0 {
-            cfgs.push("libressl291");
-        }
+        // Always emit pre-300 cfgs unconditionally as we no longer support older versions
+        cfgs.push("libressl251");
+        cfgs.push("libressl252");
+        cfgs.push("libressl261");
+        cfgs.push("libressl270");
+        cfgs.push("libressl271");
+        cfgs.push("libressl273");
+        cfgs.push("libressl280");
+        cfgs.push("libressl281");
+        cfgs.push("libressl291");
         if libressl_version >= 0x3_01_00_00_0 {
             cfgs.push("libressl310");
         }

@@ -40,7 +40,7 @@ use crate::util::{self, ForeignTypeExt, ForeignTypeRefExt};
 use crate::{cvt, cvt_n, cvt_p, cvt_p_const};
 use openssl_macros::corresponds;
 
-#[cfg(any(ossl102, boringssl, libressl261, awslc))]
+#[cfg(any(ossl102, boringssl, awslc))]
 pub mod verify;
 
 pub mod extension;
@@ -1253,7 +1253,7 @@ impl X509NameRef {
 
     /// Copies the name to a new `X509Name`.
     #[corresponds(X509_NAME_dup)]
-    #[cfg(any(boringssl, ossl110, libressl270, awslc))]
+    #[cfg(any(boringssl, ossl110, awslc))]
     pub fn to_owned(&self) -> Result<X509Name, ErrorStack> {
         unsafe { cvt_p(ffi::X509_NAME_dup(self.as_ptr())).map(|n| X509Name::from_ptr(n)) }
     }
@@ -1635,7 +1635,7 @@ impl X509RevokedRef {
 
     /// Copies the entry to a new `X509Revoked`.
     #[corresponds(X509_NAME_dup)]
-    #[cfg(any(boringssl, ossl110, libressl270, awslc))]
+    #[cfg(any(boringssl, ossl110, awslc))]
     pub fn to_owned(&self) -> Result<X509Revoked, ErrorStack> {
         unsafe { cvt_p(ffi::X509_REVOKED_dup(self.as_ptr())).map(|n| X509Revoked::from_ptr(n)) }
     }
@@ -2306,7 +2306,7 @@ impl Stackable for X509Object {
 }
 
 cfg_if! {
-    if #[cfg(any(boringssl, ossl110, libressl273, awslc))] {
+    if #[cfg(any(boringssl, ossl110, awslc))] {
         use ffi::{X509_getm_notAfter, X509_getm_notBefore, X509_up_ref, X509_get0_signature};
     } else {
         #[allow(bad_style)]
@@ -2387,7 +2387,7 @@ cfg_if! {
 }
 
 cfg_if! {
-    if #[cfg(any(ossl110, boringssl, libressl270, awslc))] {
+    if #[cfg(any(ossl110, boringssl, awslc))] {
         use ffi::X509_OBJECT_get0_X509;
     } else {
         #[allow(bad_style)]
@@ -2502,7 +2502,7 @@ impl X509PurposeRef {
         unsafe {
             let sname = CString::new(sname).unwrap();
             cfg_if! {
-                if #[cfg(any(ossl110, libressl280, boringssl, awslc))] {
+                if #[cfg(any(ossl110, boringssl, awslc))] {
                     let purpose = cvt_n(ffi::X509_PURPOSE_get_by_sname(sname.as_ptr() as *const _))?;
                 } else {
                     let purpose = cvt_n(ffi::X509_PURPOSE_get_by_sname(sname.as_ptr() as *mut _))?;
@@ -2534,7 +2534,7 @@ impl X509PurposeRef {
     pub fn purpose(&self) -> X509PurposeId {
         unsafe {
             cfg_if! {
-                if #[cfg(any(ossl110, libressl280, boringssl, awslc))] {
+                if #[cfg(any(ossl110, boringssl, awslc))] {
                     let x509_purpose = self.as_ptr() as *const ffi::X509_PURPOSE;
                 } else {
                     let x509_purpose = self.as_ptr() as *mut ffi::X509_PURPOSE;

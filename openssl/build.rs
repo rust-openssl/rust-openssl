@@ -70,30 +70,15 @@ fn main() {
     if let Ok(v) = env::var("DEP_OPENSSL_LIBRESSL_VERSION_NUMBER") {
         let version = u64::from_str_radix(&v, 16).unwrap();
 
-        if version >= 0x2_05_00_00_0 {
-            println!("cargo:rustc-cfg=libressl250");
-        }
-        if version >= 0x2_05_01_00_0 {
-            println!("cargo:rustc-cfg=libressl251");
-        }
-        if version >= 0x2_06_01_00_0 {
-            println!("cargo:rustc-cfg=libressl261");
-        }
-        if version >= 0x2_07_00_00_0 {
-            println!("cargo:rustc-cfg=libressl270");
-        }
-        if version >= 0x2_07_01_00_0 {
-            println!("cargo:rustc-cfg=libressl271");
-        }
-        if version >= 0x2_07_03_00_0 {
-            println!("cargo:rustc-cfg=libressl273");
-        }
-        if version >= 0x2_08_00_00_0 {
-            println!("cargo:rustc-cfg=libressl280");
-        }
-        if version >= 0x2_09_01_00_0 {
-            println!("cargo:rustc-cfg=libressl291");
-        }
+        // Always emit pre-300 cfgs unconditionally as we no longer support older versions
+        println!("cargo:rustc-cfg=libressl250");
+        println!("cargo:rustc-cfg=libressl251");
+        println!("cargo:rustc-cfg=libressl261");
+        println!("cargo:rustc-cfg=libressl270");
+        println!("cargo:rustc-cfg=libressl271");
+        println!("cargo:rustc-cfg=libressl273");
+        println!("cargo:rustc-cfg=libressl280");
+        println!("cargo:rustc-cfg=libressl291");
         if version >= 0x3_01_00_00_0 {
             println!("cargo:rustc-cfg=libressl310");
         }

@@ -88,45 +88,45 @@ cfg_if! {
 }
 
 extern "C" {
-    #[cfg(any(ossl102, libressl261))]
+    #[cfg(ossl102)]
     pub fn X509_VERIFY_PARAM_new() -> *mut X509_VERIFY_PARAM;
-    #[cfg(any(ossl102, libressl261))]
+    #[cfg(ossl102)]
     pub fn X509_VERIFY_PARAM_free(param: *mut X509_VERIFY_PARAM);
 
-    #[cfg(any(ossl102, libressl261))]
+    #[cfg(ossl102)]
     pub fn X509_VERIFY_PARAM_set_flags(param: *mut X509_VERIFY_PARAM, flags: c_ulong) -> c_int;
-    #[cfg(any(ossl102, libressl261))]
+    #[cfg(ossl102)]
     pub fn X509_VERIFY_PARAM_clear_flags(param: *mut X509_VERIFY_PARAM, flags: c_ulong) -> c_int;
 
-    #[cfg(any(ossl102, libressl261))]
+    #[cfg(ossl102)]
     pub fn X509_VERIFY_PARAM_set_time(param: *mut X509_VERIFY_PARAM, t: time_t);
 
-    #[cfg(any(ossl102, libressl261))]
+    #[cfg(ossl102)]
     pub fn X509_VERIFY_PARAM_set_depth(param: *mut X509_VERIFY_PARAM, depth: c_int);
 }
 const_ptr_api! {
     extern "C" {
-        #[cfg(any(ossl102, libressl261))]
+        #[cfg(ossl102)]
         pub fn X509_VERIFY_PARAM_get_flags(param: #[const_ptr_if(ossl300)] X509_VERIFY_PARAM) -> c_ulong;
     }
 }
 
 extern "C" {
-    #[cfg(any(ossl102, libressl261))]
+    #[cfg(ossl102)]
     pub fn X509_VERIFY_PARAM_set1_host(
         param: *mut X509_VERIFY_PARAM,
         name: *const c_char,
         namelen: size_t,
     ) -> c_int;
-    #[cfg(any(ossl102, libressl261))]
+    #[cfg(ossl102)]
     pub fn X509_VERIFY_PARAM_set_hostflags(param: *mut X509_VERIFY_PARAM, flags: c_uint);
-    #[cfg(any(ossl102, libressl261))]
+    #[cfg(ossl102)]
     pub fn X509_VERIFY_PARAM_set1_email(
         param: *mut X509_VERIFY_PARAM,
         email: *const c_char,
         emaillen: size_t,
     ) -> c_int;
-    #[cfg(any(ossl102, libressl261))]
+    #[cfg(ossl102)]
     pub fn X509_VERIFY_PARAM_set1_ip(
         param: *mut X509_VERIFY_PARAM,
         ip: *const c_uchar,

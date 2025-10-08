@@ -67,7 +67,7 @@ use crate::error::ErrorStack;
 use crate::ex_data::Index;
 #[cfg(ossl111)]
 use crate::hash::MessageDigest;
-#[cfg(any(ossl110, libressl270))]
+#[cfg(ossl110)]
 use crate::nid::Nid;
 use crate::pkey::{HasPrivate, PKeyRef, Params, Private};
 #[cfg(ossl300)]
@@ -81,7 +81,7 @@ use crate::stack::{Stack, StackRef, Stackable};
 use crate::util;
 use crate::util::{ForeignTypeExt, ForeignTypeRefExt};
 use crate::x509::store::{X509Store, X509StoreBuilderRef, X509StoreRef};
-#[cfg(any(ossl102, boringssl, libressl261, awslc))]
+#[cfg(any(ossl102, boringssl, awslc))]
 use crate::x509::verify::X509VerifyParamRef;
 use crate::x509::{X509Name, X509Ref, X509StoreContextRef, X509VerifyResult, X509};
 use crate::{cvt, cvt_n, cvt_p, init};
@@ -367,14 +367,14 @@ impl SslMethod {
 
     /// Support all versions of the DTLS protocol, explicitly as a client.
     #[corresponds(DTLS_client_method)]
-    #[cfg(any(boringssl, ossl110, libressl291, awslc))]
+    #[cfg(any(boringssl, ossl110, awslc))]
     pub fn dtls_client() -> SslMethod {
         unsafe { SslMethod(DTLS_client_method()) }
     }
 
     /// Support all versions of the DTLS protocol, explicitly as a server.
     #[corresponds(DTLS_server_method)]
-    #[cfg(any(boringssl, ossl110, libressl291, awslc))]
+    #[cfg(any(boringssl, ossl110, awslc))]
     pub fn dtls_server() -> SslMethod {
         unsafe { SslMethod(DTLS_server_method()) }
     }
@@ -618,11 +618,11 @@ impl SslAlert {
 /// An error returned from an ALPN selection callback.
 ///
 /// Requires AWS-LC or BoringSSL or OpenSSL 1.0.2 or LibreSSL 2.6.1 or newer.
-#[cfg(any(ossl102, libressl261, boringssl, awslc))]
+#[cfg(any(ossl102, boringssl, awslc))]
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub struct AlpnError(c_int);
 
-#[cfg(any(ossl102, libressl261, boringssl, awslc))]
+#[cfg(any(ossl102, boringssl, awslc))]
 impl AlpnError {
     /// Terminate the handshake with a fatal alert.
     ///
@@ -1175,7 +1175,7 @@ impl SslContextBuilder {
     ///
     /// Requires AWS-LC or BoringSSL or OpenSSL 1.1.0 or LibreSSL 2.6.1 or newer.
     #[corresponds(SSL_CTX_set_min_proto_version)]
-    #[cfg(any(ossl110, libressl261, boringssl, awslc))]
+    #[cfg(any(ossl110, boringssl, awslc))]
     pub fn set_min_proto_version(&mut self, version: Option<SslVersion>) -> Result<(), ErrorStack> {
         unsafe {
             cvt(ffi::SSL_CTX_set_min_proto_version(
@@ -1193,7 +1193,7 @@ impl SslContextBuilder {
     ///
     /// Requires AWS-LC or BoringSSL or OpenSSL 1.1.0 or or LibreSSL 2.6.1 or newer.
     #[corresponds(SSL_CTX_set_max_proto_version)]
-    #[cfg(any(ossl110, libressl261, boringssl, awslc))]
+    #[cfg(any(ossl110, boringssl, awslc))]
     pub fn set_max_proto_version(&mut self, version: Option<SslVersion>) -> Result<(), ErrorStack> {
         unsafe {
             cvt(ffi::SSL_CTX_set_max_proto_version(
@@ -1211,7 +1211,7 @@ impl SslContextBuilder {
     ///
     /// Requires OpenSSL 1.1.0g or LibreSSL 2.7.0 or newer.
     #[corresponds(SSL_CTX_get_min_proto_version)]
-    #[cfg(any(ossl110g, libressl270))]
+    #[cfg(ossl110g)]
     pub fn min_proto_version(&mut self) -> Option<SslVersion> {
         unsafe {
             let r = ffi::SSL_CTX_get_min_proto_version(self.as_ptr());
@@ -1230,7 +1230,7 @@ impl SslContextBuilder {
     ///
     /// Requires OpenSSL 1.1.0g or LibreSSL 2.7.0 or newer.
     #[corresponds(SSL_CTX_get_max_proto_version)]
-    #[cfg(any(ossl110g, libressl270))]
+    #[cfg(ossl110g)]
     pub fn max_proto_version(&mut self) -> Option<SslVersion> {
         unsafe {
             let r = ffi::SSL_CTX_get_max_proto_version(self.as_ptr());
@@ -1251,7 +1251,7 @@ impl SslContextBuilder {
     ///
     /// Requires AWS-LC or BoringSSL or OpenSSL 1.0.2 or LibreSSL 2.6.1 or newer.
     #[corresponds(SSL_CTX_set_alpn_protos)]
-    #[cfg(any(ossl102, libressl261, boringssl, awslc))]
+    #[cfg(any(ossl102, boringssl, awslc))]
     pub fn set_alpn_protos(&mut self, protocols: &[u8]) -> Result<(), ErrorStack> {
         unsafe {
             assert!(protocols.len() <= c_uint::MAX as usize);
@@ -1299,7 +1299,7 @@ impl SslContextBuilder {
     /// [`SslContextBuilder::set_alpn_protos`]: struct.SslContextBuilder.html#method.set_alpn_protos
     /// [`select_next_proto`]: fn.select_next_proto.html
     #[corresponds(SSL_CTX_set_alpn_select_cb)]
-    #[cfg(any(ossl102, libressl261, boringssl, awslc))]
+    #[cfg(any(ossl102, boringssl, awslc))]
     pub fn set_alpn_select_callback<F>(&mut self, callback: F)
     where
         F: for<'a> Fn(&mut SslRef, &'a [u8]) -> Result<&'a [u8], AlpnError> + 'static + Sync + Send,
@@ -1343,7 +1343,7 @@ impl SslContextBuilder {
     ///
     /// Requires AWS-LC or BoringSSL or OpenSSL 1.0.2 or newer.
     #[corresponds(SSL_CTX_get0_param)]
-    #[cfg(any(ossl102, boringssl, libressl261, awslc))]
+    #[cfg(any(ossl102, boringssl, awslc))]
     pub fn verify_param(&self) -> &X509VerifyParamRef {
         unsafe { X509VerifyParamRef::from_ptr(ffi::SSL_CTX_get0_param(self.as_ptr())) }
     }
@@ -1352,7 +1352,7 @@ impl SslContextBuilder {
     ///
     /// Requires AWS-LC or BoringSSL or OpenSSL 1.0.2 or newer.
     #[corresponds(SSL_CTX_get0_param)]
-    #[cfg(any(ossl102, boringssl, libressl261, awslc))]
+    #[cfg(any(ossl102, boringssl, awslc))]
     pub fn verify_param_mut(&mut self) -> &mut X509VerifyParamRef {
         unsafe { X509VerifyParamRef::from_ptr_mut(ffi::SSL_CTX_get0_param(self.as_ptr())) }
     }
@@ -1755,7 +1755,7 @@ impl SslContextBuilder {
     ///
     /// Requires AWS-LC or BoringSSL or OpenSSL 1.1.1 or LibreSSL 2.5.1 or newer.
     #[corresponds(SSL_CTX_set1_groups_list)]
-    #[cfg(any(ossl111, boringssl, libressl251, awslc))]
+    #[cfg(any(ossl111, boringssl, awslc))]
     pub fn set_groups_list(&mut self, groups: &str) -> Result<(), ErrorStack> {
         let groups = CString::new(groups).unwrap();
         unsafe {
@@ -1875,7 +1875,7 @@ impl SslContextRef {
     ///
     /// Requires OpenSSL 1.0.2 or LibreSSL 2.7.0 or newer.
     #[corresponds(SSL_CTX_get0_certificate)]
-    #[cfg(any(ossl102, libressl270))]
+    #[cfg(ossl102)]
     pub fn certificate(&self) -> Option<&X509Ref> {
         unsafe {
             let ptr = ffi::SSL_CTX_get0_certificate(self.as_ptr());
@@ -2134,7 +2134,7 @@ impl SslCipherRef {
     ///
     /// Requires OpenSSL 1.1.0 or LibreSSL 2.7.0 or newer.
     #[corresponds(SSL_CIPHER_get_cipher_nid)]
-    #[cfg(any(ossl110, libressl270))]
+    #[cfg(ossl110)]
     pub fn cipher_nid(&self) -> Option<Nid> {
         let n = unsafe { ffi::SSL_CIPHER_get_cipher_nid(self.as_ptr()) };
         if n == 0 {
@@ -2267,7 +2267,7 @@ impl SslSessionRef {
     ///
     /// Requires OpenSSL 1.1.0 or LibreSSL 2.7.0 or newer.
     #[corresponds(SSL_SESSION_get_protocol_version)]
-    #[cfg(any(ossl110, libressl270))]
+    #[cfg(ossl110)]
     pub fn protocol_version(&self) -> SslVersion {
         unsafe {
             let version = ffi::SSL_SESSION_get_protocol_version(self.as_ptr());
@@ -2517,7 +2517,7 @@ impl SslRef {
     ///
     /// [`SslContextBuilder::set_alpn_protos`]: struct.SslContextBuilder.html#method.set_alpn_protos
     #[corresponds(SSL_set_alpn_protos)]
-    #[cfg(any(ossl102, libressl261, boringssl, awslc))]
+    #[cfg(any(ossl102, boringssl, awslc))]
     pub fn set_alpn_protos(&mut self, protocols: &[u8]) -> Result<(), ErrorStack> {
         unsafe {
             assert!(protocols.len() <= c_uint::MAX as usize);
@@ -2671,7 +2671,7 @@ impl SslRef {
     ///
     /// Requires AWS-LC or BoringSSL or OpenSSL 1.0.2 or LibreSSL 2.6.1 or newer.
     #[corresponds(SSL_get0_alpn_selected)]
-    #[cfg(any(ossl102, libressl261, boringssl, awslc))]
+    #[cfg(any(ossl102, boringssl, awslc))]
     pub fn selected_alpn_protocol(&self) -> Option<&[u8]> {
         unsafe {
             let mut data: *const c_uchar = ptr::null();
@@ -2799,7 +2799,7 @@ impl SslRef {
     ///
     /// Requires AWS-LC or BoringSSL or OpenSSL 1.0.2 or newer.
     #[corresponds(SSL_get0_param)]
-    #[cfg(any(ossl102, boringssl, libressl261, awslc))]
+    #[cfg(any(ossl102, boringssl, awslc))]
     pub fn param_mut(&mut self) -> &mut X509VerifyParamRef {
         unsafe { X509VerifyParamRef::from_ptr_mut(ffi::SSL_get0_param(self.as_ptr())) }
     }
@@ -2826,7 +2826,7 @@ impl SslRef {
     ///
     /// Requires OpenSSL 1.1.0 or LibreSSL 2.7.0 or newer.
     #[corresponds(SSL_get_client_random)]
-    #[cfg(any(ossl110, libressl270))]
+    #[cfg(ossl110)]
     pub fn client_random(&self, buf: &mut [u8]) -> usize {
         unsafe {
             ffi::SSL_get_client_random(self.as_ptr(), buf.as_mut_ptr() as *mut c_uchar, buf.len())
@@ -2840,7 +2840,7 @@ impl SslRef {
     ///
     /// Requires OpenSSL 1.1.0 or LibreSSL 2.7.0 or newer.
     #[corresponds(SSL_get_server_random)]
-    #[cfg(any(ossl110, libressl270))]
+    #[cfg(ossl110)]
     pub fn server_random(&self, buf: &mut [u8]) -> usize {
         unsafe {
             ffi::SSL_get_server_random(self.as_ptr(), buf.as_mut_ptr() as *mut c_uchar, buf.len())
@@ -3361,7 +3361,7 @@ impl SslRef {
     ///
     /// Requires AWS-LC or BoringSSL or OpenSSL 1.1.0 or LibreSSL 2.6.1 or newer.
     #[corresponds(SSL_set_min_proto_version)]
-    #[cfg(any(ossl110, libressl261, boringssl, awslc))]
+    #[cfg(any(ossl110, boringssl, awslc))]
     pub fn set_min_proto_version(&mut self, version: Option<SslVersion>) -> Result<(), ErrorStack> {
         unsafe {
             cvt(ffi::SSL_set_min_proto_version(
@@ -3379,7 +3379,7 @@ impl SslRef {
     ///
     /// Requires AWS-LC or BoringSSL or OpenSSL 1.1.0 or or LibreSSL 2.6.1 or newer.
     #[corresponds(SSL_set_max_proto_version)]
-    #[cfg(any(ossl110, libressl261, boringssl, awslc))]
+    #[cfg(any(ossl110, boringssl, awslc))]
     pub fn set_max_proto_version(&mut self, version: Option<SslVersion>) -> Result<(), ErrorStack> {
         unsafe {
             cvt(ffi::SSL_set_max_proto_version(
@@ -4260,7 +4260,7 @@ bitflags! {
 }
 
 cfg_if! {
-    if #[cfg(any(boringssl, ossl110, libressl273, awslc))] {
+    if #[cfg(any(boringssl, ossl110, awslc))] {
         use ffi::{SSL_CTX_up_ref, SSL_SESSION_get_master_key, SSL_SESSION_up_ref, SSL_is_server};
     } else {
         #[allow(bad_style)]
@@ -4318,7 +4318,7 @@ cfg_if! {
     }
 }
 cfg_if! {
-    if #[cfg(any(boringssl, ossl110, libressl291, awslc))] {
+    if #[cfg(any(boringssl, ossl110, awslc))] {
         use ffi::{TLS_method, DTLS_method, TLS_client_method, TLS_server_method, DTLS_server_method, DTLS_client_method};
     } else {
         use ffi::{

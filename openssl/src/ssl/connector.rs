@@ -385,7 +385,7 @@ cfg_if! {
 }
 
 cfg_if! {
-    if #[cfg(any(ossl102, libressl261))] {
+    if #[cfg(ossl102)] {
         fn setup_verify(ctx: &mut SslContextBuilder) {
             ctx.set_verify(SslVerifyMode::PEER);
         }

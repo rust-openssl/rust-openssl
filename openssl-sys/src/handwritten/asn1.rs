@@ -47,7 +47,7 @@ pub union ASN1_TYPE_value {
 
 extern "C" {
     pub fn ASN1_STRING_type_new(ty: c_int) -> *mut ASN1_STRING;
-    #[cfg(any(ossl110, libressl273))]
+    #[cfg(ossl110)]
     pub fn ASN1_STRING_get0_data(x: *const ASN1_STRING) -> *const c_uchar;
     #[cfg(any(all(ossl101, not(ossl110)), libressl))]
     pub fn ASN1_STRING_data(x: *mut ASN1_STRING) -> *mut c_uchar;
@@ -107,9 +107,9 @@ extern "C" {
 
 const_ptr_api! {
     extern "C" {
-        pub fn ASN1_STRING_to_UTF8(out: *mut *mut c_uchar, s: #[const_ptr_if(any(ossl110, libressl280))] ASN1_STRING) -> c_int;
-        pub fn ASN1_STRING_type(x: #[const_ptr_if(any(ossl110, libressl280))]  ASN1_STRING) -> c_int;
-        pub fn ASN1_generate_v3(str: #[const_ptr_if(any(ossl110, libressl280))] c_char, cnf: *mut X509V3_CTX) -> *mut ASN1_TYPE;
+        pub fn ASN1_STRING_to_UTF8(out: *mut *mut c_uchar, s: #[const_ptr_if(ossl110)] ASN1_STRING) -> c_int;
+        pub fn ASN1_STRING_type(x: #[const_ptr_if(ossl110)]  ASN1_STRING) -> c_int;
+        pub fn ASN1_generate_v3(str: #[const_ptr_if(ossl110)] c_char, cnf: *mut X509V3_CTX) -> *mut ASN1_TYPE;
         pub fn i2d_ASN1_TYPE(a: #[const_ptr_if(ossl300)] ASN1_TYPE, pp: *mut *mut c_uchar) -> c_int;
     }
 }

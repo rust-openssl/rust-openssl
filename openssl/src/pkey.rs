@@ -833,7 +833,7 @@ impl PKey<Public> {
 }
 
 cfg_if! {
-    if #[cfg(any(boringssl, ossl110, libressl270, awslc))] {
+    if #[cfg(any(boringssl, ossl110, awslc))] {
         use ffi::EVP_PKEY_up_ref;
     } else {
         #[allow(bad_style)]

@@ -19,7 +19,7 @@ use crate::dh::Dh;
 use crate::ec::EcKey;
 use crate::error::ErrorStack;
 use crate::pkey::Params;
-#[cfg(any(ossl102, libressl261, boringssl, awslc))]
+#[cfg(any(ossl102, boringssl, awslc))]
 use crate::ssl::AlpnError;
 use crate::ssl::{
     try_get_session_ctx_index, SniError, Ssl, SslAlert, SslContext, SslContextRef, SslRef,
@@ -178,7 +178,7 @@ where
     }
 }
 
-#[cfg(any(ossl102, libressl261, boringssl, awslc))]
+#[cfg(any(ossl102, boringssl, awslc))]
 pub extern "C" fn raw_alpn_select<F>(
     ssl: *mut ffi::SSL,
     out: *mut *const c_uchar,
@@ -391,7 +391,7 @@ pub unsafe extern "C" fn raw_remove_session<F>(
 }
 
 cfg_if! {
-    if #[cfg(any(ossl110, libressl280, boringssl, awslc))] {
+    if #[cfg(any(ossl110, boringssl, awslc))] {
         type DataPtr = *const c_uchar;
     } else {
         type DataPtr = *mut c_uchar;
@@ -527,7 +527,7 @@ where
 
 #[cfg(not(any(boringssl, awslc)))]
 cfg_if! {
-    if #[cfg(any(ossl110, libressl280))] {
+    if #[cfg(ossl110)] {
         type CookiePtr = *const c_uchar;
     } else {
         type CookiePtr = *mut c_uchar;

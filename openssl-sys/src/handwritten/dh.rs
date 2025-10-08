@@ -41,9 +41,9 @@ extern "C" {
     #[cfg(ossl102)]
     pub fn DH_get_2048_256() -> *mut DH;
 
-    #[cfg(any(ossl110, libressl270))]
+    #[cfg(ossl110)]
     pub fn DH_set0_pqg(dh: *mut DH, p: *mut BIGNUM, q: *mut BIGNUM, g: *mut BIGNUM) -> c_int;
-    #[cfg(any(ossl110, libressl270))]
+    #[cfg(ossl110)]
     pub fn DH_get0_pqg(
         dh: *const DH,
         p: *mut *const BIGNUM,
@@ -51,9 +51,9 @@ extern "C" {
         g: *mut *const BIGNUM,
     );
 
-    #[cfg(any(ossl110, libressl270))]
+    #[cfg(ossl110)]
     pub fn DH_set0_key(dh: *mut DH, pub_key: *mut BIGNUM, priv_key: *mut BIGNUM) -> c_int;
 
-    #[cfg(any(ossl110, libressl270))]
+    #[cfg(ossl110)]
     pub fn DH_get0_key(dh: *const DH, pub_key: *mut *const BIGNUM, priv_key: *mut *const BIGNUM);
 }

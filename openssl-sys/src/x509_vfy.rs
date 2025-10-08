@@ -76,11 +76,11 @@ pub const X509_V_ERR_SUITE_B_INVALID_SIGNATURE_ALGORITHM: c_int = 59;
 pub const X509_V_ERR_SUITE_B_LOS_NOT_ALLOWED: c_int = 60;
 #[cfg(ossl102)]
 pub const X509_V_ERR_SUITE_B_CANNOT_SIGN_P_384_WITH_P_256: c_int = 61;
-#[cfg(any(ossl102, libressl251))]
+#[cfg(ossl102)]
 pub const X509_V_ERR_HOSTNAME_MISMATCH: c_int = 62;
-#[cfg(any(ossl102, libressl251))]
+#[cfg(ossl102)]
 pub const X509_V_ERR_EMAIL_MISMATCH: c_int = 63;
-#[cfg(any(ossl102, libressl251))]
+#[cfg(ossl102)]
 pub const X509_V_ERR_IP_ADDRESS_MISMATCH: c_int = 64;
 cfg_if! {
     if #[cfg(ossl110)] {
@@ -118,7 +118,7 @@ pub const X509_V_FLAG_NOTIFY_POLICY: c_ulong = 0x800;
 pub const X509_V_FLAG_EXTENDED_CRL_SUPPORT: c_ulong = 0x1000;
 pub const X509_V_FLAG_USE_DELTAS: c_ulong = 0x2000;
 pub const X509_V_FLAG_CHECK_SS_SIGNATURE: c_ulong = 0x4000;
-#[cfg(any(ossl102, libressl251))]
+#[cfg(ossl102)]
 pub const X509_V_FLAG_TRUSTED_FIRST: c_ulong = 0x8000;
 #[cfg(ossl102)]
 pub const X509_V_FLAG_SUITEB_128_LOS_ONLY: c_ulong = 0x10000;
@@ -126,11 +126,11 @@ pub const X509_V_FLAG_SUITEB_128_LOS_ONLY: c_ulong = 0x10000;
 pub const X509_V_FLAG_SUITEB_192_LOS: c_ulong = 0x20000;
 #[cfg(ossl102)]
 pub const X509_V_FLAG_SUITEB_128_LOS: c_ulong = 0x30000;
-#[cfg(any(ossl102, libressl251))]
+#[cfg(ossl102)]
 pub const X509_V_FLAG_PARTIAL_CHAIN: c_ulong = 0x80000;
-#[cfg(any(ossl110, libressl251))]
+#[cfg(ossl110)]
 pub const X509_V_FLAG_NO_ALT_CHAINS: c_ulong = 0x100000;
-#[cfg(any(ossl110, libressl251))]
+#[cfg(ossl110)]
 pub const X509_V_FLAG_NO_CHECK_TIME: c_ulong = 0x200000;
 
 pub unsafe fn X509_LOOKUP_add_dir(

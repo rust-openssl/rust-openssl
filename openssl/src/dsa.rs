@@ -315,7 +315,7 @@ impl<T> fmt::Debug for Dsa<T> {
 }
 
 cfg_if! {
-    if #[cfg(any(ossl110, libressl273, boringssl, awslc))] {
+    if #[cfg(any(ossl110, boringssl, awslc))] {
         use ffi::{DSA_get0_key, DSA_get0_pqg, DSA_set0_key, DSA_set0_pqg};
     } else {
         #[allow(bad_style)]
@@ -494,7 +494,7 @@ impl DsaSigRef {
 }
 
 cfg_if! {
-    if #[cfg(any(ossl110, libressl273, boringssl, awslc))] {
+    if #[cfg(any(ossl110, boringssl, awslc))] {
         use ffi::{DSA_SIG_set0, DSA_SIG_get0};
     } else {
         #[allow(bad_style)]

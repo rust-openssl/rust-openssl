@@ -4,7 +4,7 @@ use libc::*;
 stack!(stack_st_void);
 
 cfg_if! {
-    if #[cfg(any(ossl110, libressl271))] {
+    if #[cfg(ossl110)] {
         extern "C" {
             pub fn OpenSSL_version_num() -> c_ulong;
             pub fn OpenSSL_version(key: c_int) -> *const c_char;

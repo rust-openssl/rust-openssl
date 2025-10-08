@@ -432,27 +432,27 @@ impl Cipher {
         unsafe { Cipher(ffi::EVP_seed_ofb()) }
     }
 
-    #[cfg(all(any(ossl111, libressl291), not(osslconf = "OPENSSL_NO_SM4")))]
+    #[cfg(all(ossl111, not(osslconf = "OPENSSL_NO_SM4")))]
     pub fn sm4_ecb() -> Cipher {
         unsafe { Cipher(ffi::EVP_sm4_ecb()) }
     }
 
-    #[cfg(all(any(ossl111, libressl291), not(osslconf = "OPENSSL_NO_SM4")))]
+    #[cfg(all(ossl111, not(osslconf = "OPENSSL_NO_SM4")))]
     pub fn sm4_cbc() -> Cipher {
         unsafe { Cipher(ffi::EVP_sm4_cbc()) }
     }
 
-    #[cfg(all(any(ossl111, libressl291), not(osslconf = "OPENSSL_NO_SM4")))]
+    #[cfg(all(ossl111, not(osslconf = "OPENSSL_NO_SM4")))]
     pub fn sm4_ctr() -> Cipher {
         unsafe { Cipher(ffi::EVP_sm4_ctr()) }
     }
 
-    #[cfg(all(any(ossl111, libressl291), not(osslconf = "OPENSSL_NO_SM4")))]
+    #[cfg(all(ossl111, not(osslconf = "OPENSSL_NO_SM4")))]
     pub fn sm4_cfb128() -> Cipher {
         unsafe { Cipher(ffi::EVP_sm4_cfb128()) }
     }
 
-    #[cfg(all(any(ossl111, libressl291), not(osslconf = "OPENSSL_NO_SM4")))]
+    #[cfg(all(ossl111, not(osslconf = "OPENSSL_NO_SM4")))]
     pub fn sm4_ofb() -> Cipher {
         unsafe { Cipher(ffi::EVP_sm4_ofb()) }
     }
@@ -919,7 +919,7 @@ pub fn decrypt_aead(
 }
 
 cfg_if! {
-    if #[cfg(any(boringssl, ossl110, libressl273, awslc))] {
+    if #[cfg(any(boringssl, ossl110, awslc))] {
         use ffi::{EVP_CIPHER_block_size, EVP_CIPHER_iv_length, EVP_CIPHER_key_length};
     } else {
         use crate::LenType;
@@ -1735,7 +1735,7 @@ mod tests {
     // GB/T 32907-2016
     // http://openstd.samr.gov.cn/bzgk/gb/newGbInfo?hcno=7803DE42D3BC5E80B0C3E5D8E873D56A
     #[test]
-    #[cfg(all(any(ossl111, libressl291), not(osslconf = "OPENSSL_NO_SM4")))]
+    #[cfg(all(ossl111, not(osslconf = "OPENSSL_NO_SM4")))]
     fn test_sm4_ecb() {
         use std::mem;
 

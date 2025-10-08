@@ -501,7 +501,7 @@ fn version_error() -> ! {
     panic!(
         "
 
-This crate is only compatible with OpenSSL (version 1.0.1 through 1.1.1, or 3), or LibreSSL 2.5
+This crate is only compatible with OpenSSL (version 1.0.1 through 1.1.1, or 3), or LibreSSL 3.0.0
 through 4.1.x, but a different version of OpenSSL was found. The build is now aborting
 due to this version mismatch.
 

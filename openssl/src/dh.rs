@@ -269,7 +269,7 @@ where
 }
 
 cfg_if! {
-    if #[cfg(any(ossl110, libressl270, boringssl, awslc))] {
+    if #[cfg(any(ossl110, boringssl, awslc))] {
         use ffi::{DH_set0_pqg, DH_get0_pqg, DH_get0_key, DH_set0_key};
     } else {
         #[allow(bad_style)]
