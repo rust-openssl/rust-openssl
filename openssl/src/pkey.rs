@@ -229,6 +229,11 @@ where
         ffi::i2d_PUBKEY
     }
 
+    /// Returns the pointer of underlying [`ffi::EVP_PKEY`]
+    pub fn as_ptr(&self) -> *mut ffi::EVP_PKEY {
+        ForeignTypeRef::as_ptr(self)
+    }
+
     /// Returns the size of the key.
     ///
     /// This corresponds to the bit length of the modulus of an RSA key, and the bit length of the
