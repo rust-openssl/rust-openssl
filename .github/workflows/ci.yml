@@ -232,12 +232,11 @@ jobs:
                 name: openssl-no-deprecated
                 version: 3.5.0
       name: ${{ matrix.target }}-${{ matrix.library.name }}-${{ matrix.library.version }}-${{ matrix.bindgen }}
-      runs-on: ubuntu-22.04
+      runs-on: ${{ matrix.target == 'arm-unknown-linux-gnueabihf' && 'ubuntu-24.04-arm' || 'ubuntu-22.04' }}
       env:
         OPENSSL_DIR: /opt/openssl
         CARGO_TARGET_ARM_UNKNOWN_LINUX_GNUEABIHF_LINKER: arm-linux-gnueabihf-gcc
         CARGO_TARGET_ARM_UNKNOWN_LINUX_GNUEABIHF_AR: arm-linux-gnueabihf-ar
-        CARGO_TARGET_ARM_UNKNOWN_LINUX_GNUEABIHF_RUNNER: qemu-arm -L /usr/arm-linux-gnueabihf
       steps:
         - uses: actions/checkout@v5
         - uses: sfackler/actions/rustup@master
@@ -254,7 +253,7 @@ jobs:
               packages="gcc-multilib g++-multilib"
               ;;
             "arm-unknown-linux-gnueabihf")
-              packages="gcc-arm-linux-gnueabihf g++-arm-linux-gnueabihf qemu-user"
+              packages="gcc-arm-linux-gnueabihf g++-arm-linux-gnueabihf"
               ;;
             esac
 
