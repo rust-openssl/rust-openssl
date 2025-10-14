@@ -255,7 +255,7 @@ jobs:
             "arm-unknown-linux-gnueabihf")
               # Enable armhf architecture for running ARM32 binaries on ARM64
               sudo dpkg --add-architecture armhf
-              packages="gcc-arm-linux-gnueabihf g++-arm-linux-gnueabihf libc6:armhf libstdc++6:armhf"
+              packages="gcc-arm-linux-gnueabihf g++-arm-linux-gnueabihf libc6:armhf libstdc++6:armhf libatomic1:armhf"
               ;;
             esac
 
