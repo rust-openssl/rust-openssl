@@ -253,7 +253,9 @@ jobs:
               packages="gcc-multilib g++-multilib"
               ;;
             "arm-unknown-linux-gnueabihf")
-              packages="gcc-arm-linux-gnueabihf g++-arm-linux-gnueabihf"
+              # Enable armhf architecture for running ARM32 binaries on ARM64
+              sudo dpkg --add-architecture armhf
+              packages="gcc-arm-linux-gnueabihf g++-arm-linux-gnueabihf libc6:armhf libstdc++6:armhf"
               ;;
             esac
 
