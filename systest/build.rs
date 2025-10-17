@@ -97,67 +97,59 @@ fn main() {
         }
     }
 
-    #[allow(clippy::if_same_then_else)]
-    cfg.type_name(|s, is_struct, _is_union| {
-        // Add some `*` on some callback parameters to get function pointer to
-        // typecheck in C, especially on MSVC.
-        if s == "PasswordCallback" {
-            "pem_password_cb*".to_string()
-        } else if s == "bio_info_cb" {
-            "bio_info_cb*".to_string()
-        } else if s == "_STACK" {
-            "struct stack_st".to_string()
-        // This logic should really be cleaned up
-        } else if is_struct
-            && s != "point_conversion_form_t"
-            && s.chars().next().unwrap().is_lowercase()
-        {
-            format!("struct {}", s)
-        } else if s.starts_with("stack_st_") || s == "timeval" {
-            format!("struct {}", s)
-        } else {
-            s.to_string()
-        }
-    });
-    cfg.skip_type(|s| {
+    cfg.skip_alias(|a| {
         // function pointers are declared without a `*` in openssl so their
         // sizeof is 1 which isn't what we want.
-        s == "PasswordCallback"
-            || s == "pem_password_cb"
-            || s == "bio_info_cb"
-            || s == "OSSL_PASSPHRASE_CALLBACK"
-            || s.starts_with("CRYPTO_EX_")
+        let name = a.ident();
+        name == "PasswordCallback"
+            || name == "pem_password_cb"
+            || name == "bio_info_cb"
+            || name == "OSSL_PASSPHRASE_CALLBACK" 
+            || name.starts_with("CRYPTO_EX_")
     });
+
+    cfg.skip_const(|c| {
+        let name = c.ident();
+        name == "X509_L_ADD_DIR"
+    });
+
     cfg.skip_struct(|s| {
-        s == "ProbeResult" ||
-            s == "X509_OBJECT_data" || // inline union
-            s == "DIST_POINT_NAME_st_anon_union" || // inline union
-            s == "PKCS7_data" ||
-            s == "ASN1_TYPE_value"
+        let name = s.ident();
+        name == "ProbeResult" ||
+            name == "X509_OBJECT_data" || // inline union
+            name == "DIST_POINT_NAME_st_anon_union" || // inline union
+            name == "PKCS7_data" ||
+            name == "ASN1_TYPE_value"
     });
-    cfg.skip_fn(move |s| {
-        s == "CRYPTO_memcmp" ||                 // uses volatile
+
+    cfg.skip_fn(move |f| {
+        let name = f.ident();
+        name == "CRYPTO_memcmp" ||                 // uses volatile
 
         // Skip some functions with function pointers on windows, not entirely
         // sure how to get them to work out...
         (target.contains("windows") && {
-            s.starts_with("PEM_read_bio_") ||
-            (s.starts_with("PEM_write_bio_") && s.ends_with("PrivateKey")) ||
-            s == "d2i_PKCS8PrivateKey_bio" ||
-            s == "i2d_PKCS8PrivateKey_bio" ||
-            s == "SSL_get_ex_new_index" ||
-            s == "SSL_CTX_get_ex_new_index" ||
-            s == "CRYPTO_get_ex_new_index"
+            name.starts_with("PEM_read_bio_") ||
+            (name.starts_with("PEM_write_bio_") && name.ends_with("PrivateKey")) ||
+            name == "d2i_PKCS8PrivateKey_bio" ||
+            name == "i2d_PKCS8PrivateKey_bio" ||
+            name == "SSL_get_ex_new_index" ||
+            name == "SSL_CTX_get_ex_new_index" ||
+            name == "CRYPTO_get_ex_new_index"
         })
     });
-    cfg.skip_field_type(|s, field| {
-        (s == "EVP_PKEY" && field == "pkey") ||      // union
-            (s == "GENERAL_NAME" && field == "d") || // union
-            (s == "DIST_POINT_NAME" && field == "name") || // union
-            (s == "X509_OBJECT" && field == "data") || // union
-            (s == "PKCS7" && field == "d") || // union
-            (s == "ASN1_TYPE" && field == "value") // union
+
+    cfg.skip_struct_field(|s, field| {
+        let struct_name = s.ident();
+        let field_name = field.ident();
+        (struct_name == "EVP_PKEY" && field_name == "pkey") ||      // union
+            (struct_name == "GENERAL_NAME" && field_name == "d") || // union
+            (struct_name == "DIST_POINT_NAME" && field_name == "name") || // union
+            (struct_name == "X509_OBJECT" && field_name == "data") || // union
+            (struct_name == "PKCS7" && field_name == "d") || // union
+            (struct_name == "ASN1_TYPE" && field_name == "value") // union
     });
+
     cfg.skip_signededness(|s| {
         s.ends_with("_cb")
             || s.ends_with("_CB")
@@ -167,13 +159,7 @@ fn main() {
             || s.ends_with("_cb_func")
             || s.ends_with("_cb_ex")
     });
-    cfg.field_name(|_s, field| {
-        if field == "type_" {
-            "type".to_string()
-        } else {
-            field.to_string()
-        }
-    });
-    cfg.fn_cname(|rust, link_name| link_name.unwrap_or(rust).to_string());
-    cfg.generate("../openssl-sys/src/lib.rs", "all.rs");
+
+    cfg.generate_files("../openssl-sys/src/lib.rs", "all.rs")
+        .expect("Failed to generate test files");
 }
