@@ -91,6 +91,26 @@ impl<T> ToOwned for RsaRef<T> {
     }
 }
 
+impl<T> Rsa<T> {
+    /// Sets the RSA flags on the object.
+    #[corresponds(RSA_set_flags)]
+    #[cfg(not(boringssl))]
+    pub fn set_flags(&mut self, flags: i32) {
+        unsafe {
+            RSA_set_flags(self.as_ptr(), flags);
+        }
+    }
+
+    /// Clears the RSA flags on the object.
+    #[corresponds(RSA_set_flags)]
+    #[cfg(not(boringssl))]
+    pub fn clear_flags(&mut self, flags: i32) {
+        unsafe {
+            RSA_clear_flags(self.as_ptr(), flags);
+        }
+    }
+}
+
 impl<T> RsaRef<T>
 where
     T: HasPrivate,
@@ -366,6 +386,15 @@ where
             BigNumRef::from_const_ptr(e)
         }
     }
+
+    /// Tells if the provided set of RSA flags are set.
+    ///
+    /// This function returns the union of all flags that were set on the RSA object.
+    #[corresponds(RSA_test_flags)]
+    #[cfg(not(boringssl))]
+    pub fn test_flags(&self, flags: i32) -> i32 {
+        unsafe { RSA_test_flags(self.as_ptr(), flags) }
+    }
 }
 
 impl Rsa<Public> {
@@ -588,8 +617,11 @@ cfg_if! {
     if #[cfg(any(ossl110, libressl, boringssl, awslc))] {
         use ffi::{
             RSA_get0_key, RSA_get0_factors, RSA_get0_crt_params, RSA_set0_key, RSA_set0_factors,
-            RSA_set0_crt_params,
+            RSA_set0_crt_params
         };
+
+        #[cfg(not(boringssl))]
+        use ffi::{RSA_test_flags, RSA_set_flags, RSA_clear_flags};
     } else {
         #[allow(bad_style)]
         unsafe fn RSA_get0_key(
@@ -676,6 +708,21 @@ cfg_if! {
             (*r).dmq1 = dmq1;
             (*r).iqmp = iqmp;
             1
+        }
+
+        #[allow(bad_style)]
+        unsafe fn RSA_test_flags(r: *const ffi::RSA, flags: c_int) -> c_int {
+            (*r).flags & flags
+        }
+
+        #[allow(bad_style)]
+        unsafe fn RSA_set_flags(r: *mut ffi::RSA, flags: c_int) {
+            (*r).flags |= flags;
+        }
+
+        #[allow(bad_style)]
+        unsafe fn RSA_clear_flags(r: *mut ffi::RSA, flags: c_int) {
+            (*r).flags &= !flags;
         }
     }
 }
