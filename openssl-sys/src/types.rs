@@ -3,7 +3,7 @@ use libc::*;
 use super::*;
 
 cfg_if! {
-    if #[cfg(any(ossl110, libressl280))] {
+    if #[cfg(any(ossl110, libressl))] {
         pub enum EVP_PKEY {}
     } else {
         #[repr(C)]

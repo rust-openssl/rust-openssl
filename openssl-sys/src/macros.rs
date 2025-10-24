@@ -97,7 +97,7 @@ macro_rules! stack {
 macro_rules! const_ptr_api {
     // ----------------------------------------------------------------
     // (partialarg): partial argument, waiting for "final" argument type
-    // MAGIC PART 1: hande conditional const ptr in argument type
+    // MAGIC PART 1: handle conditional const ptr in argument type
     ( (partialarg)
         { $(#[$fn_attr:meta])* pub fn $fn_name:ident }
         $args_packed:tt
@@ -181,7 +181,7 @@ macro_rules! const_ptr_api {
 
     // ----------------------------------------------------------------
     // (partialret): have partial return type, waiting for final return type
-    // MAGIC PART 2: hande conditional const ptr in return type
+    // MAGIC PART 2: handle conditional const ptr in return type
     ( (partialret)
         { $(#[$fn_attr:meta])* pub fn $fn_name:ident }
         $args_packed:tt

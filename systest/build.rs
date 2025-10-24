@@ -25,7 +25,7 @@ fn main() {
             cfg.flag("/wd4090");
         }
 
-        // https://github.com/sfackler/rust-openssl/issues/889
+        // https://github.com/rust-openssl/rust-openssl/issues/889
         cfg.define("WIN32_LEAN_AND_MEAN", None);
     }
 
@@ -67,10 +67,12 @@ fn main() {
         .header("openssl/aes.h")
         .header("openssl/ocsp.h")
         .header("openssl/evp.h")
+        .header("openssl/dsa.h")
+        .header("openssl/rsa.h")
         .header("openssl/x509_vfy.h");
 
     if let Some(version) = libressl_version {
-        cfg.header("openssl/poly1305.h");
+        cfg.header("openssl/cms.h").header("openssl/poly1305.h");
         if version >= 0x30600000 {
             cfg.header("openssl/kdf.h");
         }

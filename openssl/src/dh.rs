@@ -155,7 +155,7 @@ impl Dh<Params> {
 
     /// Requires OpenSSL 1.0.2 or newer.
     #[corresponds(DH_get_1024_160)]
-    #[cfg(any(ossl102, ossl110))]
+    #[cfg(ossl102)]
     pub fn get_1024_160() -> Result<Dh<Params>, ErrorStack> {
         unsafe {
             ffi::init();
@@ -165,7 +165,7 @@ impl Dh<Params> {
 
     /// Requires OpenSSL 1.0.2 or newer.
     #[corresponds(DH_get_2048_224)]
-    #[cfg(any(ossl102, ossl110))]
+    #[cfg(ossl102)]
     pub fn get_2048_224() -> Result<Dh<Params>, ErrorStack> {
         unsafe {
             ffi::init();
@@ -175,7 +175,7 @@ impl Dh<Params> {
 
     /// Requires OpenSSL 1.0.2 or newer.
     #[corresponds(DH_get_2048_256)]
-    #[cfg(any(ossl102, ossl110))]
+    #[cfg(ossl102)]
     pub fn get_2048_256() -> Result<Dh<Params>, ErrorStack> {
         unsafe {
             ffi::init();
@@ -269,7 +269,7 @@ where
 }
 
 cfg_if! {
-    if #[cfg(any(ossl110, libressl270, boringssl, awslc))] {
+    if #[cfg(any(ossl110, libressl, boringssl, awslc))] {
         use ffi::{DH_set0_pqg, DH_get0_pqg, DH_get0_key, DH_set0_key};
     } else {
         #[allow(bad_style)]

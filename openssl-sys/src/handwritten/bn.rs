@@ -23,16 +23,16 @@ extern "C" {
     pub fn BN_clear_free(bn: *mut BIGNUM);
     pub fn BN_bin2bn(s: *const u8, size: c_int, ret: *mut BIGNUM) -> *mut BIGNUM;
     pub fn BN_bn2bin(a: *const BIGNUM, to: *mut u8) -> c_int;
-    #[cfg(any(ossl110, libressl340))]
+    #[cfg(any(ossl110, libressl))]
     pub fn BN_bn2binpad(a: *const BIGNUM, to: *mut u8, tolen: c_int) -> c_int;
     pub fn BN_sub(r: *mut BIGNUM, a: *const BIGNUM, b: *const BIGNUM) -> c_int;
     pub fn BN_add(r: *mut BIGNUM, a: *const BIGNUM, b: *const BIGNUM) -> c_int;
     pub fn BN_mul(r: *mut BIGNUM, a: *const BIGNUM, b: *const BIGNUM, ctx: *mut BN_CTX) -> c_int;
     pub fn BN_sqr(r: *mut BIGNUM, a: *const BIGNUM, ctx: *mut BN_CTX) -> c_int;
     pub fn BN_set_negative(bn: *mut BIGNUM, n: c_int);
-    #[cfg(any(ossl110, libressl350))]
+    #[cfg(any(ossl110, libressl))]
     pub fn BN_is_negative(b: *const BIGNUM) -> c_int;
-    #[cfg(any(ossl110, libressl350))]
+    #[cfg(any(ossl110, libressl))]
     pub fn BN_is_odd(b: *const BIGNUM) -> c_int;
 
     pub fn BN_div(
@@ -150,7 +150,7 @@ extern "C" {
 }
 
 cfg_if! {
-    if #[cfg(any(ossl110, libressl350))] {
+    if #[cfg(any(ossl110, libressl))] {
         extern "C" {
             pub fn BN_get_rfc2409_prime_768(bn: *mut BIGNUM) -> *mut BIGNUM;
             pub fn BN_get_rfc2409_prime_1024(bn: *mut BIGNUM) -> *mut BIGNUM;

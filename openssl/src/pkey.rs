@@ -79,7 +79,7 @@ pub struct Id(c_int);
 
 impl Id {
     pub const RSA: Id = Id(ffi::EVP_PKEY_RSA);
-    #[cfg(any(ossl111, libressl310, boringssl, awslc))]
+    #[cfg(any(ossl111, libressl, boringssl, awslc))]
     pub const RSA_PSS: Id = Id(ffi::EVP_PKEY_RSA_PSS);
     #[cfg(not(boringssl))]
     pub const HMAC: Id = Id(ffi::EVP_PKEY_HMAC);
@@ -384,7 +384,7 @@ impl<T> fmt::Debug for PKey<T> {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         let alg = match self.id() {
             Id::RSA => "RSA",
-            #[cfg(any(ossl111, libressl310, boringssl, awslc))]
+            #[cfg(any(ossl111, libressl, boringssl, awslc))]
             Id::RSA_PSS => "RSA-PSS",
             #[cfg(not(boringssl))]
             Id::HMAC => "HMAC",
@@ -833,7 +833,7 @@ impl PKey<Public> {
 }
 
 cfg_if! {
-    if #[cfg(any(boringssl, ossl110, libressl270, awslc))] {
+    if #[cfg(any(boringssl, ossl110, libressl, awslc))] {
         use ffi::EVP_PKEY_up_ref;
     } else {
         #[allow(bad_style)]

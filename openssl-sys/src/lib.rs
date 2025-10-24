@@ -158,7 +158,10 @@ mod openssl {
         })
     }
 
-    #[cfg(not(ossl110))]
+    #[cfg(libressl)]
+    pub fn init() {}
+
+    #[cfg(not(any(ossl110, libressl)))]
     pub fn init() {
         use std::io::{self, Write};
         use std::mem;

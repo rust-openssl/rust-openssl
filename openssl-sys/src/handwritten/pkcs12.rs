@@ -36,8 +36,8 @@ extern "C" {
 const_ptr_api! {
     extern "C" {
         pub fn PKCS12_create(
-            pass: #[const_ptr_if(any(ossl110, libressl280))] c_char,
-            friendly_name: #[const_ptr_if(any(ossl110, libressl280))] c_char,
+            pass: #[const_ptr_if(any(ossl110, libressl))] c_char,
+            friendly_name: #[const_ptr_if(any(ossl110, libressl))] c_char,
             pkey: *mut EVP_PKEY,
             cert: *mut X509,
             ca: *mut stack_st_X509,

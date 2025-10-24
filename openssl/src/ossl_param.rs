@@ -7,7 +7,7 @@
 //! This is always represented as an array of OSSL_PARAM
 //! structures, terminated by an entry with a NULL key.
 //!
-//! For convinience, the OSSL_PARAM_BLD builder can be used to
+//! For convenience, the OSSL_PARAM_BLD builder can be used to
 //! dynamically construct these structures.
 //!
 //! Note, that this module is available only in OpenSSL 3.* and

@@ -13,7 +13,7 @@ env:
   RUST_BACKTRACE: 1
 
 concurrency:
-  group: ${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
   cancel-in-progress: true
 
 permissions:
@@ -163,7 +163,7 @@ jobs:
             - name: aws-lc
               version: vendored
             - name: boringssl
-              version: 71bae60c26549ce1875f07d8c394b934de4b0f7b
+              version: 338f44af3c92ef665bf740a8127a2d69c872b52a
             - name: openssl
               version: vendored
             - name: openssl
@@ -185,21 +185,12 @@ jobs:
               version: 1.0.2u
               old: true
               dl-path: /old/1.0.2
-            - name: openssl
-              version: 1.0.1u
-              old: true
-              dl-path: /old/1.0.1
           include:
             - target: x86_64-unknown-linux-gnu
               bindgen: true
               library:
                 name: libressl
-                version: 2.5.5
-            - target: x86_64-unknown-linux-gnu
-              bindgen: true
-              library:
-                name: libressl
-                version: 3.9.2
+                version: 3.5.3
             - target: x86_64-unknown-linux-gnu
               bindgen: true
               library:
@@ -211,15 +202,15 @@ jobs:
                 name: libressl
                 version: 4.1.0
             - target: x86_64-unknown-linux-gnu
-              bindgen: false
+              bindgen: true
               library:
                 name: libressl
-                version: 2.5.5
+                version: 4.2.0
             - target: x86_64-unknown-linux-gnu
               bindgen: false
               library:
                 name: libressl
-                version: 3.9.2
+                version: 3.5.3
             - target: x86_64-unknown-linux-gnu
               bindgen: false
               library:
@@ -230,6 +221,16 @@ jobs:
               library:
                 name: libressl
                 version: 4.1.0
+            - target: x86_64-unknown-linux-gnu
+              bindgen: false
+              library:
+                name: libressl
+                version: 4.2.0
+            - target: x86_64-unknown-linux-gnu
+              bindgen: false
+              library:
+                name: openssl-no-deprecated
+                version: 3.5.0
       name: ${{ matrix.target }}-${{ matrix.library.name }}-${{ matrix.library.version }}-${{ matrix.bindgen }}
       runs-on: ubuntu-22.04
       env:
@@ -273,7 +274,7 @@ jobs:
         - name: Build OpenSSL
           run: |
             case "${{ matrix.library.name }}" in
-            "openssl")
+            "openssl"*)
               if [[ "${{ matrix.library.old }}" == "true" ]]; then
                 url="https://www.openssl.org/source${{ matrix.library.dl-path }}/openssl-${{ matrix.library.version }}.tar.gz"
               else
@@ -324,6 +325,11 @@ jobs:
             case "${{ matrix.library.name }}" in
             "openssl")
               ./Configure --prefix=$OPENSSL_DIR --libdir=lib $OS_COMPILER -fPIC -g $OS_FLAGS no-shared
+              make
+              make install_sw
+              ;;
+            "openssl-no-deprecated")
+              ./Configure --prefix=$OPENSSL_DIR --libdir=lib $OS_COMPILER -fPIC -g $OS_FLAGS --api=3.0 no-deprecated no-shared
               make
               make install_sw
               ;;
@@ -401,6 +407,7 @@ jobs:
             cargo run --manifest-path=systest/Cargo.toml --target ${{ matrix.target }} $features
           if: ${{ !(matrix.library.name == 'boringssl' || matrix.library.name == 'aws-lc') }}
         - name: Test openssl
+          if: ${{ ! endsWith(matrix.library.name, 'no-deprecated') }}
           run: |
             if [[ "${{ matrix.library.name }}" == "boringssl" && "${{ matrix.bindgen }}" != "true" ]]; then
               features="--features unstable_boringssl"
@@ -426,4 +433,4 @@ jobs:
               features="$features --features openssl-sys/bindgen"
             fi
             cargo test --manifest-path=openssl-errors/Cargo.toml --target ${{ matrix.target }} $features
-          if: ${{ !(matrix.library.name == 'boringssl' || matrix.library.name == 'aws-lc') }}
+          if: ${{ !(matrix.library.name == 'boringssl' || matrix.library.name == 'aws-lc' || endsWith(matrix.library.name, 'no-deprecated')) }}

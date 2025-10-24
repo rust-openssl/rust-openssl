@@ -4,7 +4,6 @@ use libc::{c_int, c_uint, c_ulong, time_t};
 use std::net::IpAddr;
 
 use crate::error::ErrorStack;
-#[cfg(any(ossl102, boringssl, awslc))]
 use crate::x509::X509PurposeId;
 use crate::{cvt, cvt_p};
 use openssl_macros::corresponds;
@@ -48,7 +47,6 @@ bitflags! {
         const EXTENDED_CRL_SUPPORT = ffi::X509_V_FLAG_EXTENDED_CRL_SUPPORT as _;
         const USE_DELTAS = ffi::X509_V_FLAG_USE_DELTAS as _;
         const CHECK_SS_SIGNATURE = ffi::X509_V_FLAG_CHECK_SS_SIGNATURE as _;
-        #[cfg(any(ossl102, boringssl, awslc, libressl251))]
         const TRUSTED_FIRST = ffi::X509_V_FLAG_TRUSTED_FIRST as _;
         #[cfg(ossl102)]
         const SUITEB_128_LOS_ONLY = ffi::X509_V_FLAG_SUITEB_128_LOS_ONLY;
@@ -56,11 +54,10 @@ bitflags! {
         const SUITEB_192_LOS = ffi::X509_V_FLAG_SUITEB_128_LOS;
         #[cfg(ossl102)]
         const SUITEB_128_LOS = ffi::X509_V_FLAG_SUITEB_192_LOS;
-        #[cfg(any(ossl102, boringssl, awslc, libressl251))]
         const PARTIAL_CHAIN = ffi::X509_V_FLAG_PARTIAL_CHAIN as _;
-        #[cfg(any(ossl110, boringssl, awslc, libressl251))]
+        #[cfg(any(ossl110, boringssl, awslc, libressl))]
         const NO_ALT_CHAINS = ffi::X509_V_FLAG_NO_ALT_CHAINS as _;
-        #[cfg(any(ossl110, boringssl, awslc, libressl251))]
+        #[cfg(any(ossl110, boringssl, awslc, libressl))]
         const NO_CHECK_TIME = ffi::X509_V_FLAG_NO_CHECK_TIME as _;
     }
 }
@@ -180,7 +177,7 @@ impl X509VerifyParamRef {
         }
     }
 
-    /// Set the verification time, where time is of type time_t, traditionaly defined as seconds since the epoch
+    /// Set the verification time, where time is of type time_t, traditionally defined as seconds since the epoch
     #[corresponds(X509_VERIFY_PARAM_set_time)]
     pub fn set_time(&mut self, time: time_t) {
         unsafe { ffi::X509_VERIFY_PARAM_set_time(self.as_ptr(), time) }
@@ -208,7 +205,6 @@ impl X509VerifyParamRef {
 
     /// Sets the verification purpose
     #[corresponds(X509_VERIFY_PARAM_set_purpose)]
-    #[cfg(any(ossl102, boringssl, awslc))]
     pub fn set_purpose(&mut self, purpose: X509PurposeId) -> Result<(), ErrorStack> {
         unsafe { cvt(ffi::X509_VERIFY_PARAM_set_purpose(self.as_ptr(), purpose.0)).map(|_| ()) }
     }
