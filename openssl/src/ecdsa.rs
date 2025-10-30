@@ -2,17 +2,30 @@
 
 use cfg_if::cfg_if;
 use foreign_types::{ForeignType, ForeignTypeRef};
-use libc::c_int;
 use std::mem;
 use std::ptr;
 
 use crate::bn::{BigNum, BigNumRef};
+use crate::cvt_p;
 use crate::ec::EcKeyRef;
 use crate::error::ErrorStack;
+use crate::hash::MessageDigest;
+use crate::pkey::PKey;
 use crate::pkey::{HasPrivate, HasPublic};
+use crate::sign::{Signer, Verifier};
 use crate::util::ForeignTypeRefExt;
-use crate::{cvt_n, cvt_p, LenType};
 use openssl_macros::corresponds;
+
+// TODO: this should probably be a LazyLock, but that requires 1.80+
+const ECDSA_MD: Option<fn() -> MessageDigest> = {
+    cfg_if! {
+        if #[cfg(not(any(boringssl, awslc)))] {
+            None
+        } else {
+            Some(MessageDigest::sha512)
+        }
+    }
+};
 
 foreign_type_and_impl_send_sync! {
     type CType = ffi::ECDSA_SIG;
@@ -26,20 +39,18 @@ foreign_type_and_impl_send_sync! {
 
 impl EcdsaSig {
     /// Computes a digital signature of the hash value `data` using the private EC key eckey.
-    #[corresponds(ECDSA_do_sign)]
     pub fn sign<T>(data: &[u8], eckey: &EcKeyRef<T>) -> Result<EcdsaSig, ErrorStack>
     where
         T: HasPrivate,
     {
-        unsafe {
-            assert!(data.len() <= c_int::MAX as usize);
-            let sig = cvt_p(ffi::ECDSA_do_sign(
-                data.as_ptr(),
-                data.len() as LenType,
-                eckey.as_ptr(),
-            ))?;
-            Ok(EcdsaSig::from_ptr(sig))
-        }
+        let pkey: PKey<T> = eckey.into();
+        let mut signer = match ECDSA_MD {
+            Some(md) => Signer::new(md(), &pkey),
+            None => Signer::new_without_digest(&pkey),
+        }?;
+        signer.update(data)?;
+        let sig = signer.sign_to_vec()?;
+        EcdsaSig::from_der(&sig)
     }
 
     /// Returns a new `EcdsaSig` by setting the `r` and `s` values associated with an ECDSA signature.
@@ -71,21 +82,18 @@ impl EcdsaSigRef {
     }
 
     /// Verifies if the signature is a valid ECDSA signature using the given public key.
-    #[corresponds(ECDSA_do_verify)]
     pub fn verify<T>(&self, data: &[u8], eckey: &EcKeyRef<T>) -> Result<bool, ErrorStack>
     where
         T: HasPublic,
     {
-        unsafe {
-            assert!(data.len() <= c_int::MAX as usize);
-            cvt_n(ffi::ECDSA_do_verify(
-                data.as_ptr(),
-                data.len() as LenType,
-                self.as_ptr(),
-                eckey.as_ptr(),
-            ))
-            .map(|x| x == 1)
-        }
+        let pkey: PKey<T> = eckey.into();
+        let mut verifier = match ECDSA_MD {
+            Some(md) => Verifier::new(md(), &pkey),
+            None => Verifier::new_without_digest(&pkey),
+        }?;
+        verifier.update(data)?;
+        let sig = self.to_der()?;
+        verifier.verify(&sig)
     }
 
     /// Returns internal component: `r` of an `EcdsaSig`. (See X9.62 or FIPS 186-2)
@@ -113,6 +121,8 @@ cfg_if! {
     if #[cfg(any(ossl110, libressl, boringssl, awslc))] {
         use ffi::{ECDSA_SIG_set0, ECDSA_SIG_get0};
     } else {
+        use libc::c_int;
+
         #[allow(bad_style)]
         unsafe fn ECDSA_SIG_set0(
             sig: *mut ffi::ECDSA_SIG,
