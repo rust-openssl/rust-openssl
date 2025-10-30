@@ -1049,10 +1049,91 @@ impl<T> fmt::Debug for EcKey<T> {
 #[cfg(test)]
 mod test {
     use hex::FromHex;
+    use std::str::from_utf8;
 
     use super::*;
     use crate::bn::{BigNum, BigNumContext};
     use crate::nid::Nid;
+    use crate::symm::Cipher;
+
+    #[test]
+    fn test_private_key_from_pem() {
+        EcKey::private_key_from_pem(include_bytes!("../test/ec.pem")).unwrap();
+    }
+
+    #[test]
+    fn test_private_key_from_pem_trad() {
+        EcKey::private_key_from_pem(include_bytes!("../test/ec.trad.pem")).unwrap();
+    }
+
+    #[test]
+    fn test_private_key_from_pem_password() {
+        let key = include_bytes!("../test/ec-encrypted.pem");
+        EcKey::private_key_from_pem_passphrase(key, b"mypass").unwrap();
+    }
+
+    #[test]
+    fn test_private_key_from_pem_callback() {
+        let mut password_queried = false;
+        let key = include_bytes!("../test/ec-encrypted.pem");
+        EcKey::private_key_from_pem_callback(key, |password| {
+            password_queried = true;
+            password[..6].copy_from_slice(b"mypass");
+            Ok(6)
+        })
+        .unwrap();
+
+        assert!(password_queried);
+    }
+
+    #[test]
+    fn test_private_key_from_der() {
+        EcKey::private_key_from_der(include_bytes!("../test/ec.der")).unwrap();
+    }
+
+    #[test]
+    fn test_private_key_to_pem() {
+        let key = EcKey::private_key_from_pem(include_bytes!("../test/ec.pem")).unwrap();
+        let pem = key.private_key_to_pem().unwrap();
+        assert_eq!(
+            from_utf8(&pem).unwrap(),
+            include_str!("../test/ec.trad.pem").replace("\r\n", "\n")
+        );
+    }
+
+    #[test]
+    fn test_private_key_to_pem_password() {
+        let key = EcKey::private_key_from_pem(include_bytes!("../test/ec.pem")).unwrap();
+        let pem = key
+            .private_key_to_pem_passphrase(Cipher::aes_128_cbc(), b"foobar")
+            .unwrap();
+        EcKey::private_key_from_pem_passphrase(&pem, b"foobar").unwrap();
+        assert!(EcKey::private_key_from_pem_passphrase(&pem, b"fizzbuzz").is_err());
+    }
+
+    #[test]
+    fn test_private_key_to_der() {
+        let key = EcKey::private_key_from_pem(include_bytes!("../test/ec.pem")).unwrap();
+        let der = key.private_key_to_der().unwrap();
+        assert_eq!(der, include_bytes!("../test/ec.der"));
+    }
+
+    #[test]
+    fn test_public_key_to_pem() {
+        let keypair = EcKey::private_key_from_pem(include_bytes!("../test/ec.pem")).unwrap();
+        let pubkey_pem = keypair.public_key_to_pem().unwrap();
+        assert_eq!(
+            from_utf8(&pubkey_pem).unwrap(),
+            include_str!("../test/ec.pub.pem").replace("\r\n", "\n")
+        );
+    }
+
+    #[test]
+    fn test_public_key_to_der() {
+        let keypair = EcKey::private_key_from_pem(include_bytes!("../test/ec.pem")).unwrap();
+        let pubkey_der = keypair.public_key_to_der().unwrap();
+        assert_eq!(pubkey_der, include_bytes!("../test/ec.pub.der"));
+    }
 
     #[test]
     fn key_new_by_curve_name() {
