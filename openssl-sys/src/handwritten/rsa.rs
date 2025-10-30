@@ -49,6 +49,13 @@ extern "C" {
         iqmp: *mut *const BIGNUM,
     );
 
+    #[cfg(any(ossl110, libressl273))]
+    pub fn RSA_test_flags(r: *const RSA, flags: c_int) -> c_int;
+    #[cfg(any(ossl110, libressl273))]
+    pub fn RSA_set_flags(r: *mut RSA, flags: c_int);
+    #[cfg(any(ossl110, libressl273))]
+    pub fn RSA_clear_flags(r: *mut RSA, flags: c_int);
+
     #[cfg(not(ossl110))]
     pub fn RSA_generate_key(
         modsz: c_int,
