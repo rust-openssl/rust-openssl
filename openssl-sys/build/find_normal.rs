@@ -125,7 +125,7 @@ Make sure you also have the development packages of openssl installed.
 For example, `libssl-dev` on Ubuntu or `openssl-devel` on Fedora.
 
 If you're in a situation where you think the directory *should* be found
-automatically, please open a bug at https://github.com/sfackler/rust-openssl
+automatically, please open a bug at https://github.com/rust-openssl/rust-openssl
 and include information about your system as well as this message.
 
 $HOST = {}
@@ -193,7 +193,7 @@ installation. If there isn't one installed then you can try the rust-openssl
 README for more information about how to download precompiled binaries of
 OpenSSL:
 
-https://github.com/sfackler/rust-openssl#windows
+https://github.com/rust-openssl/rust-openssl#windows
 
 ",
         );

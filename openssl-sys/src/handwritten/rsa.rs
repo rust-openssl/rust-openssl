@@ -16,31 +16,32 @@ cfg_if! {
     }
 }
 
+#[cfg(not(osslconf = "OPENSSL_NO_DEPRECATED_3_0"))]
 extern "C" {
     pub fn RSA_new() -> *mut RSA;
     pub fn RSA_size(k: *const RSA) -> c_int;
 
-    #[cfg(any(ossl110, libressl273))]
+    #[cfg(any(ossl110, libressl))]
     pub fn RSA_set0_key(r: *mut RSA, n: *mut BIGNUM, e: *mut BIGNUM, d: *mut BIGNUM) -> c_int;
-    #[cfg(any(ossl110, libressl273))]
+    #[cfg(any(ossl110, libressl))]
     pub fn RSA_set0_factors(r: *mut RSA, p: *mut BIGNUM, q: *mut BIGNUM) -> c_int;
-    #[cfg(any(ossl110, libressl273))]
+    #[cfg(any(ossl110, libressl))]
     pub fn RSA_set0_crt_params(
         r: *mut RSA,
         dmp1: *mut BIGNUM,
         dmq1: *mut BIGNUM,
         iqmp: *mut BIGNUM,
     ) -> c_int;
-    #[cfg(any(ossl110, libressl273))]
+    #[cfg(any(ossl110, libressl))]
     pub fn RSA_get0_key(
         r: *const RSA,
         n: *mut *const BIGNUM,
         e: *mut *const BIGNUM,
         d: *mut *const BIGNUM,
     );
-    #[cfg(any(ossl110, libressl273))]
+    #[cfg(any(ossl110, libressl))]
     pub fn RSA_get0_factors(r: *const RSA, p: *mut *const BIGNUM, q: *mut *const BIGNUM);
-    #[cfg(any(ossl110, libressl273))]
+    #[cfg(any(ossl110, libressl))]
     pub fn RSA_get0_crt_params(
         r: *const RSA,
         dmp1: *mut *const BIGNUM,

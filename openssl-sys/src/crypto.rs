@@ -116,7 +116,7 @@ cfg_if! {
 }
 
 cfg_if! {
-    if #[cfg(any(ossl110, libressl271))] {
+    if #[cfg(any(ossl110, libressl))] {
         pub const OPENSSL_VERSION: c_int = 0;
         pub const OPENSSL_CFLAGS: c_int = 1;
         pub const OPENSSL_BUILT_ON: c_int = 2;
@@ -131,4 +131,5 @@ cfg_if! {
     }
 }
 
+#[cfg(not(osslconf = "OPENSSL_NO_DEPRECATED_3_0"))]
 pub const CRYPTO_LOCK: c_int = 1;

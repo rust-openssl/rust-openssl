@@ -42,13 +42,13 @@ const_ptr_api! {
             conf: *mut CONF,
             ctx: *mut X509V3_CTX,
             ext_nid: c_int,
-            value: #[const_ptr_if(any(ossl110, libressl280))] c_char,
+            value: #[const_ptr_if(any(ossl110, libressl))] c_char,
         ) -> *mut X509_EXTENSION;
         pub fn X509V3_EXT_nconf(
             conf: *mut CONF,
             ctx: *mut X509V3_CTX,
-            name: #[const_ptr_if(any(ossl110, libressl280))] c_char,
-            value: #[const_ptr_if(any(ossl110, libressl280))] c_char,
+            name: #[const_ptr_if(any(ossl110, libressl))] c_char,
+            value: #[const_ptr_if(any(ossl110, libressl))] c_char,
         ) -> *mut X509_EXTENSION;
     }
 }
@@ -74,12 +74,12 @@ extern "C" {
 const_ptr_api! {
     extern "C" {
         pub fn X509V3_get_d2i(
-            x: #[const_ptr_if(any(ossl110, libressl280))] stack_st_X509_EXTENSION,
+            x: #[const_ptr_if(any(ossl110, libressl))] stack_st_X509_EXTENSION,
             nid: c_int,
             crit: *mut c_int,
             idx: *mut c_int,
         ) -> *mut c_void;
-        pub fn X509V3_extensions_print(out: *mut BIO, title: #[const_ptr_if(any(ossl110, libressl280))] c_char, exts: #[const_ptr_if(any(ossl110, libressl280))] stack_st_X509_EXTENSION, flag: c_ulong, indent: c_int) -> c_int;
+        pub fn X509V3_extensions_print(out: *mut BIO, title: #[const_ptr_if(any(ossl110, libressl))] c_char, exts: #[const_ptr_if(any(ossl110, libressl))] stack_st_X509_EXTENSION, flag: c_ulong, indent: c_int) -> c_int;
     }
 }
 

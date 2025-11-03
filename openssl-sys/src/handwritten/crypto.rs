@@ -4,7 +4,7 @@ use libc::*;
 stack!(stack_st_void);
 
 cfg_if! {
-    if #[cfg(any(ossl110, libressl271))] {
+    if #[cfg(any(ossl110, libressl))] {
         extern "C" {
             pub fn OpenSSL_version_num() -> c_ulong;
             pub fn OpenSSL_version(key: c_int) -> *const c_char;
@@ -71,9 +71,9 @@ cfg_if! {
 }
 
 extern "C" {
-    #[cfg(all(ossl101, not(ossl300)))]
+    #[cfg(all(ossl102, not(ossl300)))]
     pub fn FIPS_mode() -> c_int;
-    #[cfg(all(ossl101, not(ossl300)))]
+    #[cfg(all(ossl102, not(ossl300)))]
     pub fn FIPS_mode_set(onoff: c_int) -> c_int;
 
     pub fn CRYPTO_memcmp(a: *const c_void, b: *const c_void, len: size_t) -> c_int;

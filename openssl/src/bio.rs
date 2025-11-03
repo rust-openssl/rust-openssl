@@ -1,4 +1,3 @@
-use cfg_if::cfg_if;
 use libc::c_int;
 use std::marker::PhantomData;
 use std::ptr;
@@ -23,7 +22,7 @@ impl<'a> MemBioSlice<'a> {
 
         assert!(buf.len() <= c_int::MAX as usize);
         let bio = unsafe {
-            cvt_p(BIO_new_mem_buf(
+            cvt_p(ffi::BIO_new_mem_buf(
                 buf.as_ptr() as *const _,
                 buf.len() as crate::SLenType,
             ))?
@@ -70,17 +69,6 @@ impl MemBio {
     #[cfg(not(any(boringssl, awslc)))]
     pub unsafe fn from_ptr(bio: *mut ffi::BIO) -> MemBio {
         MemBio(bio)
-    }
-}
-
-cfg_if! {
-    if #[cfg(any(ossl102, boringssl, awslc))] {
-        use ffi::BIO_new_mem_buf;
-    } else {
-        #[allow(bad_style)]
-        unsafe fn BIO_new_mem_buf(buf: *const ::libc::c_void, len: ::libc::c_int) -> *mut ffi::BIO {
-            ffi::BIO_new_mem_buf(buf as *mut _, len)
-        }
     }
 }
 

@@ -240,7 +240,7 @@ impl EcGroupRef {
 
     /// Returns the number of bits in the group order.
     #[corresponds(EC_GROUP_order_bits)]
-    #[cfg(ossl110)]
+    #[cfg(any(ossl110, libressl, awslc, boringssl))]
     pub fn order_bits(&self) -> u32 {
         unsafe { ffi::EC_GROUP_order_bits(self.as_ptr()) as u32 }
     }
@@ -293,7 +293,7 @@ impl EcGroupRef {
     /// Sets the flag determining if the group corresponds to a named curve or must be explicitly
     /// parameterized.
     ///
-    /// This defaults to `EXPLICIT_CURVE` in OpenSSL 1.0.1 and 1.0.2, but `NAMED_CURVE` in OpenSSL
+    /// This defaults to `EXPLICIT_CURVE` in OpenSSL 1.0.2, but `NAMED_CURVE` in OpenSSL
     /// 1.1.0.
     #[corresponds(EC_GROUP_set_asn1_flag)]
     pub fn set_asn1_flag(&mut self, flag: Asn1Flag) {
@@ -519,7 +519,7 @@ impl EcPointRef {
     /// Places affine coordinates of a curve over a prime field in the provided
     /// `x` and `y` `BigNum`s.
     #[corresponds(EC_POINT_get_affine_coordinates)]
-    #[cfg(any(ossl111, boringssl, libressl350, awslc))]
+    #[cfg(any(ossl111, boringssl, libressl, awslc))]
     pub fn affine_coordinates(
         &self,
         group: &EcGroupRef,
@@ -564,7 +564,7 @@ impl EcPointRef {
     /// Sets affine coordinates of a point on an elliptic curve using the provided
     /// `x` and `y` `BigNum`s
     #[corresponds(EC_POINT_set_affine_coordinates)]
-    #[cfg(any(ossl111, boringssl, libressl350, awslc))]
+    #[cfg(any(ossl111, boringssl, libressl, awslc))]
     pub fn set_affine_coordinates(
         &mut self,
         group: &EcGroupRef,
@@ -1117,7 +1117,7 @@ mod test {
     }
 
     #[test]
-    #[cfg(any(ossl111, boringssl, libressl350, awslc))]
+    #[cfg(any(ossl111, boringssl, libressl, awslc))]
     fn ec_point_set_affine() {
         set_affine_coords_test(EcPointRef::set_affine_coordinates)
     }
@@ -1300,7 +1300,7 @@ mod test {
         assert!(ec_key.check_key().is_ok());
     }
 
-    #[cfg(any(ossl111, boringssl, libressl350, awslc))]
+    #[cfg(any(ossl111, boringssl, libressl, awslc))]
     #[test]
     fn get_affine_coordinates() {
         let group = EcGroup::from_curve_name(Nid::X9_62_PRIME256V1).unwrap();
@@ -1376,7 +1376,7 @@ mod test {
     }
 
     #[test]
-    #[cfg(any(boringssl, ossl111, libressl350, awslc))]
+    #[cfg(any(boringssl, ossl111, libressl, awslc))]
     fn asn1_flag() {
         let group = EcGroup::from_curve_name(Nid::X9_62_PRIME256V1).unwrap();
         let flag = group.asn1_flag();

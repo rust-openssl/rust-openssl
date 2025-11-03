@@ -32,6 +32,8 @@ use crate::conf::ConfRef;
 use crate::error::ErrorStack;
 use crate::ex_data::Index;
 use crate::hash::{DigestBytes, MessageDigest};
+#[cfg(ossl300)]
+use crate::lib_ctx::LibCtxRef;
 use crate::nid::Nid;
 use crate::pkey::{HasPrivate, HasPublic, PKey, PKeyRef, Public};
 use crate::ssl::SslRef;
@@ -41,7 +43,6 @@ use crate::util::{self, ForeignTypeExt, ForeignTypeRefExt};
 use crate::{cvt, cvt_n, cvt_p, cvt_p_const};
 use openssl_macros::corresponds;
 
-#[cfg(any(ossl102, boringssl, libressl261, awslc))]
 pub mod verify;
 
 pub mod extension;
@@ -1072,7 +1073,6 @@ impl X509NameBuilder {
 
     /// Add a name entry
     #[corresponds(X509_NAME_add_entry)]
-    #[cfg(any(ossl101, libressl350))]
     pub fn append_entry(&mut self, ne: &X509NameEntryRef) -> std::result::Result<(), ErrorStack> {
         unsafe {
             cvt(ffi::X509_NAME_add_entry(
@@ -1219,6 +1219,51 @@ impl Stackable for X509Name {
 }
 
 impl X509NameRef {
+    /// Returns the hash of the X509 name
+    #[cfg(ossl300)]
+    #[corresponds(X509_NAME_hash_ex)]
+    pub fn hash_ex(&self, ctx: Option<LibCtxRef>, propq: Option<&str>) -> Result<u32, ErrorStack> {
+        let ctx_ref = ctx.map_or(ptr::null_mut(), |ctx| ctx.as_ptr());
+
+        let cstr;
+        let propq = if let Some(propq) = propq {
+            cstr = CString::new(propq).unwrap();
+            cstr.as_ptr()
+        } else {
+            ptr::null()
+        };
+
+        let mut ok: c_int = 0;
+        let hash;
+
+        #[allow(clippy::unnecessary_cast)]
+        unsafe {
+            hash = ffi::X509_NAME_hash_ex(self.as_ptr(), ctx_ref, propq, &mut ok) as u32;
+        }
+
+        if ok != 1 {
+            return Err(ErrorStack::get());
+        }
+
+        Ok(hash)
+    }
+
+    /// Returns the hash of the X509 name
+    #[cfg(ossl300)]
+    #[corresponds(X509_NAME_hash)]
+    pub fn hash(&self) -> u32 {
+        self.hash_ex(None, None).unwrap_or(0)
+    }
+
+    #[cfg(not(ossl300))]
+    #[corresponds(X509_NAME_hash)]
+    pub fn hash(&self) -> u32 {
+        #[allow(clippy::unnecessary_cast)]
+        unsafe {
+            ffi::X509_NAME_hash(self.as_ptr()) as u32
+        }
+    }
+
     /// Returns the name entries by the nid.
     pub fn entries_by_nid(&self, nid: Nid) -> X509NameEntries<'_> {
         X509NameEntries {
@@ -1254,7 +1299,7 @@ impl X509NameRef {
 
     /// Copies the name to a new `X509Name`.
     #[corresponds(X509_NAME_dup)]
-    #[cfg(any(boringssl, ossl110, libressl270, awslc))]
+    #[cfg(any(boringssl, ossl110, libressl, awslc))]
     pub fn to_owned(&self) -> Result<X509Name, ErrorStack> {
         unsafe { cvt_p(ffi::X509_NAME_dup(self.as_ptr())).map(|n| X509Name::from_ptr(n)) }
     }
@@ -1720,7 +1765,7 @@ impl X509RevokedRef {
 
     /// Copies the entry to a new `X509Revoked`.
     #[corresponds(X509_NAME_dup)]
-    #[cfg(any(boringssl, ossl110, libressl270, awslc))]
+    #[cfg(any(boringssl, ossl110, libressl, awslc))]
     pub fn to_owned(&self) -> Result<X509Revoked, ErrorStack> {
         unsafe { cvt_p(ffi::X509_REVOKED_dup(self.as_ptr())).map(|n| X509Revoked::from_ptr(n)) }
     }
@@ -1949,7 +1994,7 @@ foreign_type_and_impl_send_sync! {
 ///
 /// Corresponds to the return value from the [`X509_CRL_get0_by_*`] methods.
 ///
-/// [`X509_CRL_get0_by_*`]: https://www.openssl.org/docs/man1.1.0/man3/X509_CRL_get0_by_serial.html
+/// [`X509_CRL_get0_by_*`]: https://docs.openssl.org/master/man3/X509_CRL_get0_by_serial/
 #[derive(Debug)]
 pub enum CrlStatus<'a> {
     /// The certificate is not present in the list
@@ -2784,7 +2829,7 @@ impl Stackable for X509Object {
 }
 
 cfg_if! {
-    if #[cfg(any(boringssl, ossl110, libressl273, awslc))] {
+    if #[cfg(any(boringssl, ossl110, libressl, awslc))] {
         use ffi::{X509_getm_notAfter, X509_getm_notBefore, X509_up_ref, X509_get0_signature};
     } else {
         #[allow(bad_style)]
@@ -2825,7 +2870,7 @@ cfg_if! {
 }
 
 cfg_if! {
-    if #[cfg(any(boringssl, ossl110, libressl350, awslc))] {
+    if #[cfg(any(boringssl, ossl110, libressl, awslc))] {
         use ffi::{
             X509_ALGOR_get0, ASN1_STRING_get0_data, X509_STORE_CTX_get0_chain, X509_set1_notAfter,
             X509_set1_notBefore, X509_REQ_get_version, X509_REQ_get_subject_name,
@@ -2865,7 +2910,7 @@ cfg_if! {
 }
 
 cfg_if! {
-    if #[cfg(any(ossl110, boringssl, libressl270, awslc))] {
+    if #[cfg(any(ossl110, boringssl, libressl, awslc))] {
         use ffi::X509_OBJECT_get0_X509;
     } else {
         #[allow(bad_style)]
@@ -2880,7 +2925,7 @@ cfg_if! {
 }
 
 cfg_if! {
-    if #[cfg(any(ossl110, libressl350, boringssl, awslc))] {
+    if #[cfg(any(ossl110, libressl, boringssl, awslc))] {
         use ffi::X509_OBJECT_free;
     } else {
         #[allow(bad_style)]
@@ -2892,7 +2937,7 @@ cfg_if! {
 }
 
 cfg_if! {
-    if #[cfg(any(ossl110, libressl350, boringssl, awslc))] {
+    if #[cfg(any(ossl110, libressl, boringssl, awslc))] {
         use ffi::{X509_CRL_set1_nextUpdate, X509_CRL_set1_lastUpdate};
     } else {
         use ffi::{
@@ -2904,7 +2949,7 @@ cfg_if! {
 }
 
 cfg_if! {
-    if #[cfg(any(ossl110, libressl350, boringssl, awslc))] {
+    if #[cfg(any(ossl110, libressl, boringssl, awslc))] {
         use ffi::{
             X509_CRL_get_issuer, X509_CRL_get0_nextUpdate, X509_CRL_get0_lastUpdate,
             X509_CRL_get_REVOKED,
@@ -2992,7 +3037,7 @@ impl X509PurposeRef {
         unsafe {
             let sname = CString::new(sname).unwrap();
             cfg_if! {
-                if #[cfg(any(ossl110, libressl280, boringssl, awslc))] {
+                if #[cfg(any(ossl110, libressl, boringssl, awslc))] {
                     let purpose = cvt_n(ffi::X509_PURPOSE_get_by_sname(sname.as_ptr() as *const _))?;
                 } else {
                     let purpose = cvt_n(ffi::X509_PURPOSE_get_by_sname(sname.as_ptr() as *mut _))?;
@@ -3024,7 +3069,7 @@ impl X509PurposeRef {
     pub fn purpose(&self) -> X509PurposeId {
         unsafe {
             cfg_if! {
-                if #[cfg(any(ossl110, libressl280, boringssl, awslc))] {
+                if #[cfg(any(ossl110, libressl, boringssl, awslc))] {
                     let x509_purpose = self.as_ptr() as *const ffi::X509_PURPOSE;
                 } else {
                     let x509_purpose = self.as_ptr() as *mut ffi::X509_PURPOSE;

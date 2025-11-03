@@ -13,8 +13,8 @@ const_ptr_api! {
     extern "C" {
         pub fn OCSP_cert_to_id(
             dgst: *const EVP_MD,
-            subject: #[const_ptr_if(any(ossl110, libressl281))] X509,
-            issuer: #[const_ptr_if(any(ossl110, libressl281))] X509,
+            subject: #[const_ptr_if(any(ossl110, libressl))] X509,
+            issuer: #[const_ptr_if(any(ossl110, libressl))] X509,
         ) -> *mut OCSP_CERTID;
     }
 }

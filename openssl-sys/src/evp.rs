@@ -7,7 +7,7 @@ pub const PKCS5_SALT_LEN: c_int = 8;
 pub const PKCS12_DEFAULT_ITER: c_int = 2048;
 
 pub const EVP_PKEY_RSA: c_int = NID_rsaEncryption;
-#[cfg(any(ossl111, libressl310, boringssl, awslc))]
+#[cfg(any(ossl111, libressl, boringssl, awslc))]
 pub const EVP_PKEY_RSA_PSS: c_int = NID_rsassaPss;
 pub const EVP_PKEY_DSA: c_int = NID_dsa;
 pub const EVP_PKEY_DH: c_int = NID_dhKeyAgreement;
@@ -335,18 +335,22 @@ pub unsafe fn EVP_PKEY_CTX_set_signature_md(cxt: *mut EVP_PKEY_CTX, md: *mut EVP
     )
 }
 
+#[cfg(not(osslconf = "OPENSSL_NO_DEPRECATED_3_0"))]
 pub unsafe fn EVP_PKEY_assign_RSA(pkey: *mut EVP_PKEY, rsa: *mut RSA) -> c_int {
     EVP_PKEY_assign(pkey, EVP_PKEY_RSA, rsa as *mut c_void)
 }
 
+#[cfg(not(osslconf = "OPENSSL_NO_DEPRECATED_3_0"))]
 pub unsafe fn EVP_PKEY_assign_DSA(pkey: *mut EVP_PKEY, dsa: *mut DSA) -> c_int {
     EVP_PKEY_assign(pkey, EVP_PKEY_DSA, dsa as *mut c_void)
 }
 
+#[cfg(not(osslconf = "OPENSSL_NO_DEPRECATED_3_0"))]
 pub unsafe fn EVP_PKEY_assign_DH(pkey: *mut EVP_PKEY, dh: *mut DH) -> c_int {
     EVP_PKEY_assign(pkey, EVP_PKEY_DH, dh as *mut c_void)
 }
 
+#[cfg(not(osslconf = "OPENSSL_NO_DEPRECATED_3_0"))]
 pub unsafe fn EVP_PKEY_assign_EC_KEY(pkey: *mut EVP_PKEY, ec_key: *mut EC_KEY) -> c_int {
     EVP_PKEY_assign(pkey, EVP_PKEY_EC, ec_key as *mut c_void)
 }

@@ -16,5 +16,5 @@
 
 Initial release
 
-[Unreleased]: https://github.com/sfackler/rust-openssl/compare/openssl-errors-v0.2.0...master
-[v0.2.0]: https://github.com/sfackler/rust-openssl/compare/openssl-errors-v0.1.0...openssl-errors-v0.2.0
+[Unreleased]: https://github.com/rust-openssl/rust-openssl/compare/openssl-errors-v0.2.0...master
+[v0.2.0]: https://github.com/rust-openssl/rust-openssl/compare/openssl-errors-v0.1.0...openssl-errors-v0.2.0

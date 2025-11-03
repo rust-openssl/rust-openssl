@@ -41,7 +41,7 @@ const INCLUDES: &str = "
 #include <openssl/srtp.h>
 #endif
 
-#if !(defined(LIBRESSL_VERSION_NUMBER) || defined(OPENSSL_IS_BORINGSSL) || defined(OPENSSL_IS_AWSLC))
+#if !(defined(OPENSSL_IS_BORINGSSL) || defined(OPENSSL_IS_AWSLC))
 #include <openssl/cms.h>
 #endif
 
@@ -71,6 +71,10 @@ const INCLUDES: &str = "
 
 #if defined(LIBRESSL_VERSION_NUMBER) || defined(OPENSSL_IS_BORINGSSL) || defined(OPENSSL_IS_AWSLC)
 #include <openssl/poly1305.h>
+#endif
+
+#if defined(OPENSSL_IS_BORINGSSL)
+#include <openssl/mlkem.h>
 #endif
 
 #if OPENSSL_VERSION_NUMBER >= 0x30200000

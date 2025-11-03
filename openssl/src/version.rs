@@ -18,7 +18,7 @@ use openssl_macros::corresponds;
 use std::ffi::CStr;
 
 cfg_if! {
-    if #[cfg(any(ossl110, libressl271))] {
+    if #[cfg(any(ossl110, libressl))] {
         use ffi::{
             OPENSSL_VERSION, OPENSSL_CFLAGS, OPENSSL_BUILT_ON, OPENSSL_PLATFORM, OPENSSL_DIR,
             OpenSSL_version_num, OpenSSL_version,

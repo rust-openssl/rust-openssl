@@ -21,15 +21,10 @@ pub const GEN_URI: c_int = 6;
 pub const GEN_IPADD: c_int = 7;
 pub const GEN_RID: c_int = 8;
 
-#[cfg(any(ossl102, libressl261))]
 pub const X509_CHECK_FLAG_ALWAYS_CHECK_SUBJECT: c_uint = 0x1;
-#[cfg(any(ossl102, libressl261))]
 pub const X509_CHECK_FLAG_NO_WILDCARDS: c_uint = 0x2;
-#[cfg(any(ossl102, libressl261))]
 pub const X509_CHECK_FLAG_NO_PARTIAL_WILDCARDS: c_uint = 0x4;
-#[cfg(any(ossl102, libressl261))]
 pub const X509_CHECK_FLAG_MULTI_LABEL_WILDCARDS: c_uint = 0x8;
-#[cfg(any(ossl102, libressl261))]
 pub const X509_CHECK_FLAG_SINGLE_LABEL_SUBDOMAINS: c_uint = 0x10;
 #[cfg(ossl110)]
 pub const X509_CHECK_FLAG_NEVER_CHECK_SUBJECT: c_uint = 0x20;
@@ -55,7 +50,6 @@ pub const EXFLAG_CRITICAL: u32 = 0x200;
 pub const EXFLAG_PROXY: u32 = 0x400;
 pub const EXFLAG_INVALID_POLICY: u32 = 0x800;
 pub const EXFLAG_FRESHEST: u32 = 0x1000;
-#[cfg(any(ossl102, libressl261))]
 pub const EXFLAG_SS: u32 = 0x2000;
 
 pub const X509v3_KU_DIGITAL_SIGNATURE: u32 = 0x0080;

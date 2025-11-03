@@ -60,7 +60,7 @@ cfg_if::cfg_if! {
             memcost: u32,
             out: &mut [u8],
         ) -> Result<(), ErrorStack> {
-            return argon2_helper(CStr::from_bytes_with_nul(b"ARGON2D\0").unwrap(), ctx, pass, salt, ad, secret, iter, lanes, memcost, out);
+            argon2_helper(CStr::from_bytes_with_nul(b"ARGON2D\0").unwrap(), ctx, pass, salt, ad, secret, iter, lanes, memcost, out)
         }
 
         #[allow(clippy::too_many_arguments)]
@@ -75,7 +75,7 @@ cfg_if::cfg_if! {
             memcost: u32,
             out: &mut [u8],
         ) -> Result<(), ErrorStack> {
-            return argon2_helper(CStr::from_bytes_with_nul(b"ARGON2I\0").unwrap(), ctx, pass, salt, ad, secret, iter, lanes, memcost, out);
+            argon2_helper(CStr::from_bytes_with_nul(b"ARGON2I\0").unwrap(), ctx, pass, salt, ad, secret, iter, lanes, memcost, out)
         }
 
         #[allow(clippy::too_many_arguments)]
@@ -90,7 +90,7 @@ cfg_if::cfg_if! {
             memcost: u32,
             out: &mut [u8],
         ) -> Result<(), ErrorStack> {
-            return argon2_helper(CStr::from_bytes_with_nul(b"ARGON2ID\0").unwrap(), ctx, pass, salt, ad, secret, iter, lanes, memcost, out);
+            argon2_helper(CStr::from_bytes_with_nul(b"ARGON2ID\0").unwrap(), ctx, pass, salt, ad, secret, iter, lanes, memcost, out)
         }
 
         /// Derives a key using the argon2* algorithms.
@@ -100,6 +100,7 @@ cfg_if::cfg_if! {
         /// builds with no threads all lanes will be processed sequentially.
         ///
         /// Requires OpenSSL 3.2.0 or newer.
+        #[allow(clippy::too_many_arguments)]
         fn argon2_helper(
             kdf_identifier: &CStr,
             ctx: Option<&LibCtxRef>,
