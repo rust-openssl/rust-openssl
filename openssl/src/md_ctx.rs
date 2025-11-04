@@ -301,6 +301,22 @@ impl MdCtxRef {
         Ok(len)
     }
 
+    fn convert_verify_result(r: ffi::c_int) -> Result<bool, ErrorStack> {
+        // https://docs.openssl.org/3.2/man3/EVP_DigestVerifyInit/#return-values
+        match r {
+            // EVP_DigestVerifyFinal() and EVP_DigestVerify() return 1  for success...
+            1 => Ok(true),
+            // A return value of zero indicates that the signature did not verify successfully
+            0 => {
+                // Clear the error stack so debugging any subsequent errors is not confusing
+                ErrorStack::clear();
+                Ok(false)
+            }
+            // while other values indicate a more serious error
+            _ => Err(ErrorStack::get()),
+        }
+    }
+
     /// Verifies the provided signature.
     ///
     /// Returns `Ok(true)` if the signature is valid, `Ok(false)` if the signature is invalid, and `Err` if an error
@@ -308,23 +324,9 @@ impl MdCtxRef {
     #[corresponds(EVP_DigestVerifyFinal)]
     #[inline]
     pub fn digest_verify_final(&mut self, signature: &[u8]) -> Result<bool, ErrorStack> {
-        unsafe {
-            let r = ffi::EVP_DigestVerifyFinal(
-                self.as_ptr(),
-                signature.as_ptr() as *mut _,
-                signature.len(),
-            );
-            if r == 1 {
-                Ok(true)
-            } else {
-                let errors = ErrorStack::get();
-                if errors.errors().is_empty() {
-                    Ok(false)
-                } else {
-                    Err(errors)
-                }
-            }
-        }
+        Self::convert_verify_result(unsafe {
+            ffi::EVP_DigestVerifyFinal(self.as_ptr(), signature.as_ptr() as *mut _, signature.len())
+        })
     }
 
     /// Computes the signature of the data in `from`.
@@ -377,16 +379,15 @@ impl MdCtxRef {
     #[cfg(ossl111)]
     #[inline]
     pub fn digest_verify(&mut self, data: &[u8], signature: &[u8]) -> Result<bool, ErrorStack> {
-        unsafe {
-            let r = cvt(ffi::EVP_DigestVerify(
+        Self::convert_verify_result(unsafe {
+            ffi::EVP_DigestVerify(
                 self.as_ptr(),
                 signature.as_ptr(),
                 signature.len(),
                 data.as_ptr(),
                 data.len(),
-            ))?;
-            Ok(r == 1)
-        }
+            )
+        })
     }
 
     /// Returns the size of the message digest, i.e. the size of the hash
@@ -433,10 +434,7 @@ mod test {
 
         ctx.digest_verify_init(Some(md), &key1).unwrap();
         ctx.digest_verify_update(bad_data).unwrap();
-        assert!(matches!(
-            ctx.digest_verify_final(&signature),
-            Ok(false) | Err(_)
-        ));
+        assert!(!ctx.digest_verify_final(&signature).unwrap());
         assert!(ErrorStack::get().errors().is_empty());
     }
 
