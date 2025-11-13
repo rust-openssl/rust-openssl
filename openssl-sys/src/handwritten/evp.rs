@@ -737,6 +737,30 @@ cfg_if! {
         }
     }
 }
+cfg_if! {
+    if #[cfg(ossl300)] {
+        extern "C" {
+            pub fn EVP_PKEY_new_raw_private_key_ex(
+                ctx: *mut OSSL_LIB_CTX,
+                keytype: *const c_char,
+                propq: *const c_char,
+                key: *const c_uchar,
+                keylen: size_t
+            ) -> *mut EVP_PKEY;
+            pub fn EVP_PKEY_new_raw_public_key_ex(
+                ctx: *mut OSSL_LIB_CTX,
+                keytype: *const c_char,
+                propq: *const c_char,
+                key: *const c_uchar,
+                keylen: size_t
+            ) -> *mut EVP_PKEY;
+            pub fn EVP_PKEY_is_a(
+                pkey: *const EVP_PKEY,
+                name: *const c_char
+            ) -> c_int;
+        }
+    }
+}
 
 extern "C" {
     pub fn EVP_EncodeBlock(dst: *mut c_uchar, src: *const c_uchar, src_len: c_int) -> c_int;
