@@ -231,7 +231,9 @@ impl<T> PKeyRef<T> {
         unsafe { ffi::EVP_PKEY_size(self.as_ptr()) as usize }
     }
 
+    /// Returns true if the key matches the string key_type.
     #[corresponds(EVP_PKEY_is_a)]
+    #[cfg(ossl300)]
     pub fn is_key_type(&self, key_type: &str) -> Result<bool, ErrorStack> {
         let key_type = CString::new(key_type).unwrap();
         let res = unsafe { ffi::EVP_PKEY_is_a(self.as_ptr(), key_type.as_ptr()) == 1 };
@@ -566,7 +568,7 @@ impl PKey<Private> {
         ctx.keygen()
     }
 
-    #[cfg(ossl300)]
+    #[cfg(ossl350)] // This function exists since ossl300, but we only use it in a function gated to ossl350.
     fn generate_key_from_name(name: &str) -> Result<PKey<Private>, ErrorStack> {
         use crate::ossl_param::OsslParamBuilder;
 
