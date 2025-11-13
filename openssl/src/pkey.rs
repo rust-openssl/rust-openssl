@@ -41,26 +41,36 @@
 //! ```
 #![allow(clippy::missing_safety_doc)]
 use crate::bio::{MemBio, MemBioSlice};
+#[cfg(ossl300)]
+use crate::bn::BigNumRef;
 #[cfg(ossl110)]
 use crate::cipher::CipherRef;
 use crate::dh::Dh;
 use crate::dsa::Dsa;
 use crate::ec::EcKey;
 use crate::error::ErrorStack;
+#[cfg(ossl300)]
+use crate::ossl_param::OsslParamArray;
 #[cfg(any(ossl110, boringssl, libressl370, awslc))]
 use crate::pkey_ctx::PkeyCtx;
+#[cfg(ossl300)]
+use crate::pkey_ctx::Selection;
 use crate::rsa::Rsa;
 use crate::symm::Cipher;
 use crate::util::{invoke_passwd_cb, CallbackState};
 use crate::{cvt, cvt_p};
 use cfg_if::cfg_if;
 use foreign_types::{ForeignType, ForeignTypeRef};
+#[cfg(ossl300)]
+use libc::c_char;
 use libc::{c_int, c_long};
 use openssl_macros::corresponds;
 use std::convert::{TryFrom, TryInto};
-use std::ffi::CString;
+#[cfg(ossl300)]
+use std::ffi::c_uchar;
+use std::ffi::{CStr, CString};
 use std::fmt;
-#[cfg(all(not(any(boringssl, awslc)), ossl110))]
+#[cfg(all(not(any(boringssl, awslc, ossl300)), ossl110))]
 use std::mem;
 use std::ptr;
 
@@ -119,6 +129,103 @@ impl Id {
     }
 }
 
+impl TryFrom<Id> for &'static str {
+    type Error = ();
+    fn try_from(id: Id) -> Result<Self, Self::Error> {
+        match id {
+            Id::RSA => Ok("RSA"),
+            #[cfg(any(ossl111, libressl, boringssl, awslc))]
+            Id::RSA_PSS => Ok("RSA-PSS"),
+            #[cfg(not(boringssl))]
+            Id::HMAC => Ok("HMAC"),
+            #[cfg(not(any(boringssl, awslc)))]
+            Id::CMAC => Ok("CMAC"),
+            Id::DSA => Ok("DSA"),
+            Id::DH => Ok("DH"),
+            #[cfg(ossl110)]
+            Id::DHX => Ok("DHX"),
+            Id::EC => Ok("EC"),
+            #[cfg(ossl111)]
+            Id::SM2 => Ok("SM2"),
+            #[cfg(any(ossl110, boringssl, libressl360, awslc))]
+            Id::HKDF => Ok("HKDF"),
+            #[cfg(any(ossl111, boringssl, libressl370, awslc))]
+            Id::ED25519 => Ok("Ed25519"),
+            #[cfg(ossl111)]
+            Id::ED448 => Ok("Ed448"),
+            #[cfg(any(ossl111, boringssl, libressl370, awslc))]
+            Id::X25519 => Ok("X25519"),
+            #[cfg(ossl111)]
+            Id::X448 => Ok("X448"),
+            #[cfg(ossl111)]
+            Id::POLY1305 => Ok("POLY1305"),
+            _ => Err(()),
+        }
+    }
+}
+
+cstr_const!(ID_RSA, b"RSA\0");
+#[cfg(any(ossl111, libressl310, boringssl, awslc))]
+cstr_const!(ID_RSA_PSS, b"RSA-PSS\0");
+#[cfg(not(boringssl))]
+cstr_const!(ID_HMAC, b"HMAC\0");
+#[cfg(not(any(boringssl, awslc)))]
+cstr_const!(ID_CMAC, b"CMAC\0");
+cstr_const!(ID_DSA, b"DSA\0");
+cstr_const!(ID_DH, b"DH\0");
+#[cfg(ossl110)]
+cstr_const!(ID_DHX, b"DHX\0");
+cstr_const!(ID_EC, b"EC\0");
+#[cfg(ossl111)]
+cstr_const!(ID_SM2, b"SM2\0");
+#[cfg(any(ossl110, boringssl, libressl360, awslc))]
+cstr_const!(ID_HKDF, b"HKDF\0");
+#[cfg(any(ossl111, boringssl, libressl370, awslc))]
+cstr_const!(ID_ED25519, b"Ed25519\0");
+#[cfg(ossl111)]
+cstr_const!(ID_ED448, b"Ed448\0");
+#[cfg(any(ossl111, boringssl, libressl370, awslc))]
+cstr_const!(ID_X25519, b"X25519\0");
+#[cfg(ossl111)]
+cstr_const!(ID_X448, b"X448\0");
+#[cfg(ossl111)]
+cstr_const!(ID_POLY1305, b"POLY1305\0");
+
+impl TryFrom<Id> for &'static CStr {
+    type Error = ();
+    fn try_from(id: Id) -> Result<Self, Self::Error> {
+        match id {
+            Id::RSA => Ok(ID_RSA),
+            #[cfg(any(ossl111, libressl310, boringssl, awslc))]
+            Id::RSA_PSS => Ok(ID_RSA_PSS),
+            #[cfg(not(boringssl))]
+            Id::HMAC => Ok(ID_HMAC),
+            #[cfg(not(any(boringssl, awslc)))]
+            Id::CMAC => Ok(ID_CMAC),
+            Id::DSA => Ok(ID_DSA),
+            Id::DH => Ok(ID_DH),
+            #[cfg(ossl110)]
+            Id::DHX => Ok(ID_DHX),
+            Id::EC => Ok(ID_EC),
+            #[cfg(ossl111)]
+            Id::SM2 => Ok(ID_SM2),
+            #[cfg(any(ossl110, boringssl, libressl360, awslc))]
+            Id::HKDF => Ok(ID_HKDF),
+            #[cfg(any(ossl111, boringssl, libressl370, awslc))]
+            Id::ED25519 => Ok(ID_ED25519),
+            #[cfg(ossl111)]
+            Id::ED448 => Ok(ID_ED448),
+            #[cfg(any(ossl111, boringssl, libressl370, awslc))]
+            Id::X25519 => Ok(ID_X25519),
+            #[cfg(ossl111)]
+            Id::X448 => Ok(ID_X448),
+            #[cfg(ossl111)]
+            Id::POLY1305 => Ok(ID_POLY1305),
+            _ => Err(()),
+        }
+    }
+}
+
 /// A trait indicating that a key has parameters.
 pub unsafe trait HasParams {}
 
@@ -137,6 +244,14 @@ unsafe impl<T> HasPublic for T where T: HasPrivate {}
 pub unsafe trait HasPrivate {}
 
 unsafe impl HasPrivate for Private {}
+
+/// KeyID trait that tags the type of key.
+///
+/// Used for decoding PKeys
+#[cfg(ossl300)]
+pub(crate) trait KeyID {
+    const ID: Id;
+}
 
 generic_foreign_type_and_impl_send_sync! {
     type CType = ffi::EVP_PKEY;
@@ -159,41 +274,72 @@ impl<T> ToOwned for PKeyRef<T> {
     }
 }
 
+#[cfg(ossl110)]
+pub trait KeyCheck {
+    fn check_key(&self) -> Result<(), ErrorStack>;
+}
+
 impl<T> PKeyRef<T> {
     /// Returns a copy of the internal RSA key.
-    #[corresponds(EVP_PKEY_get1_RSA)]
     pub fn rsa(&self) -> Result<Rsa<T>, ErrorStack> {
-        unsafe {
-            let rsa = cvt_p(ffi::EVP_PKEY_get1_RSA(self.as_ptr()))?;
-            Ok(Rsa::from_ptr(rsa))
+        if self.id() != Id::RSA {
+            return Err(ErrorStack::get());
         }
+
+        let rsa = self.as_ptr();
+        #[cfg(ossl300)]
+        cvt(unsafe { ffi::EVP_PKEY_up_ref(rsa) })?;
+        #[cfg(not(ossl300))]
+        let rsa = cvt_p(unsafe { ffi::EVP_PKEY_get1_RSA(rsa) })?;
+
+        Ok(unsafe { Rsa::from_ptr(rsa) })
     }
 
     /// Returns a copy of the internal DSA key.
     #[corresponds(EVP_PKEY_get1_DSA)]
     pub fn dsa(&self) -> Result<Dsa<T>, ErrorStack> {
-        unsafe {
-            let dsa = cvt_p(ffi::EVP_PKEY_get1_DSA(self.as_ptr()))?;
-            Ok(Dsa::from_ptr(dsa))
+        if self.id() != Id::DSA {
+            return Err(ErrorStack::get());
         }
+
+        let dsa = self.as_ptr();
+        #[cfg(ossl300)]
+        cvt(unsafe { ffi::EVP_PKEY_up_ref(dsa) })?;
+        #[cfg(not(ossl300))]
+        let dsa = cvt_p(unsafe { ffi::EVP_PKEY_get1_DSA(dsa) })?;
+
+        Ok(unsafe { Dsa::from_ptr(dsa) })
     }
 
     /// Returns a copy of the internal DH key.
     #[corresponds(EVP_PKEY_get1_DH)]
     pub fn dh(&self) -> Result<Dh<T>, ErrorStack> {
-        unsafe {
-            let dh = cvt_p(ffi::EVP_PKEY_get1_DH(self.as_ptr()))?;
-            Ok(Dh::from_ptr(dh))
+        if ![Id::DH, Id::DHX].contains(&self.id()) {
+            return Err(ErrorStack::get());
         }
+
+        let dh = self.as_ptr();
+        #[cfg(ossl300)]
+        cvt(unsafe { ffi::EVP_PKEY_up_ref(dh) })?;
+        #[cfg(not(ossl300))]
+        let dh = cvt_p(unsafe { ffi::EVP_PKEY_get1_DH(dh) })?;
+        Ok(unsafe { Dh::from_ptr(dh) })
     }
 
     /// Returns a copy of the internal elliptic curve key.
     #[corresponds(EVP_PKEY_get1_EC_KEY)]
     pub fn ec_key(&self) -> Result<EcKey<T>, ErrorStack> {
-        unsafe {
-            let ec_key = cvt_p(ffi::EVP_PKEY_get1_EC_KEY(self.as_ptr()))?;
-            Ok(EcKey::from_ptr(ec_key))
+        if self.id() != Id::EC {
+            return Err(ErrorStack::get());
         }
+
+        let ec_key = self.as_ptr();
+        #[cfg(ossl300)]
+        cvt(unsafe { ffi::EVP_PKEY_up_ref(ec_key) })?;
+        #[cfg(not(ossl300))]
+        let ec_key = cvt_p(unsafe { ffi::EVP_PKEY_get1_EC_KEY(ec_key) })?;
+
+        Ok(unsafe { EcKey::from_ptr(ec_key) })
     }
 
     /// Returns the `Id` that represents the type of this key.
@@ -205,7 +351,89 @@ impl<T> PKeyRef<T> {
     /// Returns the maximum size of a signature in bytes.
     #[corresponds(EVP_PKEY_size)]
     pub fn size(&self) -> usize {
+        // TODO: Next time we make backwards incompatible changes, the return type should be unified
+        //  with the Rsa, Dsa, etc APIs. u32 or usize?
         unsafe { ffi::EVP_PKEY_size(self.as_ptr()) as usize }
+    }
+
+    /// Returns the BigNum value associated with the given key name.
+    #[corresponds(EVP_PKEY_get_bn_param)]
+    #[cfg(ossl300)]
+    #[allow(dead_code)]
+    pub(crate) fn get_bn_param(&self, key: &CStr) -> Result<&BigNumRef, ErrorStack> {
+        let mut value = ptr::null_mut();
+        unsafe {
+            cvt(ffi::EVP_PKEY_get_bn_param(
+                self.as_ptr(),
+                key.as_ptr(),
+                &mut value,
+            ))?;
+            Ok(BigNumRef::from_ptr(value))
+        }
+    }
+
+    /// Returns the byte string value associated with the given key name.
+    #[corresponds(EVP_PKEY_get_octet_string_param)]
+    #[cfg(ossl300)]
+    #[allow(dead_code)]
+    pub(crate) fn get_byte_string_param(&self, key: &CStr) -> Result<Vec<u8>, ErrorStack> {
+        const VALUE_LEN: usize = 4096;
+        let mut value_buf: Vec<u8> = vec![0; VALUE_LEN];
+        let mut out_len: usize = 0;
+        unsafe {
+            cvt(ffi::EVP_PKEY_get_octet_string_param(
+                self.as_ptr(),
+                key.as_ptr(),
+                value_buf.as_mut_ptr().cast::<c_uchar>(),
+                VALUE_LEN,
+                &mut out_len,
+            ))?;
+        }
+        value_buf.truncate(out_len);
+        Ok(value_buf)
+    }
+
+    /// Returns the String value associated with the given key name.
+    #[corresponds(EVP_PKEY_get_utf8_string_param)]
+    #[cfg(ossl300)]
+    #[allow(dead_code)]
+    pub(crate) fn get_utf8_string_param(&self, key: &CStr) -> Result<String, ErrorStack> {
+        const VALUE_LEN: usize = 4096;
+        let mut value_buf: Vec<u8> = vec![0; VALUE_LEN];
+        let mut out_len: usize = 0;
+        unsafe {
+            cvt(ffi::EVP_PKEY_get_utf8_string_param(
+                self.as_ptr(),
+                key.as_ptr(),
+                value_buf.as_mut_ptr().cast::<c_char>(),
+                VALUE_LEN,
+                &mut out_len,
+            ))?;
+        }
+        value_buf.truncate(out_len);
+        Ok(String::from_utf8(value_buf).unwrap())
+    }
+
+    /// Converts the `PKey` to an `OsslParamArray`.
+    ///
+    /// Use `selection` to control what parameters are included.
+    #[corresponds(EVP_PKEY_todata)]
+    #[cfg(ossl300)]
+    #[allow(dead_code)] // TODO: remove when used by non-deprecated key wrappers
+    pub(crate) fn to_data(&self, selection: Selection) -> Result<OsslParamArray, ErrorStack> {
+        let mut params = ptr::null_mut();
+        cvt(unsafe { ffi::EVP_PKEY_todata(self.as_ptr(), selection.into(), &mut params) })?;
+        Ok(unsafe { OsslParamArray::from_ptr(params) })
+    }
+}
+
+#[cfg(ossl111)]
+impl KeyCheck for PKeyRef<Params> {
+    /// Validates the key parameters.
+    #[corresponds(EVP_PKEY_param_check)]
+    fn check_key(&self) -> Result<(), ErrorStack> {
+        let ctx = PkeyCtx::new(self)?;
+        cvt(unsafe { ffi::EVP_PKEY_param_check(ctx.as_ptr()) }).map(|_| ())
     }
 }
 
@@ -253,11 +481,14 @@ where
     where
         U: HasPublic,
     {
-        let res = unsafe { ffi::EVP_PKEY_cmp(self.as_ptr(), other.as_ptr()) == 1 };
+        #[cfg(ossl300)]
+        let res = unsafe { ffi::EVP_PKEY_eq(self.as_ptr(), other.as_ptr()) };
+        #[cfg(not(ossl300))]
+        let res = unsafe { ffi::EVP_PKEY_cmp(self.as_ptr(), other.as_ptr()) };
         // Clear the stack. OpenSSL will put an error on the stack when the
         // keys are different types in some situations.
         let _ = ErrorStack::get();
-        res
+        res == 1
     }
 
     /// Raw byte representation of a public key.
@@ -283,6 +514,16 @@ where
             buf.truncate(len);
             Ok(buf)
         }
+    }
+}
+
+#[cfg(ossl111)]
+impl KeyCheck for PKeyRef<Public> {
+    /// Validates the public key parameters.
+    #[corresponds(EVP_PKEY_public_check)]
+    fn check_key(&self) -> Result<(), ErrorStack> {
+        let ctx = PkeyCtx::new(self)?;
+        cvt(unsafe { ffi::EVP_PKEY_public_check(ctx.as_ptr()) }).map(|_| ())
     }
 }
 
@@ -380,37 +621,19 @@ where
     }
 }
 
+#[cfg(ossl111)]
+impl KeyCheck for PKeyRef<Private> {
+    /// Validates the private key parameters.
+    #[corresponds(EVP_PKEY_check)]
+    fn check_key(&self) -> Result<(), ErrorStack> {
+        let ctx = PkeyCtx::new(self)?;
+        cvt(unsafe { ffi::EVP_PKEY_check(ctx.as_ptr()) }).map(|_| ())
+    }
+}
+
 impl<T> fmt::Debug for PKey<T> {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let alg = match self.id() {
-            Id::RSA => "RSA",
-            #[cfg(any(ossl111, libressl, boringssl, awslc))]
-            Id::RSA_PSS => "RSA-PSS",
-            #[cfg(not(boringssl))]
-            Id::HMAC => "HMAC",
-            #[cfg(not(any(boringssl, awslc)))]
-            Id::CMAC => "CMAC",
-            Id::DSA => "DSA",
-            Id::DH => "DH",
-            #[cfg(ossl110)]
-            Id::DHX => "DHX",
-            Id::EC => "EC",
-            #[cfg(ossl111)]
-            Id::SM2 => "SM2",
-            #[cfg(any(ossl110, boringssl, libressl360, awslc))]
-            Id::HKDF => "HKDF",
-            #[cfg(any(ossl111, boringssl, libressl370, awslc))]
-            Id::ED25519 => "Ed25519",
-            #[cfg(ossl111)]
-            Id::ED448 => "Ed448",
-            #[cfg(any(ossl111, boringssl, libressl370, awslc))]
-            Id::X25519 => "X25519",
-            #[cfg(ossl111)]
-            Id::X448 => "X448",
-            #[cfg(ossl111)]
-            Id::POLY1305 => "POLY1305",
-            _ => "unknown",
-        };
+        let alg = self.id().try_into().unwrap_or("unknown");
         fmt.debug_struct("PKey").field("algorithm", &alg).finish()
         // TODO: Print details for each specific type of key
     }
@@ -424,66 +647,114 @@ impl<T> Clone for PKey<T> {
 
 impl<T> PKey<T> {
     /// Creates a new `PKey` containing an RSA key.
-    #[corresponds(EVP_PKEY_set1_RSA)]
     pub fn from_rsa(rsa: Rsa<T>) -> Result<PKey<T>, ErrorStack> {
         // TODO: Next time we make backwards incompatible changes, this could
         // become an `&RsaRef<T>`. Same for all the other `from_*` methods.
+        let pkey: PKey<T>;
+
+        #[cfg(ossl300)]
+        unsafe {
+            EVP_PKEY_up_ref(rsa.as_ptr());
+            pkey = PKey::from_ptr(rsa.as_ptr());
+        }
+
+        #[cfg(not(ossl300))]
         unsafe {
             let evp = cvt_p(ffi::EVP_PKEY_new())?;
-            let pkey = PKey::from_ptr(evp);
+            pkey = PKey::from_ptr(evp);
             cvt(ffi::EVP_PKEY_set1_RSA(pkey.0, rsa.as_ptr()))?;
-            Ok(pkey)
         }
+        Ok(pkey)
     }
 
     /// Creates a new `PKey` containing a DSA key.
     #[corresponds(EVP_PKEY_set1_DSA)]
     pub fn from_dsa(dsa: Dsa<T>) -> Result<PKey<T>, ErrorStack> {
+        let pkey: PKey<T>;
+
+        #[cfg(ossl300)]
+        unsafe {
+            ffi::EVP_PKEY_up_ref(dsa.as_ptr());
+            pkey = PKey::from_ptr(dsa.as_ptr());
+        }
+
+        #[cfg(not(ossl300))]
         unsafe {
             let evp = cvt_p(ffi::EVP_PKEY_new())?;
-            let pkey = PKey::from_ptr(evp);
+            pkey = PKey::from_ptr(evp);
             cvt(ffi::EVP_PKEY_set1_DSA(pkey.0, dsa.as_ptr()))?;
-            Ok(pkey)
         }
+        Ok(pkey)
     }
 
     /// Creates a new `PKey` containing a Diffie-Hellman key.
     #[corresponds(EVP_PKEY_set1_DH)]
     #[cfg(not(boringssl))]
     pub fn from_dh(dh: Dh<T>) -> Result<PKey<T>, ErrorStack> {
+        let pkey: PKey<T>;
+
+        #[cfg(ossl300)]
+        unsafe {
+            ffi::EVP_PKEY_up_ref(dh.as_ptr());
+            pkey = PKey::from_ptr(dh.as_ptr());
+        }
+
+        #[cfg(not(ossl300))]
         unsafe {
             let evp = cvt_p(ffi::EVP_PKEY_new())?;
-            let pkey = PKey::from_ptr(evp);
+            pkey = PKey::from_ptr(evp);
             cvt(ffi::EVP_PKEY_set1_DH(pkey.0, dh.as_ptr()))?;
-            Ok(pkey)
         }
+        Ok(pkey)
     }
 
     /// Creates a new `PKey` containing a Diffie-Hellman key with type DHX.
     #[cfg(all(not(any(boringssl, awslc)), ossl110))]
     pub fn from_dhx(dh: Dh<T>) -> Result<PKey<T>, ErrorStack> {
+        let pkey: PKey<T>;
+
+        #[cfg(ossl300)]
+        {
+            let tmp_pkey = Self::from_dh(dh)?;
+            let params = tmp_pkey.to_data(Selection::Keypair)?;
+            let mut ctx = PkeyCtx::new_id(Id::DHX)?;
+            ctx.fromdata_init()?;
+            pkey = ctx.fromdata(&params, Selection::Keypair)?;
+        }
+
+        #[cfg(not(ossl300))]
         unsafe {
             let evp = cvt_p(ffi::EVP_PKEY_new())?;
-            let pkey = PKey::from_ptr(evp);
+            pkey = PKey::from_ptr(evp);
             cvt(ffi::EVP_PKEY_assign(
                 pkey.0,
                 ffi::EVP_PKEY_DHX,
                 dh.as_ptr().cast(),
             ))?;
             mem::forget(dh);
-            Ok(pkey)
         }
+
+        Ok(pkey)
     }
 
     /// Creates a new `PKey` containing an elliptic curve key.
     #[corresponds(EVP_PKEY_set1_EC_KEY)]
     pub fn from_ec_key(ec_key: EcKey<T>) -> Result<PKey<T>, ErrorStack> {
+        let pkey: PKey<T>;
+
+        #[cfg(ossl300)]
+        unsafe {
+            ffi::EVP_PKEY_up_ref(ec_key.as_ptr());
+            pkey = PKey::from_ptr(ec_key.as_ptr());
+        }
+
+        #[cfg(not(ossl300))]
         unsafe {
             let evp = cvt_p(ffi::EVP_PKEY_new())?;
-            let pkey = PKey::from_ptr(evp);
+            pkey = PKey::from_ptr(evp);
             cvt(ffi::EVP_PKEY_set1_EC_KEY(pkey.0, ec_key.as_ptr()))?;
-            Ok(pkey)
         }
+        Ok(pkey)
     }
 }
 
@@ -914,6 +1185,40 @@ impl<T> TryFrom<PKey<T>> for Dh<T> {
     }
 }
 
+cfg_if! {
+    if #[cfg(ossl300)] {
+        cstr_const!(pub(crate) OSSL_PKEY_PARAM_GROUP_NAME, b"group\0");
+
+        cstr_const!(pub(crate) OSSL_PKEY_PARAM_PUB_KEY, b"pub\0");
+        cstr_const!(pub(crate) OSSL_PKEY_PARAM_PRIV_KEY, b"priv\0");
+
+        cstr_const!(pub(crate) OSSL_PKEY_PARAM_FFC_P, b"p\0");
+        cstr_const!(pub(crate) OSSL_PKEY_PARAM_FFC_G, b"g\0");
+        cstr_const!(pub(crate) OSSL_PKEY_PARAM_FFC_Q, b"q\0");
+
+        cstr_const!(pub(crate) OSSL_PKEY_PARAM_RSA_N, b"n\0");
+        cstr_const!(pub(crate) OSSL_PKEY_PARAM_RSA_E, b"e\0");
+        cstr_const!(pub(crate) OSSL_PKEY_PARAM_RSA_D, b"d\0");
+        cstr_const!(
+            /// rsa-factor1 (p)
+            pub(crate) OSSL_PKEY_PARAM_RSA_FACTOR1, b"rsa-factor1\0");
+        cstr_const!(
+            /// rsa-factor2 (q)
+            pub(crate) OSSL_PKEY_PARAM_RSA_FACTOR2, b"rsa-factor2\0");
+        cstr_const!(
+            /// rsa-exponent1 (dmp1)
+            pub(crate) OSSL_PKEY_PARAM_RSA_EXPONENT1, b"rsa-exponent1\0");
+        cstr_const!(
+            /// rsa-exponent2 (dmq1)
+            pub(crate) OSSL_PKEY_PARAM_RSA_EXPONENT2, b"rsa-exponent2\0");
+        cstr_const!(
+            /// rsa-coefficient1 (iqmp)
+            pub(crate) OSSL_PKEY_PARAM_RSA_COEFFICIENT1, b"rsa-coefficient1\0");
+
+        cstr_const!(pub(crate) OSSL_SIGNATURE_PARAM_NONCE_TYPE, b"nonce-type\0");
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::convert::TryInto;
@@ -921,9 +1226,15 @@ mod tests {
     #[cfg(not(boringssl))]
     use crate::dh::Dh;
     use crate::dsa::Dsa;
+    #[cfg(ossl300)]
+    use crate::ec::EcGroup;
     use crate::ec::EcKey;
+    #[cfg(ossl300)]
+    use crate::encrypt::{Decrypter, Encrypter};
     use crate::error::Error;
     use crate::nid::Nid;
+    #[cfg(ossl300)]
+    use crate::pkey_ctx::pkey_from_params;
     use crate::rsa::Rsa;
     use crate::symm::Cipher;
 
@@ -1218,5 +1529,51 @@ mod tests {
 
         assert!(!pkey1.public_eq(&pkey2));
         assert!(Error::get().is_none());
+    }
+
+    #[cfg(ossl300)]
+    #[test]
+    fn test_get_bn_param() {
+        let rsa = Rsa::generate(2048).unwrap();
+        let pkey = PKey::from_rsa(rsa.clone()).unwrap();
+        assert_eq!(pkey.get_bn_param(OSSL_PKEY_PARAM_RSA_N).unwrap(), rsa.n());
+        assert_eq!(pkey.get_bn_param(OSSL_PKEY_PARAM_RSA_D).unwrap(), rsa.d());
+    }
+
+    #[cfg(ossl300)]
+    #[test]
+    fn test_get_utf8_string_param() {
+        let group = EcGroup::from_curve_name(Nid::X9_62_PRIME256V1).unwrap();
+        let ec = EcKey::generate(&group).unwrap();
+        let pkey = PKey::from_ec_key(ec.clone()).unwrap();
+
+        assert_eq!(
+            pkey.get_utf8_string_param(OSSL_PKEY_PARAM_GROUP_NAME)
+                .unwrap(),
+            String::from("prime256v1")
+        );
+    }
+
+    #[cfg(ossl300)]
+    #[test]
+    fn test_todata() {
+        let data: &[u8] = b"hello, world";
+        let pkey1 = PKey::from_rsa(Rsa::generate(2048).unwrap()).unwrap();
+
+        // Encrypt some data using the generated pkey
+        let encrypter = Encrypter::new(&pkey1).unwrap();
+        let mut encrypted = vec![0u8; encrypter.encrypt_len(data).unwrap()];
+        encrypter.encrypt(data, &mut encrypted).unwrap();
+
+        // Convert the pkey to OSSL_PARAMs and back into a PKey
+        let params = pkey1.to_data(Selection::Keypair).unwrap();
+        let pkey2: PKey<Private> = pkey_from_params(Id::RSA, &params).unwrap();
+
+        // Decrypt the data using the new pkey
+        let decrypter = Decrypter::new(&pkey2).unwrap();
+        let mut decrypted = vec![0u8; decrypter.decrypt_len(&encrypted).unwrap()];
+        let decrypted_len = decrypter.decrypt(&encrypted, &mut decrypted).unwrap();
+        decrypted.truncate(decrypted_len);
+        assert_eq!(data, &decrypted);
     }
 }
