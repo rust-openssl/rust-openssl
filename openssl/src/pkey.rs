@@ -49,6 +49,7 @@ use crate::ec::EcKey;
 use crate::error::ErrorStack;
 #[cfg(any(ossl110, boringssl, libressl370, awslc))]
 use crate::pkey_ctx::PkeyCtx;
+#[cfg(ossl350)]
 use crate::pkey_ml_dsa::{self, PKeyMlDsaParams};
 use crate::rsa::Rsa;
 use crate::symm::Cipher;
@@ -199,6 +200,7 @@ impl<T> PKeyRef<T> {
 
     /// Returns the inner `PKeyMlDsaParams`. Returns Ok(None) if either the variant is incorrect or the key is not of type ML-DSA.
     #[corresponds(EVP_PKEY_todata)]
+    #[cfg(ossl350)]
     pub fn ml_dsa(
         &self,
         variant: pkey_ml_dsa::Variant,
@@ -703,7 +705,7 @@ impl PKey<Private> {
     /// Generates a new ML-DSA key with the provided variant.
     ///
     /// Requires OpenSSL 3.0.0 or newer.
-    #[cfg(ossl300)]
+    #[cfg(ossl350)]
     pub fn generate_ml_dsa(variant: pkey_ml_dsa::Variant) -> Result<PKey<Private>, ErrorStack> {
         Self::generate_key_from_name(variant.as_str())
     }
