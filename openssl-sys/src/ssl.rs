@@ -560,7 +560,7 @@ pub const SSL_READ_EARLY_DATA_SUCCESS: c_int = 1;
 pub const SSL_READ_EARLY_DATA_FINISH: c_int = 2;
 
 cfg_if! {
-    if #[cfg(ossl110)] {
+    if #[cfg(any(ossl110, libressl))] {
         pub unsafe fn SSL_get_ex_new_index(
             l: c_long,
             p: *mut c_void,
@@ -573,7 +573,7 @@ cfg_if! {
     }
 }
 cfg_if! {
-    if #[cfg(ossl110)] {
+    if #[cfg(any(ossl110, libressl))] {
         pub unsafe fn SSL_CTX_get_ex_new_index(
             l: c_long,
             p: *mut c_void,
