@@ -233,7 +233,7 @@ impl<T> PKeyRef<T> {
 
     /// Returns true if the key matches the string key_type.
     #[corresponds(EVP_PKEY_is_a)]
-    #[cfg(ossl300)]
+    #[cfg(ossl350)] // Available since ossl300, but currently only used in a function gated behind ossl350
     fn is_key_type(&self, key_type: &str) -> Result<bool, ErrorStack> {
         let key_type = CString::new(key_type).unwrap();
         let res = unsafe { ffi::EVP_PKEY_is_a(self.as_ptr(), key_type.as_ptr()) == 1 };
