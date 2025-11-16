@@ -189,7 +189,7 @@ unsafe extern "C" fn destroy<S>(bio: *mut BIO) -> c_int {
 }
 
 cfg_if! {
-    if #[cfg(any(ossl110, libressl273, boringssl))] {
+    if #[cfg(any(ossl110, libressl, boringssl))] {
         use ffi::{BIO_get_data, BIO_set_data, BIO_set_flags, BIO_set_init};
         use crate::cvt;
 

@@ -47,9 +47,9 @@ pub union ASN1_TYPE_value {
 
 extern "C" {
     pub fn ASN1_STRING_type_new(ty: c_int) -> *mut ASN1_STRING;
-    #[cfg(any(ossl110, libressl273))]
+    #[cfg(any(ossl110, libressl))]
     pub fn ASN1_STRING_get0_data(x: *const ASN1_STRING) -> *const c_uchar;
-    #[cfg(any(all(ossl101, not(ossl110)), libressl))]
+    #[cfg(any(all(ossl102, not(ossl110)), libressl))]
     pub fn ASN1_STRING_data(x: *mut ASN1_STRING) -> *mut c_uchar;
     pub fn ASN1_STRING_new() -> *mut ASN1_STRING;
     pub fn ASN1_OCTET_STRING_new() -> *mut ASN1_OCTET_STRING;
@@ -65,10 +65,14 @@ extern "C" {
     pub fn ASN1_BIT_STRING_free(x: *mut ASN1_BIT_STRING);
     pub fn ASN1_OCTET_STRING_free(x: *mut ASN1_OCTET_STRING);
 
+    pub fn ASN1_GENERALIZEDTIME_new() -> *mut ASN1_GENERALIZEDTIME;
     pub fn ASN1_GENERALIZEDTIME_free(tm: *mut ASN1_GENERALIZEDTIME);
     pub fn ASN1_GENERALIZEDTIME_print(b: *mut BIO, tm: *const ASN1_GENERALIZEDTIME) -> c_int;
+    pub fn ASN1_GENERALIZEDTIME_set_string(
+        s: *mut ASN1_GENERALIZEDTIME,
+        str: *const c_char,
+    ) -> c_int;
     pub fn ASN1_TIME_new() -> *mut ASN1_TIME;
-    #[cfg(ossl102)]
     pub fn ASN1_TIME_diff(
         pday: *mut c_int,
         psec: *mut c_int,
@@ -107,9 +111,9 @@ extern "C" {
 
 const_ptr_api! {
     extern "C" {
-        pub fn ASN1_STRING_to_UTF8(out: *mut *mut c_uchar, s: #[const_ptr_if(any(ossl110, libressl280))] ASN1_STRING) -> c_int;
-        pub fn ASN1_STRING_type(x: #[const_ptr_if(any(ossl110, libressl280))]  ASN1_STRING) -> c_int;
-        pub fn ASN1_generate_v3(str: #[const_ptr_if(any(ossl110, libressl280))] c_char, cnf: *mut X509V3_CTX) -> *mut ASN1_TYPE;
+        pub fn ASN1_STRING_to_UTF8(out: *mut *mut c_uchar, s: #[const_ptr_if(any(ossl110, libressl))] ASN1_STRING) -> c_int;
+        pub fn ASN1_STRING_type(x: #[const_ptr_if(any(ossl110, libressl))]  ASN1_STRING) -> c_int;
+        pub fn ASN1_generate_v3(str: #[const_ptr_if(any(ossl110, libressl))] c_char, cnf: *mut X509V3_CTX) -> *mut ASN1_TYPE;
         pub fn i2d_ASN1_TYPE(a: #[const_ptr_if(ossl300)] ASN1_TYPE, pp: *mut *mut c_uchar) -> c_int;
     }
 }

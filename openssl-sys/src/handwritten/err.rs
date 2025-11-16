@@ -33,16 +33,9 @@ extern "C" {
         data: *mut *const c_char,
         flags: *mut c_int,
     ) -> c_ulong;
-    pub fn ERR_get_error_line_data(
-        file: *mut *const c_char,
-        line: *mut c_int,
-        data: *mut *const c_char,
-        flags: *mut c_int,
-    ) -> c_ulong;
     pub fn ERR_peek_last_error() -> c_ulong;
     pub fn ERR_clear_error();
     pub fn ERR_lib_error_string(err: c_ulong) -> *const c_char;
-    pub fn ERR_func_error_string(err: c_ulong) -> *const c_char;
     pub fn ERR_reason_error_string(err: c_ulong) -> *const c_char;
     #[cfg(ossl110)]
     pub fn ERR_load_strings(lib: c_int, str: *mut ERR_STRING_DATA) -> c_int;
@@ -52,4 +45,15 @@ extern "C" {
     pub fn ERR_load_crypto_strings();
 
     pub fn ERR_get_next_error_library() -> c_int;
+}
+
+#[cfg(not(osslconf = "OPENSSL_NO_DEPRECATED_3_0"))]
+extern "C" {
+    pub fn ERR_get_error_line_data(
+        file: *mut *const c_char,
+        line: *mut c_int,
+        data: *mut *const c_char,
+        flags: *mut c_int,
+    ) -> c_ulong;
+    pub fn ERR_func_error_string(err: c_ulong) -> *const c_char;
 }

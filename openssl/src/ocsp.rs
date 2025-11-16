@@ -1,10 +1,11 @@
 use bitflags::bitflags;
-use foreign_types::ForeignTypeRef;
+use foreign_types::{ForeignType, ForeignTypeRef};
 use libc::{c_int, c_long, c_ulong};
 use std::mem;
 use std::ptr;
+use std::sync::OnceLock;
 
-use crate::asn1::Asn1GeneralizedTimeRef;
+use crate::asn1::{Asn1GeneralizedTime, Asn1GeneralizedTimeRef};
 use crate::error::ErrorStack;
 use crate::hash::MessageDigest;
 use crate::stack::StackRef;
@@ -13,6 +14,19 @@ use crate::x509::store::X509StoreRef;
 use crate::x509::{X509Ref, X509};
 use crate::{cvt, cvt_p};
 use openssl_macros::corresponds;
+
+// Sentinel value used when next_update is not present in OCSP response
+// This represents the maximum possible time (9999-12-31 23:59:59 UTC)
+static SENTINEL_MAX_TIME: OnceLock<Asn1GeneralizedTime> = OnceLock::new();
+
+fn get_sentinel_max_time() -> &'static Asn1GeneralizedTimeRef {
+    SENTINEL_MAX_TIME
+        .get_or_init(|| {
+            Asn1GeneralizedTime::from_str("99991231235959Z")
+                .expect("Failed to create sentinel time")
+        })
+        .as_ref()
+}
 
 bitflags! {
     #[derive(Copy, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
@@ -119,10 +133,26 @@ pub struct OcspStatus<'a> {
     /// The time that this revocation check was performed.
     pub this_update: &'a Asn1GeneralizedTimeRef,
     /// The time at which this revocation check expires.
+    ///
+    /// # Deprecated
+    /// Contains a sentinel maximum time (99991231235959Z) when the field is
+    /// not present in the response.
+    /// Use [`next_update()`](Self::next_update) instead.
+    #[deprecated(since = "0.10.75", note = "Use the next_update() method instead")]
     pub next_update: &'a Asn1GeneralizedTimeRef,
+    // The actual optional next_update value from the OCSP response.
+    next_update_opt: Option<&'a Asn1GeneralizedTimeRef>,
 }
 
 impl OcspStatus<'_> {
+    /// Returns the time at which this revocation check expires.
+    ///
+    /// Returns `None` if the OCSP response does not include a `next_update`
+    /// field.
+    pub fn next_update(&self) -> Option<&Asn1GeneralizedTimeRef> {
+        self.next_update_opt
+    }
+
     /// Checks validity of the `this_update` and `next_update` fields.
     ///
     /// The `nsec` parameter specifies an amount of slack time that will be used when comparing
@@ -132,10 +162,14 @@ impl OcspStatus<'_> {
     /// very old responses.
     #[corresponds(OCSP_check_validity)]
     pub fn check_validity(&self, nsec: u32, maxsec: Option<u32>) -> Result<(), ErrorStack> {
+        let next_update_ptr = self
+            .next_update_opt
+            .map(|t| t.as_ptr())
+            .unwrap_or(ptr::null_mut());
         unsafe {
             cvt(ffi::OCSP_check_validity(
                 self.this_update.as_ptr(),
-                self.next_update.as_ptr(),
+                next_update_ptr,
                 nsec as c_long,
                 maxsec.map(|n| n as c_long).unwrap_or(-1),
             ))
@@ -196,13 +230,18 @@ impl OcspBasicResponseRef {
             );
             if r == 1 {
                 let revocation_time = Asn1GeneralizedTimeRef::from_const_ptr_opt(revocation_time);
+                let next_update_opt = Asn1GeneralizedTimeRef::from_const_ptr_opt(next_update);
+                // For backwards compatibility, use sentinel max time if next_update is not present
+                let next_update_compat = next_update_opt.unwrap_or_else(|| get_sentinel_max_time());
 
+                #[allow(deprecated)]
                 Some(OcspStatus {
                     status: OcspCertStatus(status),
                     reason: OcspRevokedStatus(status),
                     revocation_time,
                     this_update: Asn1GeneralizedTimeRef::from_ptr(this_update),
-                    next_update: Asn1GeneralizedTimeRef::from_ptr(next_update),
+                    next_update: next_update_compat,
+                    next_update_opt,
                 })
             } else {
                 None
@@ -349,4 +388,46 @@ foreign_type_and_impl_send_sync! {
 
     pub struct OcspOneReq;
     pub struct OcspOneReqRef;
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{
+        get_sentinel_max_time, OcspCertId, OcspCertStatus, OcspResponse, OcspResponseStatus,
+    };
+    use crate::hash::MessageDigest;
+    use crate::x509::X509;
+
+    // Test vectors: OCSP response with next_update=NULL and associated certificates
+    const OCSP_RESPONSE_NO_NEXTUPDATE: &[u8] =
+        include_bytes!("../test/ocsp_resp_no_nextupdate.der");
+    const OCSP_CA_CERT: &[u8] = include_bytes!("../test/ocsp_ca_cert.der");
+    const OCSP_SUBJECT_CERT: &[u8] = include_bytes!("../test/ocsp_subject_cert.der");
+
+    #[test]
+    fn test_ocsp_no_next_update() {
+        // Verify find_status correctly handles OCSP responses with next_update=NULL
+        let response = OcspResponse::from_der(OCSP_RESPONSE_NO_NEXTUPDATE).unwrap();
+        assert_eq!(response.status(), OcspResponseStatus::SUCCESSFUL);
+
+        let ca_cert = X509::from_der(OCSP_CA_CERT).unwrap();
+        let subject_cert = X509::from_der(OCSP_SUBJECT_CERT).unwrap();
+        let basic = response.basic().unwrap();
+
+        let cert_id =
+            OcspCertId::from_cert(MessageDigest::sha256(), &subject_cert, &ca_cert).unwrap();
+
+        let status = basic
+            .find_status(&cert_id)
+            .expect("find_status should find the status");
+
+        assert!(status.next_update().is_none());
+
+        #[allow(deprecated)]
+        let deprecated_next = status.next_update;
+        let sentinel = get_sentinel_max_time();
+        assert_eq!(format!("{}", deprecated_next), format!("{}", sentinel));
+
+        assert_eq!(status.status, OcspCertStatus::GOOD);
+    }
 }

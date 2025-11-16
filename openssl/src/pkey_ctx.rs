@@ -708,7 +708,6 @@ impl<T> PkeyCtxRef<T> {
     ///
     /// This is only useful for RSA keys.
     #[corresponds(EVP_PKEY_CTX_set_rsa_oaep_md)]
-    #[cfg(any(ossl102, libressl310, boringssl, awslc))]
     #[inline]
     pub fn set_rsa_oaep_md(&mut self, md: &MdRef) -> Result<(), ErrorStack> {
         unsafe {
@@ -725,7 +724,6 @@ impl<T> PkeyCtxRef<T> {
     ///
     /// This is only useful for RSA keys.
     #[corresponds(EVP_PKEY_CTX_set0_rsa_oaep_label)]
-    #[cfg(any(ossl102, libressl310, boringssl, awslc))]
     pub fn set_rsa_oaep_label(&mut self, label: &[u8]) -> Result<(), ErrorStack> {
         use crate::LenType;
         let len = LenType::try_from(label.len()).unwrap();
@@ -1061,7 +1059,6 @@ mod test {
     }
 
     #[test]
-    #[cfg(any(ossl102, libressl310, boringssl, awslc))]
     fn rsa_oaep() {
         let key = include_bytes!("../test/rsa.pem");
         let rsa = Rsa::private_key_from_pem(key).unwrap();
@@ -1186,8 +1183,7 @@ mod test {
             cfg_if! {
                 if #[cfg(awslc)] {
                     72
-                } else if #[cfg(any(libressl, all(ossl101, not(ossl102))))] {
-                    // LibreSSL and OpenSSL 1.0.1 and earlier
+                } else if #[cfg(libressl)] {
                     48
                 } else {
                     64
@@ -1351,7 +1347,7 @@ mod test {
         // result_buf contains the digest
         assert_eq!(result_buf[..length], digest);
 
-        // Attempt recovery of teh entire DigestInfo
+        // Attempt recovery of the entire DigestInfo
         let mut ctx = PkeyCtx::new(&key).unwrap();
         ctx.verify_recover_init().unwrap();
         ctx.set_rsa_padding(Padding::PKCS1).unwrap();
@@ -1394,12 +1390,12 @@ mxJ7imIrEg9nIQ==
         let key1 = EcKey::private_key_from_pem(private_key_pem.as_bytes()).unwrap();
         let key1 = PKey::from_ec_key(key1).unwrap();
         let input = "sample";
-        let expected_output = hex::decode("3044022061340C88C3AAEBEB4F6D667F672CA9759A6CCAA9FA8811313039EE4A35471D3202206D7F147DAC089441BB2E2FE8F7A3FA264B9C475098FDCF6E00D7C996E1B8B7EB").unwrap();
+        let expected_output = hex::decode("3046022100EFD48B2AACB6A8FD1140DD9CD45E81D69D2C877B56AAF991C34D0EA84EAF3716022100F7CB1C942D657C41D436C7A1B6E29F65F3E900DBB9AFF4064DC4AB2F843ACDA8").unwrap();
 
-        let hashed_input = hash(MessageDigest::sha1(), input.as_bytes()).unwrap();
+        let hashed_input = hash(MessageDigest::sha256(), input.as_bytes()).unwrap();
         let mut ctx = PkeyCtx::new(&key1).unwrap();
         ctx.sign_init().unwrap();
-        ctx.set_signature_md(Md::sha1()).unwrap();
+        ctx.set_signature_md(Md::sha256()).unwrap();
         ctx.set_nonce_type(NonceType::DETERMINISTIC_K).unwrap();
 
         let mut output = vec![];

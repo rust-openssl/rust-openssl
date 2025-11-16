@@ -39,8 +39,6 @@
 //! decrypted.truncate(decrypted_len);
 //! assert_eq!(&*decrypted, data);
 //! ```
-#[cfg(any(ossl102, libressl310))]
-use libc::c_int;
 use std::{marker::PhantomData, ptr};
 
 use crate::error::ErrorStack;
@@ -137,7 +135,6 @@ impl<'a> Encrypter<'a> {
     ///
     /// This is only useful for RSA keys.
     #[corresponds(EVP_PKEY_CTX_set_rsa_oaep_md)]
-    #[cfg(any(ossl102, libressl310, boringssl, awslc))]
     pub fn set_rsa_oaep_md(&mut self, md: MessageDigest) -> Result<(), ErrorStack> {
         unsafe {
             cvt(ffi::EVP_PKEY_CTX_set_rsa_oaep_md(
@@ -152,7 +149,6 @@ impl<'a> Encrypter<'a> {
     ///
     /// This is only useful for RSA keys.
     #[corresponds(EVP_PKEY_CTX_set0_rsa_oaep_label)]
-    #[cfg(any(ossl102, libressl310))]
     pub fn set_rsa_oaep_label(&mut self, label: &[u8]) -> Result<(), ErrorStack> {
         unsafe {
             let p = cvt_p(ffi::OPENSSL_malloc(label.len() as _))?;
@@ -160,8 +156,8 @@ impl<'a> Encrypter<'a> {
 
             cvt(ffi::EVP_PKEY_CTX_set0_rsa_oaep_label(
                 self.pctx,
-                p,
-                label.len() as c_int,
+                p.cast(),
+                label.len() as _,
             ))
             .map(|_| ())
             .map_err(|e| {
@@ -323,7 +319,6 @@ impl<'a> Decrypter<'a> {
     ///
     /// This is only useful for RSA keys.
     #[corresponds(EVP_PKEY_CTX_set_rsa_oaep_md)]
-    #[cfg(any(ossl102, libressl310, boringssl, awslc))]
     pub fn set_rsa_oaep_md(&mut self, md: MessageDigest) -> Result<(), ErrorStack> {
         unsafe {
             cvt(ffi::EVP_PKEY_CTX_set_rsa_oaep_md(
@@ -338,7 +333,6 @@ impl<'a> Decrypter<'a> {
     ///
     /// This is only useful for RSA keys.
     #[corresponds(EVP_PKEY_CTX_set0_rsa_oaep_label)]
-    #[cfg(any(ossl102, libressl310))]
     pub fn set_rsa_oaep_label(&mut self, label: &[u8]) -> Result<(), ErrorStack> {
         unsafe {
             let p = cvt_p(ffi::OPENSSL_malloc(label.len() as _))?;
@@ -346,8 +340,8 @@ impl<'a> Decrypter<'a> {
 
             cvt(ffi::EVP_PKEY_CTX_set0_rsa_oaep_label(
                 self.pctx,
-                p,
-                label.len() as c_int,
+                p.cast(),
+                label.len() as _,
             ))
             .map(|_| ())
             .map_err(|e| {
@@ -443,7 +437,6 @@ mod test {
     use hex::FromHex;
 
     use crate::encrypt::{Decrypter, Encrypter};
-    #[cfg(any(ossl102, libressl310, boringssl, awslc))]
     use crate::hash::MessageDigest;
     use crate::pkey::PKey;
     use crate::rsa::{Padding, Rsa};
@@ -478,7 +471,6 @@ mod test {
     }
 
     #[test]
-    #[cfg(any(ossl102, libressl310, boringssl, awslc))]
     fn rsa_encrypt_decrypt_with_sha256() {
         let key = include_bytes!("../test/rsa.pem");
         let private_key = Rsa::private_key_from_pem(key).unwrap();
@@ -509,7 +501,6 @@ mod test {
     }
 
     #[test]
-    #[cfg(any(ossl102, libressl310))]
     fn rsa_encrypt_decrypt_oaep_label() {
         let key = include_bytes!("../test/rsa.pem");
         let private_key = Rsa::private_key_from_pem(key).unwrap();

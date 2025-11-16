@@ -25,7 +25,7 @@ fn main() {
             cfg.flag("/wd4090");
         }
 
-        // https://github.com/sfackler/rust-openssl/issues/889
+        // https://github.com/rust-openssl/rust-openssl/issues/889
         cfg.define("WIN32_LEAN_AND_MEAN", None);
     }
 
@@ -67,10 +67,12 @@ fn main() {
         .header("openssl/aes.h")
         .header("openssl/ocsp.h")
         .header("openssl/evp.h")
+        .header("openssl/dsa.h")
+        .header("openssl/rsa.h")
         .header("openssl/x509_vfy.h");
 
     if let Some(version) = libressl_version {
-        cfg.header("openssl/poly1305.h");
+        cfg.header("openssl/cms.h").header("openssl/poly1305.h");
         if version >= 0x30600000 {
             cfg.header("openssl/kdf.h");
         }
@@ -83,7 +85,9 @@ fn main() {
         }
 
         if version >= 0x30000000 {
-            cfg.header("openssl/provider.h")
+            cfg.header("openssl/decoder.h")
+                .header("openssl/encoder.h")
+                .header("openssl/provider.h")
                 .header("openssl/params.h")
                 .header("openssl/param_build.h")
                 .header("openssl/ssl.h");
@@ -121,6 +125,7 @@ fn main() {
         s == "PasswordCallback"
             || s == "pem_password_cb"
             || s == "bio_info_cb"
+            || s == "OSSL_PASSPHRASE_CALLBACK"
             || s.starts_with("CRYPTO_EX_")
     });
     cfg.skip_struct(|s| {

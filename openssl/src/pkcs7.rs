@@ -75,7 +75,7 @@ bitflags! {
         const NOCRL = ffi::PKCS7_NOCRL;
         const PARTIAL = ffi::PKCS7_PARTIAL;
         const REUSE_DIGEST = ffi::PKCS7_REUSE_DIGEST;
-        #[cfg(not(any(ossl101, ossl102, libressl)))]
+        #[cfg(ossl110)]
         const NO_DUAL_CONTENT = ffi::PKCS7_NO_DUAL_CONTENT;
     }
 }

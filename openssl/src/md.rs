@@ -194,7 +194,7 @@ impl Md {
         unsafe { MdRef::from_ptr(ffi::EVP_ripemd160() as *mut _) }
     }
 
-    #[cfg(all(any(ossl111, libressl291), not(osslconf = "OPENSSL_NO_SM3")))]
+    #[cfg(all(any(ossl111, libressl), not(osslconf = "OPENSSL_NO_SM3")))]
     #[inline]
     pub fn sm3() -> &'static MdRef {
         unsafe { MdRef::from_ptr(ffi::EVP_sm3() as *mut _) }

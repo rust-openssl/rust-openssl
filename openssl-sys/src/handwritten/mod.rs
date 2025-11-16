@@ -6,9 +6,13 @@ pub use self::cmac::*;
 pub use self::cms::*;
 pub use self::conf::*;
 pub use self::crypto::*;
+#[cfg(ossl300)]
+pub use self::decoder::*;
 pub use self::dh::*;
 pub use self::dsa::*;
 pub use self::ec::*;
+#[cfg(ossl300)]
+pub use self::encoder::*;
 pub use self::err::*;
 pub use self::evp::*;
 pub use self::hmac::*;
@@ -46,9 +50,13 @@ mod cmac;
 mod cms;
 mod conf;
 mod crypto;
+#[cfg(ossl300)]
+mod decoder;
 mod dh;
 mod dsa;
 mod ec;
+#[cfg(ossl300)]
+mod encoder;
 mod err;
 mod evp;
 mod hmac;

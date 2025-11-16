@@ -15,7 +15,7 @@ cfg_if! {
                 ptr::null_mut(),
             )
         }
+
+        pub const EVP_PKEY_CTRL_DSA_PARAMGEN_BITS: c_int = EVP_PKEY_ALG_CTRL + 1;
     }
 }
-
-pub const EVP_PKEY_CTRL_DSA_PARAMGEN_BITS: c_int = EVP_PKEY_ALG_CTRL + 1;

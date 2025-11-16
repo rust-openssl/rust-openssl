@@ -84,6 +84,29 @@ impl fmt::Display for Asn1GeneralizedTimeRef {
     }
 }
 
+impl Asn1GeneralizedTime {
+    /// Creates a new generalized time corresponding to the specified ASN1 time
+    /// string.
+    #[corresponds(ASN1_GENERALIZEDTIME_set_string)]
+    #[allow(clippy::should_implement_trait)]
+    pub fn from_str(s: &str) -> Result<Asn1GeneralizedTime, ErrorStack> {
+        unsafe {
+            ffi::init();
+
+            let time_str = CString::new(s).unwrap();
+            let ptr = cvt_p(ffi::ASN1_GENERALIZEDTIME_new())?;
+            let time = Asn1GeneralizedTime::from_ptr(ptr);
+
+            cvt(ffi::ASN1_GENERALIZEDTIME_set_string(
+                time.as_ptr(),
+                time_str.as_ptr(),
+            ))?;
+
+            Ok(time)
+        }
+    }
+}
+
 /// The type of an ASN.1 value.
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub struct Asn1Type(c_int);
@@ -165,7 +188,6 @@ impl Asn1Type {
 /// [`diff`]: struct.Asn1TimeRef.html#method.diff
 /// [`Asn1TimeRef`]: struct.Asn1TimeRef.html
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-#[cfg(any(ossl102, boringssl, awslc))]
 pub struct TimeDiff {
     /// Difference in days
     pub days: c_int,
@@ -198,7 +220,6 @@ foreign_type_and_impl_send_sync! {
 impl Asn1TimeRef {
     /// Find difference between two times
     #[corresponds(ASN1_TIME_diff)]
-    #[cfg(any(ossl102, boringssl, awslc))]
     pub fn diff(&self, compare: &Self) -> Result<TimeDiff, ErrorStack> {
         let mut days = 0;
         let mut secs = 0;
@@ -214,7 +235,6 @@ impl Asn1TimeRef {
 
     /// Compare two times
     #[corresponds(ASN1_TIME_compare)]
-    #[cfg(any(ossl102, boringssl, awslc))]
     pub fn compare(&self, other: &Self) -> Result<Ordering, ErrorStack> {
         let d = self.diff(other)?;
         if d.days > 0 || d.secs > 0 {
@@ -228,7 +248,6 @@ impl Asn1TimeRef {
     }
 }
 
-#[cfg(any(ossl102, boringssl, awslc))]
 impl PartialEq for Asn1TimeRef {
     fn eq(&self, other: &Asn1TimeRef) -> bool {
         self.diff(other)
@@ -237,7 +256,6 @@ impl PartialEq for Asn1TimeRef {
     }
 }
 
-#[cfg(any(ossl102, boringssl, awslc))]
 impl PartialEq<Asn1Time> for Asn1TimeRef {
     fn eq(&self, other: &Asn1Time) -> bool {
         self.diff(other)
@@ -246,7 +264,6 @@ impl PartialEq<Asn1Time> for Asn1TimeRef {
     }
 }
 
-#[cfg(any(ossl102, boringssl, awslc))]
 impl PartialEq<Asn1Time> for &Asn1TimeRef {
     fn eq(&self, other: &Asn1Time) -> bool {
         self.diff(other)
@@ -255,21 +272,18 @@ impl PartialEq<Asn1Time> for &Asn1TimeRef {
     }
 }
 
-#[cfg(any(ossl102, boringssl, awslc))]
 impl PartialOrd for Asn1TimeRef {
     fn partial_cmp(&self, other: &Asn1TimeRef) -> Option<Ordering> {
         self.compare(other).ok()
     }
 }
 
-#[cfg(any(ossl102, boringssl, awslc))]
 impl PartialOrd<Asn1Time> for Asn1TimeRef {
     fn partial_cmp(&self, other: &Asn1Time) -> Option<Ordering> {
         self.compare(other).ok()
     }
 }
 
-#[cfg(any(ossl102, boringssl, awslc))]
 impl PartialOrd<Asn1Time> for &Asn1TimeRef {
     fn partial_cmp(&self, other: &Asn1Time) -> Option<Ordering> {
         self.compare(other).ok()
@@ -366,7 +380,6 @@ impl Asn1Time {
     }
 }
 
-#[cfg(any(ossl102, boringssl, awslc))]
 impl PartialEq for Asn1Time {
     fn eq(&self, other: &Asn1Time) -> bool {
         self.diff(other)
@@ -375,7 +388,6 @@ impl PartialEq for Asn1Time {
     }
 }
 
-#[cfg(any(ossl102, boringssl, awslc))]
 impl PartialEq<Asn1TimeRef> for Asn1Time {
     fn eq(&self, other: &Asn1TimeRef) -> bool {
         self.diff(other)
@@ -384,7 +396,6 @@ impl PartialEq<Asn1TimeRef> for Asn1Time {
     }
 }
 
-#[cfg(any(ossl102, boringssl, awslc))]
 impl<'a> PartialEq<&'a Asn1TimeRef> for Asn1Time {
     fn eq(&self, other: &&'a Asn1TimeRef) -> bool {
         self.diff(other)
@@ -393,21 +404,18 @@ impl<'a> PartialEq<&'a Asn1TimeRef> for Asn1Time {
     }
 }
 
-#[cfg(any(ossl102, boringssl, awslc))]
 impl PartialOrd for Asn1Time {
     fn partial_cmp(&self, other: &Asn1Time) -> Option<Ordering> {
         self.compare(other).ok()
     }
 }
 
-#[cfg(any(ossl102, boringssl, awslc))]
 impl PartialOrd<Asn1TimeRef> for Asn1Time {
     fn partial_cmp(&self, other: &Asn1TimeRef) -> Option<Ordering> {
         self.compare(other).ok()
     }
 }
 
-#[cfg(any(ossl102, boringssl, awslc))]
 impl<'a> PartialOrd<&'a Asn1TimeRef> for Asn1Time {
     fn partial_cmp(&self, other: &&'a Asn1TimeRef) -> Option<Ordering> {
         self.compare(other).ok()
@@ -737,7 +745,7 @@ impl fmt::Debug for Asn1ObjectRef {
 }
 
 cfg_if! {
-    if #[cfg(any(ossl110, libressl273, boringssl, awslc))] {
+    if #[cfg(any(ossl110, libressl, boringssl, awslc))] {
         use ffi::ASN1_STRING_get0_data;
     } else {
         #[allow(bad_style)]
@@ -802,13 +810,18 @@ mod tests {
     }
 
     #[test]
+    fn generalized_time_from_str() {
+        let time = Asn1GeneralizedTime::from_str("99991231235959Z").unwrap();
+        assert_eq!("Dec 31 23:59:59 9999 GMT", time.to_string());
+    }
+
+    #[test]
     fn time_from_unix() {
         let t = Asn1Time::from_unix(0).unwrap();
         assert_eq!("Jan  1 00:00:00 1970 GMT", t.to_string());
     }
 
     #[test]
-    #[cfg(any(ossl102, boringssl, awslc))]
     fn time_eq() {
         let a = Asn1Time::from_str("99991231235959Z").unwrap();
         let b = Asn1Time::from_str("99991231235959Z").unwrap();
@@ -827,7 +840,6 @@ mod tests {
     }
 
     #[test]
-    #[cfg(any(ossl102, boringssl, awslc))]
     fn time_ord() {
         let a = Asn1Time::from_str("99991231235959Z").unwrap();
         let b = Asn1Time::from_str("99991231235959Z").unwrap();

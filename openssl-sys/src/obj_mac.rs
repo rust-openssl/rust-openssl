@@ -956,39 +956,39 @@ pub const NID_ED448: c_int = 1088;
 pub const NID_sm2: c_int = 1172;
 #[cfg(ossl111)]
 pub const NID_sm3: c_int = 1143;
-#[cfg(libressl291)]
+#[cfg(libressl)]
 pub const NID_sm3: c_int = 968;
 #[cfg(ossl111)]
 pub const NID_sm3WithRSAEncryption: c_int = 1144;
-#[cfg(libressl291)]
+#[cfg(libressl)]
 pub const NID_sm3WithRSAEncryption: c_int = 969;
 #[cfg(ossl111)]
 pub const NID_sm4_ecb: c_int = 1133;
-#[cfg(libressl291)]
+#[cfg(libressl)]
 pub const NID_sm4_ecb: c_int = 973;
 #[cfg(ossl111)]
 pub const NID_sm4_cbc: c_int = 1134;
-#[cfg(libressl291)]
+#[cfg(libressl)]
 pub const NID_sm4_cbc: c_int = 974;
 #[cfg(ossl111)]
 pub const NID_sm4_ofb128: c_int = 1135;
-#[cfg(libressl291)]
+#[cfg(libressl)]
 pub const NID_sm4_ofb128: c_int = 975;
 #[cfg(ossl111)]
 pub const NID_sm4_cfb128: c_int = 1137;
-#[cfg(libressl291)]
+#[cfg(libressl)]
 pub const NID_sm4_cfb128: c_int = 976;
 #[cfg(ossl111)]
 pub const NID_sm4_cfb1: c_int = 1136;
-#[cfg(libressl291)]
+#[cfg(libressl)]
 pub const NID_sm4_cfb1: c_int = 977;
 #[cfg(ossl111)]
 pub const NID_sm4_cfb8: c_int = 1138;
-#[cfg(libressl291)]
+#[cfg(libressl)]
 pub const NID_sm4_cfb8: c_int = 978;
 #[cfg(ossl111)]
 pub const NID_sm4_ctr: c_int = 1139;
-#[cfg(libressl291)]
+#[cfg(libressl)]
 pub const NID_sm4_ctr: c_int = 979;
 #[cfg(ossl111)]
 pub const NID_sha3_224: c_int = 1096;
@@ -1012,7 +1012,7 @@ pub const NID_shake128: c_int = 1100;
 pub const NID_shake256: c_int = 1101;
 #[cfg(ossl110)]
 pub const NID_chacha20_poly1305: c_int = 1018;
-#[cfg(libressl271)]
+#[cfg(libressl)]
 pub const NID_chacha20_poly1305: c_int = 967;
 cfg_if! {
     if #[cfg(ossl340)] {

@@ -16,5 +16,5 @@ pub const PKCS7_STREAM: c_int = 0x1000;
 pub const PKCS7_NOCRL: c_int = 0x2000;
 pub const PKCS7_PARTIAL: c_int = 0x4000;
 pub const PKCS7_REUSE_DIGEST: c_int = 0x8000;
-#[cfg(not(any(ossl101, ossl102, libressl)))]
+#[cfg(ossl110)]
 pub const PKCS7_NO_DUAL_CONTENT: c_int = 0x10000;
