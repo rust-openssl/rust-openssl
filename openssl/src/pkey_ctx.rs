@@ -72,8 +72,6 @@ use crate::error::ErrorStack;
 use crate::lib_ctx::LibCtxRef;
 use crate::md::MdRef;
 use crate::nid::Nid;
-#[cfg(ossl340)]
-use crate::ossl_param::OsslParamArray;
 use crate::pkey::{HasPrivate, HasPublic, Id, PKey, PKeyRef, Params, Private};
 use crate::rsa::Padding;
 use crate::sign::RsaPssSaltlen;
@@ -385,13 +383,15 @@ where
     }
 
     /// Prepares the context for signing a message using the private key with params.
-    #[cfg(ossl340)]
+    /// Used internally for testing.
+    #[cfg(ossl350)]
     #[corresponds(EVP_PKEY_sign_message_init)]
     #[inline]
-    pub fn sign_message_init_with_params(
+    #[cfg(test)]
+    pub(crate) fn sign_message_init_with_params(
         &mut self,
         algo: &mut crate::signature::Signature,
-        params: OsslParamArray,
+        params: crate::ossl_param::OsslParamArray,
     ) -> Result<(), ErrorStack> {
         unsafe {
             cvt(ffi::EVP_PKEY_sign_message_init(
