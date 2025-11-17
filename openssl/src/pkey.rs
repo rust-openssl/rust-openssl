@@ -706,7 +706,7 @@ impl PKey<Private> {
 
     /// Generates a new ML-DSA key with the provided variant.
     ///
-    /// Requires OpenSSL 3.0.0 or newer.
+    /// Requires OpenSSL 3.5.0 or newer.
     #[cfg(ossl350)]
     pub fn generate_ml_dsa(variant: pkey_ml_dsa::Variant) -> Result<PKey<Private>, ErrorStack> {
         Self::generate_key_from_name(variant.as_str())

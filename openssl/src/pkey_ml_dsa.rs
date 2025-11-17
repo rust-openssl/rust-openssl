@@ -14,7 +14,7 @@ use std::ffi::CStr;
 use std::marker::PhantomData;
 
 // Safety: these all have null terminators.
-// We cen remove these CStr::from_bytes_with_nul_unchecked calls
+// We can remove these CStr::from_bytes_with_nul_unchecked calls
 // when we upgrade to Rust 1.77+ with literal c"" syntax.
 const OSSL_PKEY_PARAM_SEED: &CStr = unsafe { CStr::from_bytes_with_nul_unchecked(b"seed\0") };
 const OSSL_PKEY_PARAM_PUB_KEY: &CStr = unsafe { CStr::from_bytes_with_nul_unchecked(b"pub\0") };
