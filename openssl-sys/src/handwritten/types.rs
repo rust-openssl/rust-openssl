@@ -856,3 +856,8 @@ pub type OSSL_PASSPHRASE_CALLBACK = Option<
         arg: *mut c_void,
     ) -> c_int,
 >;
+
+#[cfg(ossl300)]
+pub enum EVP_MAC {}
+#[cfg(ossl300)]
+pub enum EVP_MAC_CTX {}

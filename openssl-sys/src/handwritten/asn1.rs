@@ -65,8 +65,13 @@ extern "C" {
     pub fn ASN1_BIT_STRING_free(x: *mut ASN1_BIT_STRING);
     pub fn ASN1_OCTET_STRING_free(x: *mut ASN1_OCTET_STRING);
 
+    pub fn ASN1_GENERALIZEDTIME_new() -> *mut ASN1_GENERALIZEDTIME;
     pub fn ASN1_GENERALIZEDTIME_free(tm: *mut ASN1_GENERALIZEDTIME);
     pub fn ASN1_GENERALIZEDTIME_print(b: *mut BIO, tm: *const ASN1_GENERALIZEDTIME) -> c_int;
+    pub fn ASN1_GENERALIZEDTIME_set_string(
+        s: *mut ASN1_GENERALIZEDTIME,
+        str: *const c_char,
+    ) -> c_int;
     pub fn ASN1_TIME_new() -> *mut ASN1_TIME;
     pub fn ASN1_TIME_diff(
         pday: *mut c_int,

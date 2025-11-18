@@ -73,6 +73,7 @@ jobs:
             index-${{ runner.os }}-
       - run: cargo generate-lockfile
       - run: |
+          cargo update -p home --precise 0.5.11
           cargo update -p once_cell --precise 1.20.3
       - uses: actions/cache@v4
         with:
@@ -195,17 +196,17 @@ jobs:
               bindgen: true
               library:
                 name: libressl
-                version: 4.0.0
+                version: 4.0.1
             - target: x86_64-unknown-linux-gnu
               bindgen: true
               library:
                 name: libressl
-                version: 4.1.0
+                version: 4.1.2
             - target: x86_64-unknown-linux-gnu
               bindgen: true
               library:
                 name: libressl
-                version: 4.2.0
+                version: 4.2.1
             - target: x86_64-unknown-linux-gnu
               bindgen: false
               library:
@@ -215,17 +216,17 @@ jobs:
               bindgen: false
               library:
                 name: libressl
-                version: 4.0.0
+                version: 4.0.1
             - target: x86_64-unknown-linux-gnu
               bindgen: false
               library:
                 name: libressl
-                version: 4.1.0
+                version: 4.1.2
             - target: x86_64-unknown-linux-gnu
               bindgen: false
               library:
                 name: libressl
-                version: 4.2.0
+                version: 4.2.1
             - target: x86_64-unknown-linux-gnu
               bindgen: false
               library:

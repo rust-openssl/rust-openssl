@@ -1,6 +1,6 @@
 [package]
 name = "openssl-sys"
-version = "0.9.110"
+version = "0.9.111"
 authors = [
     "Alex Crichton <alex@alexcrichton.com>",
     "Steven Fackler <sfackler@gmail.com>",

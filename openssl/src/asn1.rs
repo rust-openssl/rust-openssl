@@ -84,6 +84,29 @@ impl fmt::Display for Asn1GeneralizedTimeRef {
     }
 }
 
+impl Asn1GeneralizedTime {
+    /// Creates a new generalized time corresponding to the specified ASN1 time
+    /// string.
+    #[corresponds(ASN1_GENERALIZEDTIME_set_string)]
+    #[allow(clippy::should_implement_trait)]
+    pub fn from_str(s: &str) -> Result<Asn1GeneralizedTime, ErrorStack> {
+        unsafe {
+            ffi::init();
+
+            let time_str = CString::new(s).unwrap();
+            let ptr = cvt_p(ffi::ASN1_GENERALIZEDTIME_new())?;
+            let time = Asn1GeneralizedTime::from_ptr(ptr);
+
+            cvt(ffi::ASN1_GENERALIZEDTIME_set_string(
+                time.as_ptr(),
+                time_str.as_ptr(),
+            ))?;
+
+            Ok(time)
+        }
+    }
+}
+
 /// The type of an ASN.1 value.
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub struct Asn1Type(c_int);
@@ -794,6 +817,12 @@ mod tests {
         Asn1Time::from_str("99991231235959Z").unwrap();
         #[cfg(ossl111)]
         Asn1Time::from_str_x509("99991231235959Z").unwrap();
+    }
+
+    #[test]
+    fn generalized_time_from_str() {
+        let time = Asn1GeneralizedTime::from_str("99991231235959Z").unwrap();
+        assert_eq!("Dec 31 23:59:59 9999 GMT", time.to_string());
     }
 
     #[test]

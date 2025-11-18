@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+## [v0.9.111] - 2025-11-07
+
+### Added
+
+* Added bindings to `EVP_MAC` APIs.
+* Added bindings to `ASN1_GENERALIZEDTIME_new` and `ASN1_GENERALIZEDTIME_set_string`.
+
 ## [v0.9.110] - 2025-10-14
 
 ### Added
@@ -679,7 +686,8 @@ Fixed builds against OpenSSL built with `no-cast`.
 * Added `X509_verify` and `X509_REQ_verify`.
 * Added `EVP_MD_type` and `EVP_GROUP_get_curve_name`.
 
-[Unreleased]: https://github.com/rust-openssl/rust-openssl/compare/openssl-sys-v0.9.110..master
+[Unreleased]: https://github.com/rust-openssl/rust-openssl/compare/openssl-sys-v0.9.111..master
+[v0.9.111]: https://github.com/rust-openssl/rust-openssl/compare/openssl-sys-v0.9.110...openssl-sys-v0.9.111
 [v0.9.110]: https://github.com/rust-openssl/rust-openssl/compare/openssl-sys-v0.9.109...openssl-sys-v0.9.110
 [v0.9.109]: https://github.com/rust-openssl/rust-openssl/compare/openssl-sys-v0.9.108...openssl-sys-v0.9.109
 [v0.9.108]: https://github.com/rust-openssl/rust-openssl/compare/openssl-sys-v0.9.107...openssl-sys-v0.9.108
