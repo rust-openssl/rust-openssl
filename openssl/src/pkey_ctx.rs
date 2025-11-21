@@ -200,6 +200,112 @@ where
         Ok(())
     }
 
+    /// Prepares the context for encapsulateion using the public key.
+    #[cfg(ossl300)]
+    #[corresponds(EVP_PKEY_encapsulate_init)]
+    #[inline]
+    pub fn encapsulate_init(&mut self) -> Result<(), ErrorStack> {
+        unsafe {
+            cvt(ffi::EVP_PKEY_encapsulate_init(self.as_ptr(), ptr::null()))?;
+        }
+
+        Ok(())
+    }
+
+    /// Performs a public key encapsulation operation.
+    #[cfg(ossl300)]
+    #[corresponds(EVP_PKEY_encapsulate)]
+    pub fn encapsulate(
+        &mut self,
+        wrappedkey: Option<&mut [u8]>,
+        genkey: Option<&mut [u8]>,
+    ) -> Result<(usize, usize), ErrorStack> {
+        let mut wrappedkey_len = wrappedkey.as_ref().map_or(0, |b| b.len());
+        let mut genkey_len = genkey.as_ref().map_or(0, |b| b.len());
+        unsafe {
+            cvt(ffi::EVP_PKEY_encapsulate(
+                self.as_ptr(),
+                wrappedkey.map_or(ptr::null_mut(), |b| b.as_mut_ptr()),
+                &mut wrappedkey_len,
+                genkey.map_or(ptr::null_mut(), |b| b.as_mut_ptr()),
+                &mut genkey_len,
+            ))?;
+        }
+
+        Ok((wrappedkey_len, genkey_len))
+    }
+
+    /// Like [`Self::encapsulate`] but appends ciphertext and key to a [`Vec`].
+    #[cfg(ossl300)]
+    pub fn encapsulate_to_vec(
+        &mut self,
+        wrappedkey: &mut Vec<u8>,
+        genkey: &mut Vec<u8>,
+    ) -> Result<(usize, usize), ErrorStack> {
+        let wrappedkey_base = wrappedkey.len();
+        let genkey_base = genkey.len();
+        // Get maximum output buffer size for wrappedkey and genkey
+        let (wrappedkey_len, genkey_len) = self.encapsulate(None, None)?;
+
+        wrappedkey.resize(wrappedkey_base + wrappedkey_len, 0);
+        genkey.resize(genkey_base + genkey_len, 0);
+
+        let (wrappedkey_len, genkey_len) = self.encapsulate(
+            Some(&mut wrappedkey[wrappedkey_base..]),
+            Some(&mut genkey[genkey_base..]),
+        )?;
+
+        wrappedkey.truncate(wrappedkey_base + wrappedkey_len);
+        genkey.truncate(genkey_base + genkey_len);
+
+        Ok((wrappedkey_len, genkey_len))
+    }
+
+    /// Prepares the context for decapsulation using the private key.
+    #[cfg(ossl300)]
+    #[corresponds(EVP_PKEY_decapsulate_init)]
+    #[inline]
+    pub fn decapsulate_init(&mut self) -> Result<(), ErrorStack> {
+        unsafe {
+            cvt(ffi::EVP_PKEY_decapsulate_init(self.as_ptr(), ptr::null()))?;
+        }
+
+        Ok(())
+    }
+
+    /// Performs a decapsulation operation using the private key.
+    #[cfg(ossl300)]
+    #[corresponds(EVP_PKEY_decapsulate)]
+    pub fn decapsulate(&mut self, from: &[u8], to: Option<&mut [u8]>) -> Result<usize, ErrorStack> {
+        let mut written = to.as_ref().map_or(0, |b| b.len());
+        unsafe {
+            cvt(ffi::EVP_PKEY_decapsulate(
+                self.as_ptr(),
+                to.map_or(ptr::null_mut(), |b| b.as_mut_ptr()),
+                &mut written,
+                from.as_ptr(),
+                from.len(),
+            ))?;
+        }
+
+        Ok(written)
+    }
+
+    /// Like [`Self::decapsulate`] but appends plaintext to a [`Vec`].
+    #[cfg(ossl300)]
+    pub fn decapsulate_to_vec(
+        &mut self,
+        from: &[u8],
+        out: &mut Vec<u8>,
+    ) -> Result<usize, ErrorStack> {
+        let base = out.len();
+        let len = self.decapsulate(from, None)?;
+        out.resize(base + len, 0);
+        let len = self.decapsulate(from, Some(&mut out[base..]))?;
+        out.truncate(base + len);
+        Ok(len)
+    }
+
     /// Prepares the context for signature verification using the public key.
     #[corresponds(EVP_PKEY_verify_init)]
     #[inline]

@@ -51,6 +51,8 @@ use crate::error::ErrorStack;
 use crate::pkey_ctx::PkeyCtx;
 #[cfg(ossl350)]
 use crate::pkey_ml_dsa::{self, PKeyMlDsaParams};
+#[cfg(ossl350)]
+use crate::pkey_ml_kem::{self, PKeyMlKemParams};
 use crate::rsa::Rsa;
 use crate::symm::Cipher;
 use crate::util::{invoke_passwd_cb, CallbackState};
@@ -216,6 +218,27 @@ impl<T> PKeyRef<T> {
                 &mut params,
             ))?;
             Ok(Some(PKeyMlDsaParams::<T>::from_params_ptr(params)))
+        }
+    }
+
+    /// Returns the inner `PKeyMlKemParams`. Returns Ok(None) if either the variant is incorrect or the key is not of type ML-DSA.
+    #[corresponds(EVP_PKEY_todata)]
+    #[cfg(ossl350)]
+    pub fn ml_kem(
+        &self,
+        variant: pkey_ml_kem::Variant,
+    ) -> Result<Option<PKeyMlKemParams<T>>, ErrorStack> {
+        if !self.is_key_type(variant.as_str())? {
+            return Ok(None);
+        }
+        unsafe {
+            let mut params: *mut ffi::OSSL_PARAM = ptr::null_mut();
+            cvt(ffi::EVP_PKEY_todata(
+                self.as_ptr(),
+                ffi::EVP_PKEY_KEYPAIR,
+                &mut params,
+            ))?;
+            Ok(Some(PKeyMlKemParams::<T>::from_params_ptr(params)))
         }
     }
 
@@ -709,6 +732,14 @@ impl PKey<Private> {
     /// Requires OpenSSL 3.5.0 or newer.
     #[cfg(ossl350)]
     pub fn generate_ml_dsa(variant: pkey_ml_dsa::Variant) -> Result<PKey<Private>, ErrorStack> {
+        Self::generate_key_from_name(variant.as_str())
+    }
+
+    /// Generates a new ML-DSA key with the provided variant.
+    ///
+    /// Requires OpenSSL 3.5.0 or newer.
+    #[cfg(ossl350)]
+    pub fn generate_ml_kem(variant: pkey_ml_kem::Variant) -> Result<PKey<Private>, ErrorStack> {
         Self::generate_key_from_name(variant.as_str())
     }
 
