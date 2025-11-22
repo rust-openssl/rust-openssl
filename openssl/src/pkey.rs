@@ -47,8 +47,12 @@ use crate::dh::Dh;
 use crate::dsa::Dsa;
 use crate::ec::EcKey;
 use crate::error::ErrorStack;
+#[cfg(ossl300)]
+use crate::ossl_param::OsslParamArray;
 #[cfg(any(ossl110, boringssl, libressl370, awslc))]
 use crate::pkey_ctx::PkeyCtx;
+#[cfg(ossl300)]
+use crate::pkey_ctx::Selection;
 use crate::rsa::Rsa;
 use crate::symm::Cipher;
 use crate::util::{invoke_passwd_cb, CallbackState};
@@ -58,7 +62,7 @@ use foreign_types::{ForeignType, ForeignTypeRef};
 use libc::{c_int, c_long};
 use openssl_macros::corresponds;
 use std::convert::{TryFrom, TryInto};
-use std::ffi::CString;
+use std::ffi::{CStr, CString};
 use std::fmt;
 #[cfg(all(not(any(boringssl, awslc)), ossl110))]
 use std::mem;
@@ -116,6 +120,103 @@ impl Id {
     #[allow(clippy::trivially_copy_pass_by_ref)]
     pub fn as_raw(&self) -> c_int {
         self.0
+    }
+}
+
+impl TryFrom<Id> for &'static str {
+    type Error = ();
+    fn try_from(id: Id) -> Result<Self, Self::Error> {
+        match id {
+            Id::RSA => Ok("RSA"),
+            #[cfg(any(ossl111, libressl, boringssl, awslc))]
+            Id::RSA_PSS => Ok("RSA-PSS"),
+            #[cfg(not(boringssl))]
+            Id::HMAC => Ok("HMAC"),
+            #[cfg(not(any(boringssl, awslc)))]
+            Id::CMAC => Ok("CMAC"),
+            Id::DSA => Ok("DSA"),
+            Id::DH => Ok("DH"),
+            #[cfg(ossl110)]
+            Id::DHX => Ok("DHX"),
+            Id::EC => Ok("EC"),
+            #[cfg(ossl111)]
+            Id::SM2 => Ok("SM2"),
+            #[cfg(any(ossl110, boringssl, libressl360, awslc))]
+            Id::HKDF => Ok("HKDF"),
+            #[cfg(any(ossl111, boringssl, libressl370, awslc))]
+            Id::ED25519 => Ok("Ed25519"),
+            #[cfg(ossl111)]
+            Id::ED448 => Ok("Ed448"),
+            #[cfg(any(ossl111, boringssl, libressl370, awslc))]
+            Id::X25519 => Ok("X25519"),
+            #[cfg(ossl111)]
+            Id::X448 => Ok("X448"),
+            #[cfg(ossl111)]
+            Id::POLY1305 => Ok("POLY1305"),
+            _ => Err(()),
+        }
+    }
+}
+
+cstr_const!(ID_RSA, b"RSA\0");
+#[cfg(any(ossl111, libressl310, boringssl, awslc))]
+cstr_const!(ID_RSA_PSS, b"RSA-PSS\0");
+#[cfg(not(boringssl))]
+cstr_const!(ID_HMAC, b"HMAC\0");
+#[cfg(not(any(boringssl, awslc)))]
+cstr_const!(ID_CMAC, b"CMAC\0");
+cstr_const!(ID_DSA, b"DSA\0");
+cstr_const!(ID_DH, b"DH\0");
+#[cfg(ossl110)]
+cstr_const!(ID_DHX, b"DHX\0");
+cstr_const!(ID_EC, b"EC\0");
+#[cfg(ossl111)]
+cstr_const!(ID_SM2, b"SM2\0");
+#[cfg(any(ossl110, boringssl, libressl360, awslc))]
+cstr_const!(ID_HKDF, b"HKDF\0");
+#[cfg(any(ossl111, boringssl, libressl370, awslc))]
+cstr_const!(ID_ED25519, b"Ed25519\0");
+#[cfg(ossl111)]
+cstr_const!(ID_ED448, b"Ed448\0");
+#[cfg(any(ossl111, boringssl, libressl370, awslc))]
+cstr_const!(ID_X25519, b"X25519\0");
+#[cfg(ossl111)]
+cstr_const!(ID_X448, b"X448\0");
+#[cfg(ossl111)]
+cstr_const!(ID_POLY1305, b"POLY1305\0");
+
+impl TryFrom<Id> for &'static CStr {
+    type Error = ();
+    fn try_from(id: Id) -> Result<Self, Self::Error> {
+        match id {
+            Id::RSA => Ok(ID_RSA),
+            #[cfg(any(ossl111, libressl310, boringssl, awslc))]
+            Id::RSA_PSS => Ok(ID_RSA_PSS),
+            #[cfg(not(boringssl))]
+            Id::HMAC => Ok(ID_HMAC),
+            #[cfg(not(any(boringssl, awslc)))]
+            Id::CMAC => Ok(ID_CMAC),
+            Id::DSA => Ok(ID_DSA),
+            Id::DH => Ok(ID_DH),
+            #[cfg(ossl110)]
+            Id::DHX => Ok(ID_DHX),
+            Id::EC => Ok(ID_EC),
+            #[cfg(ossl111)]
+            Id::SM2 => Ok(ID_SM2),
+            #[cfg(any(ossl110, boringssl, libressl360, awslc))]
+            Id::HKDF => Ok(ID_HKDF),
+            #[cfg(any(ossl111, boringssl, libressl370, awslc))]
+            Id::ED25519 => Ok(ID_ED25519),
+            #[cfg(ossl111)]
+            Id::ED448 => Ok(ID_ED448),
+            #[cfg(any(ossl111, boringssl, libressl370, awslc))]
+            Id::X25519 => Ok(ID_X25519),
+            #[cfg(ossl111)]
+            Id::X448 => Ok(ID_X448),
+            #[cfg(ossl111)]
+            Id::POLY1305 => Ok(ID_POLY1305),
+            _ => Err(()),
+        }
     }
 }
 
@@ -206,6 +307,18 @@ impl<T> PKeyRef<T> {
     #[corresponds(EVP_PKEY_size)]
     pub fn size(&self) -> usize {
         unsafe { ffi::EVP_PKEY_size(self.as_ptr()) as usize }
+    }
+
+    /// Converts the `PKey` to an `OsslParamArray`.
+    ///
+    /// Use `selection` to control what parameters are included.
+    #[corresponds(EVP_PKEY_todata)]
+    #[cfg(ossl300)]
+    #[allow(dead_code)] // TODO: remove when used by non-deprecated key wrappers
+    pub(crate) fn to_data(&self, selection: Selection) -> Result<OsslParamArray, ErrorStack> {
+        let mut params = ptr::null_mut();
+        cvt(unsafe { ffi::EVP_PKEY_todata(self.as_ptr(), selection.into(), &mut params) })?;
+        Ok(unsafe { OsslParamArray::from_ptr(params) })
     }
 }
 
@@ -382,35 +495,7 @@ where
 
 impl<T> fmt::Debug for PKey<T> {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let alg = match self.id() {
-            Id::RSA => "RSA",
-            #[cfg(any(ossl111, libressl, boringssl, awslc))]
-            Id::RSA_PSS => "RSA-PSS",
-            #[cfg(not(boringssl))]
-            Id::HMAC => "HMAC",
-            #[cfg(not(any(boringssl, awslc)))]
-            Id::CMAC => "CMAC",
-            Id::DSA => "DSA",
-            Id::DH => "DH",
-            #[cfg(ossl110)]
-            Id::DHX => "DHX",
-            Id::EC => "EC",
-            #[cfg(ossl111)]
-            Id::SM2 => "SM2",
-            #[cfg(any(ossl110, boringssl, libressl360, awslc))]
-            Id::HKDF => "HKDF",
-            #[cfg(any(ossl111, boringssl, libressl370, awslc))]
-            Id::ED25519 => "Ed25519",
-            #[cfg(ossl111)]
-            Id::ED448 => "Ed448",
-            #[cfg(any(ossl111, boringssl, libressl370, awslc))]
-            Id::X25519 => "X25519",
-            #[cfg(ossl111)]
-            Id::X448 => "X448",
-            #[cfg(ossl111)]
-            Id::POLY1305 => "POLY1305",
-            _ => "unknown",
-        };
+        let alg = self.id().try_into().unwrap_or("unknown");
         fmt.debug_struct("PKey").field("algorithm", &alg).finish()
         // TODO: Print details for each specific type of key
     }
@@ -914,6 +999,25 @@ impl<T> TryFrom<PKey<T>> for Dh<T> {
     }
 }
 
+cfg_if! {
+    if #[cfg(ossl300)] {
+        cstr_const!(pub(crate) OSSL_PKEY_PARAM_GROUP_NAME, b"group\0");
+
+        cstr_const!(pub(crate) OSSL_PKEY_PARAM_PUB_KEY, b"pub\0");
+        cstr_const!(pub(crate) OSSL_PKEY_PARAM_PRIV_KEY, b"priv\0");
+
+        cstr_const!(pub(crate) OSSL_PKEY_PARAM_FFC_P, b"p\0");
+        cstr_const!(pub(crate) OSSL_PKEY_PARAM_FFC_G, b"g\0");
+        cstr_const!(pub(crate) OSSL_PKEY_PARAM_FFC_Q, b"q\0");
+
+        cstr_const!(pub(crate) OSSL_PKEY_PARAM_RSA_N, b"n\0");
+        cstr_const!(pub(crate) OSSL_PKEY_PARAM_RSA_E, b"e\0");
+        cstr_const!(pub(crate) OSSL_PKEY_PARAM_RSA_D, b"d\0");
+
+        cstr_const!(pub(crate) OSSL_SIGNATURE_PARAM_NONCE_TYPE, b"nonce-type\0");
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::convert::TryInto;
@@ -922,8 +1026,12 @@ mod tests {
     use crate::dh::Dh;
     use crate::dsa::Dsa;
     use crate::ec::EcKey;
+    #[cfg(ossl300)]
+    use crate::encrypt::{Decrypter, Encrypter};
     use crate::error::Error;
     use crate::nid::Nid;
+    #[cfg(ossl300)]
+    use crate::pkey_ctx::pkey_from_params;
     use crate::rsa::Rsa;
     use crate::symm::Cipher;
 
@@ -1218,5 +1326,28 @@ mod tests {
 
         assert!(!pkey1.public_eq(&pkey2));
         assert!(Error::get().is_none());
+    }
+
+    #[cfg(ossl300)]
+    #[test]
+    fn test_todata() {
+        let data: &[u8] = b"hello, world";
+        let pkey1 = PKey::from_rsa(Rsa::generate(2048).unwrap()).unwrap();
+
+        // Encrypt some data using the generated pkey
+        let encrypter = Encrypter::new(&pkey1).unwrap();
+        let mut encrypted = vec![0u8; encrypter.encrypt_len(data).unwrap()];
+        encrypter.encrypt(data, &mut encrypted).unwrap();
+
+        // Convert the pkey to OSSL_PARAMs and back into a PKey
+        let params = pkey1.to_data(Selection::Keypair).unwrap();
+        let pkey2: PKey<Private> = pkey_from_params(Id::RSA, &params).unwrap();
+
+        // Decrypt the data using the new pkey
+        let decrypter = Decrypter::new(&pkey2).unwrap();
+        let mut decrypted = vec![0u8; decrypter.decrypt_len(&encrypted).unwrap()];
+        let decrypted_len = decrypter.decrypt(&encrypted, &mut decrypted).unwrap();
+        decrypted.truncate(decrypted_len);
+        assert_eq!(data, &decrypted);
     }
 }

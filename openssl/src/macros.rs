@@ -268,3 +268,14 @@ macro_rules! generic_foreign_type_and_impl_send_sync {
         unsafe impl<T> Sync for $borrowed<T>{}
     };
 }
+
+#[cfg_attr(not(ossl300), allow(unused_macros))]
+macro_rules! cstr_const {
+    // Safety: these all have null terminators.
+    // We cen remove these CStr::from_bytes_with_nul_unchecked calls
+    // when we upgrade to Rust 1.77+ with literal c"" syntax.
+    ($vis:vis $name:ident, $key:literal) => {
+        #[allow(dead_code)]
+        $vis const $name: &std::ffi::CStr = unsafe { std::ffi::CStr::from_bytes_with_nul_unchecked($key) };
+    }
+}
