@@ -735,7 +735,7 @@ extern "C" {
 }
 
 extern "C" {
-    #[cfg(not(ossl110))]
+    #[cfg(not(any(ossl110, libressl)))]
     pub fn SSL_get_ex_new_index(
         argl: c_long,
         argp: *mut c_void,
@@ -747,7 +747,7 @@ extern "C" {
     pub fn SSL_set_ex_data(ssl: *mut SSL, idx: c_int, data: *mut c_void) -> c_int;
     pub fn SSL_get_ex_data(ssl: *const SSL, idx: c_int) -> *mut c_void;
 
-    #[cfg(not(ossl110))]
+    #[cfg(not(any(ossl110, libressl)))]
     pub fn SSL_CTX_get_ex_new_index(
         argl: c_long,
         argp: *mut c_void,
