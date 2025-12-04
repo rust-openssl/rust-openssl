@@ -735,7 +735,7 @@ mod test {
     #[cfg(not(any(boringssl, awslc)))]
     fn seal_open() {
         let private_pem = include_bytes!("../test/rsa.pem");
-        let public_pem = include_bytes!("../test/rsa.pem.pub");
+        let public_pem = include_bytes!("../test/rsa.pub.pem");
         let private_key = PKey::private_key_from_pem(private_pem).unwrap();
         let public_key = PKey::public_key_from_pem(public_pem).unwrap();
         let cipher = Cipher::aes_256_cbc();

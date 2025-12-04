@@ -14,10 +14,14 @@ use std::ptr;
 use std::str;
 use std::sync::Arc;
 
+#[cfg(all(ossl300, not(osslconf = "OPENSSL_NO_DEPRECATED_3_0")))]
+use crate::cvt_p;
+#[cfg(not(osslconf = "OPENSSL_NO_DEPRECATED_3_0"))]
 use crate::dh::Dh;
 #[cfg(all(ossl102, not(ossl110)))]
 use crate::ec::EcKey;
 use crate::error::ErrorStack;
+#[cfg(not(osslconf = "OPENSSL_NO_DEPRECATED_3_0"))]
 use crate::pkey::Params;
 use crate::ssl::AlpnError;
 use crate::ssl::{
@@ -208,6 +212,7 @@ where
     }
 }
 
+#[cfg(not(osslconf = "OPENSSL_NO_DEPRECATED_3_0"))]
 pub unsafe extern "C" fn raw_tmp_dh<F>(
     ssl: *mut ffi::SSL,
     is_export: c_int,
@@ -224,6 +229,9 @@ where
 
     match (*callback)(ssl, is_export != 0, keylength as u32) {
         Ok(dh) => {
+            #[cfg(ossl300)]
+            let ptr = cvt_p(unsafe { ffi::EVP_PKEY_get1_DH(dh.as_ptr()) }).unwrap();
+            #[cfg(not(ossl300))]
             let ptr = dh.as_ptr();
             mem::forget(dh);
             ptr
@@ -263,6 +271,7 @@ where
     }
 }
 
+#[cfg(not(osslconf = "OPENSSL_NO_DEPRECATED_3_0"))]
 pub unsafe extern "C" fn raw_tmp_dh_ssl<F>(
     ssl: *mut ffi::SSL,
     is_export: c_int,
@@ -279,6 +288,9 @@ where
 
     match callback(ssl, is_export != 0, keylength as u32) {
         Ok(dh) => {
+            #[cfg(ossl300)]
+            let ptr = cvt_p(unsafe { ffi::EVP_PKEY_get1_DH(dh.as_ptr()) }).unwrap();
+            #[cfg(not(ossl300))]
             let ptr = dh.as_ptr();
             mem::forget(dh);
             ptr
