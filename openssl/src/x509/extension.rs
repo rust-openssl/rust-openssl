@@ -555,6 +555,245 @@ impl SubjectAlternativeName {
     }
 }
 
+pub struct CrlNumber(i64);
+
+impl CrlNumber {
+    pub fn new(number: i64) -> Self {
+        Self(number)
+    }
+
+    pub fn build(self) -> Result<X509Extension, ErrorStack> {
+        unsafe {
+            ffi::init();
+
+            let int_ptr = cvt_p(ffi::ASN1_INTEGER_new())?;
+
+            if let Err(e) = cvt(ffi::ASN1_INTEGER_set(int_ptr, self.0)) {
+                ffi::ASN1_INTEGER_free(int_ptr);
+                return Err(e);
+            }
+
+            let r = cvt_p(ffi::X509V3_EXT_i2d(
+                Nid::CRL_NUMBER.as_raw(),
+                0,
+                int_ptr.cast(),
+            ))
+            .map(|p| X509Extension::from_ptr(p));
+            ffi::ASN1_INTEGER_free(int_ptr);
+            r
+        }
+    }
+}
+
+unsafe impl ExtensionType for CrlNumber {
+    const NID: Nid = Nid::CRL_NUMBER;
+    type Output = Asn1Integer;
+}
+
+pub struct CrlIssuerAlternativeName(Stack<GeneralName>);
+
+impl CrlIssuerAlternativeName {
+    pub fn new(ian: Stack<GeneralName>) -> Self {
+        Self(ian)
+    }
+
+    pub fn build(self) -> Result<X509Extension, ErrorStack> {
+        unsafe {
+            ffi::init();
+
+            let gns: *mut ffi::OPENSSL_STACK = self.0.as_ptr().cast();
+
+            cvt_p(ffi::X509V3_EXT_i2d(
+                Nid::ISSUER_ALT_NAME.as_raw(),
+                0,
+                gns.cast(),
+            ))
+            .map(|p| X509Extension::from_ptr(p))
+        }
+    }
+}
+
+pub struct AuthorityInfoAccess(Stack<AccessDescription>);
+
+impl AuthorityInfoAccess {
+    pub fn new(ai: Stack<AccessDescription>) -> Self {
+        Self(ai)
+    }
+
+    pub fn build(self) -> Result<X509Extension, ErrorStack> {
+        unsafe {
+            ffi::init();
+
+            let ads = self.0.as_ptr();
+            cvt_p(ffi::X509V3_EXT_i2d(
+                Nid::INFO_ACCESS.as_raw(),
+                0,
+                ads.cast(),
+            ))
+            .map(|p| X509Extension::from_ptr(p))
+        }
+    }
+}
+
+pub struct DeltaCrlIndicator(i64);
+
+impl DeltaCrlIndicator {
+    pub fn new(base_crl_number: i64) -> Self {
+        Self(base_crl_number)
+    }
+
+    pub fn build(self) -> Result<X509Extension, ErrorStack> {
+        unsafe {
+            ffi::init();
+
+            let int_ptr = cvt_p(ffi::ASN1_INTEGER_new())?;
+
+            if let Err(e) = cvt(ffi::ASN1_INTEGER_set(int_ptr, self.0)) {
+                ffi::ASN1_INTEGER_free(int_ptr);
+                return Err(e);
+            }
+
+            let r = cvt_p(ffi::X509V3_EXT_i2d(
+                openssl::nid::Nid::DELTA_CRL.as_raw(),
+                1,
+                int_ptr.cast(),
+            ))
+            .map(|p| X509Extension::from_ptr(p));
+
+            ffi::ASN1_INTEGER_free(int_ptr);
+            r
+        }
+    }
+}
+
+pub struct IssuingDistributionPoint {
+    dp: Option<DistPointName>,
+    only_user: bool,
+    only_ca: bool,
+    only_some_reasons: Option<Vec<CrlReason>>,
+    indirect: bool,
+    only_attr: bool,
+}
+
+impl IssuingDistributionPoint {
+    pub fn new() -> Self {
+        Self {
+            dp: None,
+            only_user: false,
+            only_ca: false,
+            only_some_reasons: None,
+            indirect: false,
+            only_attr: false,
+        }
+    }
+
+    pub fn distribution_point(mut self, dp: DistPointName) -> Self {
+        self.dp = Some(dp);
+        self
+    }
+
+    pub fn only_contains_user_certs(mut self, v: bool) -> Self {
+        self.only_user = v;
+        self
+    }
+
+    pub fn only_contains_ca_certs(mut self, v: bool) -> Self {
+        self.only_ca = v;
+        self
+    }
+
+    pub fn indirect_crl(mut self, v: bool) -> Self {
+        self.indirect = v;
+        self
+    }
+
+    pub fn only_contains_attribute_certs(mut self, v: bool) -> Self {
+        self.only_attr = v;
+        self
+    }
+
+    pub fn only_some_reasons(mut self, reasons: Vec<CrlReason>) -> Self {
+        self.only_some_reasons = Some(reasons);
+        self
+    }
+
+    pub fn build(self) -> Result<X509Extension, ErrorStack> {
+        unsafe {
+            ffi::init();
+
+            let idp = cvt_p(ffi::ISSUING_DIST_POINT_new())?;
+
+            if let Some(dp) = self.dp {
+                (*idp).distpoint = dp.as_ptr();
+                std::mem::forget(dp);
+            }
+
+            (*idp).onlyuser = self.only_user as i32;
+            (*idp).onlyCA = self.only_ca as i32;
+            (*idp).indirectCRL = self.indirect as i32;
+            (*idp).onlyattr = self.only_attr as i32;
+
+            if let Some(reasons) = self.only_some_reasons {
+                let bitstr = match cvt_p(ffi::ASN1_BIT_STRING_new()) {
+                    Ok(p) => p,
+                    Err(e) => {
+                        ffi::ISSUING_DIST_POINT_free(idp);
+                        return Err(e);
+                    }
+                };
+
+                for r in reasons {
+                    if let Err(e) = cvt(ffi::ASN1_BIT_STRING_set_bit(bitstr, r.as_raw(), 1)) {
+                        ffi::ASN1_BIT_STRING_free(bitstr);
+                        ffi::ISSUING_DIST_POINT_free(idp);
+                        return Err(e);
+                    }
+                }
+
+                (*idp).onlysomereasons = bitstr;
+            }
+
+            let r = cvt_p(ffi::X509V3_EXT_i2d(
+                openssl::nid::Nid::ISSUING_DISTRIBUTION_POINT.as_raw(),
+                0,
+                idp.cast(),
+            ))
+            .map(|p| X509Extension::from_ptr(p));
+
+            ffi::ISSUING_DIST_POINT_free(idp);
+
+            r
+        }
+    }
+}
+
+pub struct FreshestCrl(Stack<DistPoint>);
+
+impl FreshestCrl {
+    pub fn new() -> Result<Self, ErrorStack> {
+        Ok(Self(Stack::new()?))
+    }
+
+    pub fn add_point(mut self, dp: DistPoint) -> Result<Self, ErrorStack> {
+        self.0.push(dp)?;
+        Ok(self)
+    }
+
+    pub fn build(self) -> Result<X509Extension, ErrorStack> {
+        unsafe {
+            ffi::init();
+
+            cvt_p(ffi::X509V3_EXT_i2d(
+                openssl::nid::Nid::FRESHEST_CRL.as_raw(),
+                0,
+                self.0.as_ptr().cast(),
+            ))
+            .map(|p| X509Extension::from_ptr(p))
+        }
+    }
+}
+
+
 fn append(value: &mut String, first: &mut bool, should: bool, element: &str) {
     if !should {
         return;

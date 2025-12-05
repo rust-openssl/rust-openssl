@@ -1598,6 +1598,140 @@ impl CrlReason {
     }
 }
 
+pub struct X509RevokedBuilder(X509Revoked);
+
+impl X509RevokedBuilder {
+    /// Creates a new builder
+    pub fn new() -> Result<Self, ErrorStack> {
+        unsafe {
+            ffi::init();
+            cvt_p(ffi::X509_REVOKED_new()).map(|p| X509RevokedBuilder(X509Revoked::from_ptr(p)))
+        }
+    }
+
+    fn add_i2d_extension<T>(
+        &mut self,
+        nid: Nid,
+        critical: bool,
+        inner: *mut T,
+    ) -> Result<(), ErrorStack> {
+        unsafe {
+            let ext = cvt_p(ffi::X509V3_EXT_i2d(
+                nid.as_raw(),
+                critical as i32,
+                inner as *mut _,
+            ))?;
+            let r = cvt(ffi::X509_REVOKED_add_ext(self.0.as_ptr(), ext, -1)).map(|_| ());
+            ffi::X509_EXTENSION_free(ext);
+
+            r
+        }
+    }
+
+    /// Add reason extension
+    pub fn add_reason_extension(&mut self, reason: CrlReason) -> Result<(), ErrorStack> {
+        unsafe {
+            let obj = ffi::ASN1_ENUMERATED_new();
+            cvt(ffi::ASN1_ENUMERATED_set(obj, reason.as_raw() as i64))?;
+            let r = self.add_i2d_extension(Nid::CRL_REASON, false, obj);
+            ffi::ASN1_ENUMERATED_free(obj);
+            r
+        }
+    }
+
+    /// Add invalidity date extension
+    pub fn add_invalidity_date_extension(&mut self, date: &Asn1TimeRef) -> Result<(), ErrorStack> {
+        unsafe {
+            let obj = cvt_p(ffi::ASN1_TIME_to_generalizedtime(
+                date.as_ptr(),
+                std::ptr::null_mut(),
+            ))?;
+
+            let r = self.add_i2d_extension(Nid::INVALIDITY_DATE, false, obj);
+
+            ffi::ASN1_GENERALIZEDTIME_free(obj);
+
+            r
+        }
+    }
+
+    /// Add certificate issuer extension
+    pub fn add_certificate_issuer_extension(
+        &mut self,
+        issuer: &X509NameRef,
+    ) -> Result<(), ErrorStack> {
+        unsafe {
+            let gns = cvt_p(ffi::OPENSSL_sk_new_null())?;
+
+            // Free helpers for stack items
+            unsafe extern "C" fn free_general_name(p: *mut std::ffi::c_void) {
+                unsafe {
+                    ffi::GENERAL_NAME_free(p as *mut ffi::GENERAL_NAME);
+                }
+            }
+
+            let gn = match cvt_p(ffi::GENERAL_NAME_new()) {
+                Ok(p) => p,
+                Err(e) => {
+                    ffi::OPENSSL_sk_free(gns);
+                    return Err(e);
+                }
+            };
+
+            (*gn).type_ = ffi::GEN_DIRNAME;
+            let name_dup = match cvt_p(ffi::X509_NAME_dup(issuer.as_ptr())) {
+                Ok(p) => p,
+                Err(e) => {
+                    ffi::GENERAL_NAME_free(gn);
+                    ffi::OPENSSL_sk_free(gns);
+                    return Err(e);
+                }
+            };
+
+            (*gn).d.dirn = name_dup;
+
+            if ffi::OPENSSL_sk_push(gns, gn.cast()) == 0 {
+                ffi::GENERAL_NAME_free(gn);
+                ffi::OPENSSL_sk_free(gns);
+                return Err(ErrorStack::get());
+            }
+
+            let r = self.add_i2d_extension(Nid::CERTIFICATE_ISSUER, true, gns);
+
+            ffi::OPENSSL_sk_pop_free_ex(gns, Some(call_free_func), Some(free_general_name));
+
+            r
+        }
+    }
+
+    /// Set revocation date
+    pub fn set_revocation_date(&mut self, date: &Asn1TimeRef) -> Result<(), ErrorStack> {
+        unsafe {
+            cvt(ffi::X509_REVOKED_set_revocationDate(
+                self.0.as_ptr(),
+                date.as_ptr(),
+            ))
+            .map(|_| ())
+        }
+    }
+
+    /// Set serial number
+    pub fn set_serial_number(&mut self, serial: &Asn1IntegerRef) -> Result<(), ErrorStack> {
+        unsafe {
+            cvt(ffi::X509_REVOKED_set_serialNumber(
+                self.0.as_ptr(),
+                serial.as_ptr(),
+            ))
+            .map(|_| ())
+        }
+    }
+
+    /// Consumes the builder, returning the X509Revoked.
+    pub fn build(self) -> X509Revoked {
+        self.0
+    }
+}
+
 foreign_type_and_impl_send_sync! {
     type CType = ffi::X509_REVOKED;
     fn drop = ffi::X509_REVOKED_free;
@@ -1720,6 +1854,115 @@ unsafe impl ExtensionType for AuthorityInformationAccess {
     const NID: Nid = Nid::from_raw(ffi::NID_info_access);
 
     type Output = Stack<AccessDescription>;
+}
+
+pub struct X509CrlBuilder(X509Crl);
+
+impl X509CrlBuilder {
+    /// Creates a new builder
+    pub fn new() -> Result<Self, ErrorStack> {
+        unsafe {
+            ffi::init();
+            cvt_p(ffi::X509_CRL_new()).map(|p| X509CrlBuilder(X509Crl::from_ptr(p)))
+        }
+    }
+
+    /// Set version
+    ///
+    /// Note that the version is zero-indexed;
+    /// that is, a CRL corresponding to version 2 of the X.509 standard should pass 1 to this method.
+    pub fn set_version(&mut self, version: i32) -> Result<(), ErrorStack> {
+        unsafe {
+            cvt(ffi::X509_CRL_set_version(
+                self.0.as_ptr(),
+                version as c_long,
+            ))
+            .map(|_| ())
+        }
+    }
+
+    /// Set issuer name
+    pub fn set_issuer_name(&mut self, issuer_name: &X509NameRef) -> Result<(), ErrorStack> {
+        unsafe {
+            cvt(ffi::X509_CRL_set_issuer_name(
+                self.0.as_ptr(),
+                issuer_name.as_ptr(),
+            ))
+            .map(|_| ())
+        }
+    }
+
+    /// Set lastUpdate time
+    pub fn set_last_update(&mut self, t: &Asn1TimeRef) -> Result<(), ErrorStack> {
+        unsafe { cvt(ffi::X509_CRL_set1_lastUpdate(self.0.as_ptr(), t.as_ptr())).map(|_| ()) }
+    }
+
+    /// Set the nextUpdate time
+    pub fn set_next_update(&mut self, t: &Asn1TimeRef) -> Result<(), ErrorStack> {
+        unsafe { cvt(ffi::X509_CRL_set1_nextUpdate(self.0.as_ptr(), t.as_ptr())).map(|_| ()) }
+    }
+
+    /// Adds an X509 extension value to the CRL.
+    ///
+    /// This works just as `append_extension` except it takes ownership of the `X509Extension`.
+    pub fn append_extension(&mut self, extension: X509Extension) -> Result<(), ErrorStack> {
+        self.append_extension2(&extension)
+    }
+
+    /// Adds an X509 extension value to the CRL.
+    pub fn append_extension2(&mut self, extension: &X509ExtensionRef) -> Result<(), ErrorStack> {
+        unsafe {
+            cvt(ffi::X509_CRL_add_ext(
+                self.0.as_ptr(),
+                extension.as_ptr(),
+                -1,
+            ))
+            .map(|_| ())
+        }
+    }
+
+    /// Add a revoked certificate
+    pub fn add_revoked(&mut self, revoked: X509Revoked) -> Result<(), ErrorStack> {
+        unsafe {
+            let r = cvt(ffi::X509_CRL_add0_revoked(
+                self.0.as_ptr(),
+                revoked.as_ptr(),
+            ))
+            .map(|_| ());
+            std::mem::forget(revoked);
+            r
+        }
+    }
+
+    fn sort(&mut self) -> Result<(), ErrorStack> {
+        unsafe { cvt(ffi::X509_CRL_sort(self.0.as_ptr())).map(|_| ()) }
+    }
+
+    /// Signs the CRL with a private key.
+    pub fn sign<T>(&mut self, key: &PKeyRef<T>, hash: MessageDigest) -> Result<(), ErrorStack>
+    where
+        T: HasPrivate,
+    {
+        unsafe {
+            self.sort()?;
+
+            cvt(ffi::X509_CRL_sign(
+                self.0.as_ptr(),
+                key.as_ptr(),
+                hash.as_ptr(),
+            ))
+            .map(|_| ())
+        }
+    }
+
+    /// Consumes the builder, returning the certificate.
+    pub fn build(self) -> X509Crl {
+        self.0
+    }
+
+    pub fn from_ptr(ptr: *mut ffi::X509_crl_st) -> Self {
+        unsafe { Self(X509Crl::from_ptr(ptr)) }
+    }
 }
 
 foreign_type_and_impl_send_sync! {
@@ -1980,6 +2223,83 @@ impl X509VerifyResult {
         X509VerifyResult(ffi::X509_V_ERR_APPLICATION_VERIFICATION);
 }
 
+pub struct GeneralNameBuilder(GeneralNameKind);
+
+impl GeneralNameBuilder {
+    pub fn new(kind: GeneralNameKind) -> Self {
+        Self(kind)
+    }
+
+    fn create(type_: c_int, asn1_type: Asn1Type, value: &[u8]) -> Result<GeneralName, ErrorStack> {
+        unsafe {
+            ffi::init();
+
+            let gn = GeneralName::from_ptr(cvt_p(ffi::GENERAL_NAME_new())?);
+            (*gn.as_ptr()).type_ = type_;
+            let s = cvt_p(ffi::ASN1_STRING_type_new(asn1_type.as_raw()))?;
+            if let Err(e) = cvt(ffi::ASN1_STRING_set(
+                s,
+                value.as_ptr().cast(),
+                value.len() as ffi::ossl_ssize_t,
+            )) {
+                ffi::ASN1_STRING_free(s);
+                return Err(e);
+            }
+
+            (*gn.as_ptr()).d.ptr = s.cast();
+
+            Ok(gn)
+        }
+    }
+
+    fn dns(value: &[u8]) -> Result<GeneralName, ErrorStack> {
+        Self::create(ffi::GEN_DNS, Asn1Type::IA5STRING, value)
+    }
+
+    fn email(value: &[u8]) -> Result<GeneralName, ErrorStack> {
+        Self::create(ffi::GEN_EMAIL, Asn1Type::IA5STRING, value)
+    }
+
+    fn uri(value: &[u8]) -> Result<GeneralName, ErrorStack> {
+        Self::create(ffi::GEN_URI, Asn1Type::IA5STRING, value)
+    }
+
+    fn ip(value: IpAddr) -> Result<GeneralName, ErrorStack> {
+        match value {
+            IpAddr::V4(addr) => {
+                Self::create(ffi::GEN_IPADD, Asn1Type::OCTET_STRING, &addr.octets())
+            }
+            IpAddr::V6(addr) => {
+                Self::create(ffi::GEN_IPADD, Asn1Type::OCTET_STRING, &addr.octets())
+            }
+        }
+    }
+
+    fn rid(oid: Asn1Object) -> Result<GeneralName, ErrorStack> {
+        unsafe {
+            ffi::init();
+
+            let gn = cvt_p(ffi::GENERAL_NAME_new())?;
+            (*gn).type_ = ffi::GEN_RID;
+
+            (*gn).d.registeredID = oid.as_ptr();
+            std::mem::forget(oid);
+
+            Ok(GeneralName::from_ptr(gn))
+        }
+    }
+
+    pub fn build(self) -> Result<GeneralName, ErrorStack> {
+        match self.0 {
+            GeneralNameKind::Dns(s) => Self::dns(s.as_bytes()),
+            GeneralNameKind::Email(s) => Self::email(s.as_bytes()),
+            GeneralNameKind::Uri(s) => Self::uri(s.as_bytes()),
+            GeneralNameKind::Ip(ip) => Self::ip(ip),
+            GeneralNameKind::Rid(s) => Self::rid(Asn1Object::from_str(&s)?),
+        }
+    }
+}
+
 foreign_type_and_impl_send_sync! {
     type CType = ffi::GENERAL_NAME;
     fn drop = ffi::GENERAL_NAME_free;
@@ -2217,6 +2537,64 @@ impl Stackable for GeneralName {
     type StackType = ffi::stack_st_GENERAL_NAME;
 }
 
+pub struct DistPointBuilder(
+    Option<DistPointName>,
+    Option<u32>,
+    Option<Stack<GeneralName>>,
+);
+
+impl DistPointBuilder {
+    pub fn new(
+        name: Option<DistPointName>,
+        reasons: Option<u32>,
+        crl_issuer: Option<Stack<GeneralName>>,
+    ) -> Self {
+        Self(name, reasons, crl_issuer)
+    }
+
+    pub fn build(self) -> Result<DistPoint, ErrorStack> {
+        unsafe {
+            ffi::init();
+
+            let dp = cvt_p(ffi::DIST_POINT_new())?;
+
+            if let Some(name) = self.0 {
+                (*dp).distpoint = name.as_ptr();
+                std::mem::forget(name);
+            }
+
+            if let Some(bits) = self.1 {
+                let b = match cvt_p(ffi::ASN1_BIT_STRING_new()) {
+                    Ok(p) => p,
+                    Err(e) => {
+                        ffi::DIST_POINT_free(dp);
+                        return Err(e);
+                    }
+                };
+
+                for i in 0..32 {
+                    if bits & (1 << i) != 0
+                        && let Err(e) = cvt(ffi::ASN1_BIT_STRING_set_bit(b, i, 1))
+                    {
+                        ffi::ASN1_BIT_STRING_free(b);
+                        ffi::DIST_POINT_free(dp);
+                        return Err(e);
+                    }
+                }
+
+                (*dp).reasons = b;
+            }
+
+            if let Some(stack) = self.2 {
+                (*dp).CRLissuer = stack.as_ptr();
+                std::mem::forget(stack);
+            }
+
+            Ok(DistPoint::from_ptr(dp))
+        }
+    }
+}
+
 foreign_type_and_impl_send_sync! {
     type CType = ffi::DIST_POINT;
     fn drop = ffi::DIST_POINT_free;
@@ -2231,6 +2609,81 @@ impl DistPointRef {
     /// Returns the name of this distribution point if it exists
     pub fn distpoint(&self) -> Option<&DistPointNameRef> {
         unsafe { DistPointNameRef::from_const_ptr_opt((*self.as_ptr()).distpoint) }
+    }
+}
+
+pub enum DistPointNameKind {
+    Full(Stack<GeneralName>),
+    Relative(X509Name),
+}
+
+pub struct DistPointNameBuilder(DistPointNameKind);
+
+impl DistPointNameBuilder {
+    pub fn new(kind: DistPointNameKind) -> Self {
+        Self(kind)
+    }
+
+    pub fn build(self) -> Result<DistPointName, ErrorStack> {
+        unsafe {
+            ffi::init();
+
+            let dpn = cvt_p(ffi::DIST_POINT_NAME_new())?;
+            (*dpn).dpname = std::ptr::null_mut();
+            match self.0 {
+                DistPointNameKind::Full(inner) => {
+                    (*dpn).type_ = 0;
+                    (*dpn).name.fullname = inner.as_ptr();
+                    std::mem::forget(inner);
+                }
+                DistPointNameKind::Relative(inner) => {
+                    (*dpn).type_ = 1;
+
+                    let sk = match cvt_p(ffi::OPENSSL_sk_new_null()) {
+                        Ok(p) => p,
+                        Err(e) => {
+                            ffi::DIST_POINT_NAME_free(dpn);
+                            return Err(e);
+                        }
+                    };
+
+                    // Free helpers for stack items
+                    unsafe extern "C" fn free_x509_name_entry(p: *mut std::ffi::c_void) {
+                        unsafe {
+                            ffi::X509_NAME_ENTRY_free(p as *mut ffi::X509_NAME_ENTRY);
+                        }
+                    }
+
+                    for entry in inner.entries() {
+                        let dup = match cvt_p(ffi::X509_NAME_ENTRY_dup(entry.as_ptr())) {
+                            Ok(p) => p,
+                            Err(e) => {
+                                ffi::DIST_POINT_NAME_free(dpn);
+                                ffi::OPENSSL_sk_pop_free_ex(
+                                    sk,
+                                    Some(call_free_func),
+                                    Some(free_x509_name_entry),
+                                );
+                                return Err(e);
+                            }
+                        };
+
+                        if ffi::OPENSSL_sk_push(sk, dup.cast()) == 0 {
+                            ffi::DIST_POINT_NAME_free(dpn);
+                            ffi::X509_NAME_ENTRY_free(dup);
+                            ffi::OPENSSL_sk_pop_free_ex(
+                                sk,
+                                Some(call_free_func),
+                                Some(free_x509_name_entry),
+                            );
+                            return Err(ErrorStack::get());
+                        }
+                    }
+                    (*dpn).name.relativename = sk as *mut ffi::stack_st_X509_NAME_ENTRY;
+                }
+            }
+            Ok(DistPointName::from_ptr(dpn))
+        }
     }
 }
 
@@ -2258,6 +2711,36 @@ impl DistPointNameRef {
 
 impl Stackable for DistPoint {
     type StackType = ffi::stack_st_DIST_POINT;
+}
+
+pub struct AccessDescriptionBuilder(GeneralName, Nid);
+
+impl AccessDescriptionBuilder {
+    pub fn new(location: GeneralName, method: Nid) -> Self {
+        Self(location, method)
+    }
+
+    pub fn build(self) -> Result<AccessDescription, ErrorStack> {
+        unsafe {
+            ffi::init();
+
+            let ad_ptr = cvt_p(ffi::ACCESS_DESCRIPTION_new())?;
+            let oid = match cvt_p(ffi::OBJ_nid2obj(self.1.as_raw())) {
+                Ok(p) => p,
+                Err(e) => {
+                    ffi::ACCESS_DESCRIPTION_free(ad_ptr);
+                    return Err(e);
+                }
+            };
+
+            (*ad_ptr).method = oid;
+            ffi::GENERAL_NAME_free((*ad_ptr).location);
+            (*ad_ptr).location = self.0.as_ptr();
+            std::mem::forget(self.0);
+
+            Ok(AccessDescription::from_ptr(ad_ptr))
+        }
+    }
 }
 
 foreign_type_and_impl_send_sync! {
