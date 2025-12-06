@@ -17,11 +17,14 @@ use crate::x509::extension::{
 use crate::x509::store::X509Lookup;
 use crate::x509::store::X509StoreBuilder;
 use crate::x509::verify::{X509VerifyFlags, X509VerifyParam};
+
+#[cfg(ossl110)]
+use crate::x509::X509Builder;
 #[cfg(any(ossl102, boringssl, awslc))]
 use crate::x509::X509PurposeId;
 use crate::x509::X509PurposeRef;
-#[cfg(ossl110)]
-use crate::x509::{CrlReason, X509Builder};
+#[cfg(any(ossl102, libressl261))]
+use crate::x509::{CrlReason, X509Revoked};
 use crate::x509::{
     CrlStatus, X509Crl, X509Extension, X509Name, X509Req, X509StoreContext, X509VerifyResult, X509,
 };
@@ -673,11 +676,13 @@ fn test_load_crl() {
     let crl = include_bytes!("../../test/test.crl");
     let crl = X509Crl::from_der(crl).unwrap();
     assert!(crl.verify(&ca.public_key().unwrap()).unwrap());
+    let issuer = crl.issuer_name();
+    assert_eq!(format!("{:08x}", issuer.hash()), "f88ed8fa");
 
     let cert = include_bytes!("../../test/subca.crt");
     let cert = X509::from_pem(cert).unwrap();
 
-    let revoked = match crl.get_by_cert(&cert) {
+    let revoked = match crl.get_by_serial(cert.serial_number()) {
         CrlStatus::Revoked(revoked) => revoked,
         _ => panic!("cert should be revoked"),
     };
@@ -686,6 +691,186 @@ fn test_load_crl() {
         revoked.serial_number().to_bn().unwrap(),
         cert.serial_number().to_bn().unwrap(),
         "revoked and cert serial numbers should match"
+    );
+}
+
+#[test]
+fn test_crl_sign() {
+    let ca = include_bytes!("../../test/crl-ca.crt");
+    let ca = X509::from_pem(ca).unwrap();
+    let pkey = include_bytes!("../../test/rsa.pem");
+    let pkey = PKey::private_key_from_pem(pkey).unwrap();
+
+    let mut crl = X509Crl::new(&ca, None).unwrap();
+    crl.sign(&pkey, MessageDigest::sha256()).unwrap();
+    assert!(crl.verify(&pkey).unwrap());
+}
+
+#[test]
+fn test_crl_revoke() {
+    let ca = include_bytes!("../../test/crl-ca.crt");
+    let ca = X509::from_pem(ca).unwrap();
+
+    // ensure revoking an already revoked cert does not change the revoked count
+    {
+        let crl = include_bytes!("../../test/test.crl");
+        let mut crl = X509Crl::from_der(crl).unwrap();
+        assert!(crl.verify(&ca.public_key().unwrap()).unwrap());
+
+        let already_revoked_cert = include_bytes!("../../test/subca.crt");
+        let already_revoked_cert = X509::from_pem(already_revoked_cert).unwrap();
+
+        let count_before = crl.entry_count();
+        crl.revoke(&already_revoked_cert).unwrap();
+        assert_eq!(
+            count_before,
+            crl.entry_count(),
+            "clr's entry count should not change when trying to revoke an already revoked cert"
+        );
+
+        let revoked = match crl.get_by_serial(already_revoked_cert.serial_number()) {
+            CrlStatus::Revoked(revoked) => revoked,
+            _ => panic!("cert should be revoked"),
+        };
+        assert_eq!(
+            revoked.serial_number().to_bn().unwrap(),
+            already_revoked_cert.serial_number().to_bn().unwrap(),
+            "revoked and cert serial numbers should match"
+        );
+    }
+
+    // ensure revoke does correctly add a new revoked cert to the crl
+    {
+        let mut crl = X509Crl::new(&ca, None).unwrap();
+        let cert = include_bytes!("../../test/subca.crt");
+        let cert = X509::from_pem(cert).unwrap();
+
+        let count_before = crl.entry_count();
+        crl.revoke(&cert).unwrap();
+        assert_eq!(
+            count_before + 1,
+            crl.entry_count(),
+            "clr's entry count should have incremented by one after revoking a cert"
+        );
+
+        let revoked = match crl.get_by_serial(cert.serial_number()) {
+            CrlStatus::Revoked(revoked) => revoked,
+            _ => panic!("cert should be revoked"),
+        };
+        assert_eq!(
+            revoked.serial_number().to_bn().unwrap(),
+            cert.serial_number().to_bn().unwrap(),
+            "revoked and cert serial numbers should match"
+        );
+    }
+}
+
+#[cfg(any(ossl102, libressl261))]
+#[test]
+fn test_verify_crl() {
+    let ca = include_bytes!("../../test/crl-ca.crt");
+    let ca = X509::from_pem(ca).unwrap();
+
+    let crl = include_bytes!("../../test/test.crl");
+    let crl = X509Crl::from_der(crl).unwrap();
+    assert!(crl.verify(&ca.public_key().unwrap()).unwrap());
+
+    let cert = include_bytes!("../../test/subca.crt");
+    let cert = X509::from_pem(cert).unwrap();
+
+    let revoked = match crl.get_by_serial(cert.serial_number()) {
+        CrlStatus::Revoked(revoked) => revoked,
+        _ => panic!("cert should be revoked"),
+    };
+
+    assert_eq!(
+        revoked.serial_number().to_bn().unwrap(),
+        cert.serial_number().to_bn().unwrap(),
+        "revoked and cert serial numbers should match"
+    );
+
+    let chain = Stack::new().unwrap();
+    let mut store_bldr = X509StoreBuilder::new().unwrap();
+    store_bldr.add_cert(ca).unwrap();
+    store_bldr.add_crl(&crl).unwrap();
+    store_bldr.set_flags(X509VerifyFlags::CRL_CHECK).unwrap();
+    let store = store_bldr.build();
+    let mut context = X509StoreContext::new().unwrap();
+    assert_eq!(
+        context
+            .init(&store, &cert, &chain, |c| {
+                c.verify_cert()?;
+                Ok(c.error())
+            })
+            .unwrap()
+            .error_string(),
+        "CRL has expired"
+    )
+}
+
+#[test]
+#[cfg(any(ossl102, libressl261))]
+fn test_crl_builder() {
+    let ca = include_bytes!("../../test/root-ca.pem");
+    let ca = X509::from_pem(ca).unwrap();
+    let pkey = include_bytes!("../../test/root-ca.key");
+    let pkey = PKey::<Private>::private_key_from_pem(pkey).unwrap();
+    let cert = include_bytes!("../../test/intermediate-ca.pem");
+    let cert = X509::from_pem(cert).unwrap();
+
+    let mut crl_bldr = X509Crl::builder().unwrap();
+    crl_bldr.set_issuer_name(ca.subject_name()).unwrap();
+    let authority_key_identifier = AuthorityKeyIdentifier::new()
+        .keyid(true)
+        .issuer(true)
+        .build(&crl_bldr.x509v3_context(&cert, None))
+        .unwrap();
+    crl_bldr
+        .append_extension(&authority_key_identifier)
+        .unwrap();
+
+    // revoke certificate with unspecified reason something
+    let mut revoked_bldr = X509Revoked::builder().unwrap();
+    revoked_bldr
+        .set_crl_reason(&CrlReason::KEY_COMPROMISE)
+        .unwrap();
+    revoked_bldr
+        .set_revocation_date(&Asn1Time::days_from_now(0).unwrap())
+        .unwrap();
+    revoked_bldr
+        .set_serial_number(cert.serial_number())
+        .unwrap();
+    let revoked = revoked_bldr.build();
+
+    crl_bldr.add_revoked(revoked).unwrap();
+
+    crl_bldr
+        .set_last_update(&Asn1Time::days_from_now(0).unwrap())
+        .unwrap();
+    crl_bldr
+        .set_next_update(&Asn1Time::days_from_now(1).unwrap())
+        .unwrap();
+
+    crl_bldr.sign(&pkey, MessageDigest::sha256()).unwrap();
+    let crl = crl_bldr.build();
+    assert!(crl.verify(&ca.public_key().unwrap()).unwrap());
+
+    let chain = Stack::new().unwrap();
+    let mut store_bldr = X509StoreBuilder::new().unwrap();
+    store_bldr.add_cert(ca).unwrap();
+    store_bldr.add_crl(&crl).unwrap();
+    store_bldr.set_flags(X509VerifyFlags::CRL_CHECK).unwrap();
+    let store = store_bldr.build();
+    let mut context = X509StoreContext::new().unwrap();
+    assert_eq!(
+        context
+            .init(&store, &cert, &chain, |c| {
+                c.verify_cert()?;
+                Ok(c.error())
+            })
+            .unwrap()
+            .error_string(),
+        "certificate revoked"
     );
 }
 

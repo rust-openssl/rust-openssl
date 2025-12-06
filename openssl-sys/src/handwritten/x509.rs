@@ -290,6 +290,16 @@ extern "C" {
 
     pub fn X509_NAME_new() -> *mut X509_NAME;
     pub fn X509_NAME_cmp(x: *const X509_NAME, y: *const X509_NAME) -> c_int;
+    #[cfg(ossl300)]
+    pub fn X509_NAME_hash_ex(
+        x: *const X509_NAME,
+        ctx: *mut OSSL_LIB_CTX,
+        propq: *const c_char,
+        ok: *mut c_int,
+    ) -> c_ulong;
+
+    #[cfg(not(ossl300))]
+    pub fn X509_NAME_hash(x: *mut X509_NAME) -> c_ulong;
     pub fn X509_NAME_free(x: *mut X509_NAME);
 
     pub fn X509_new() -> *mut X509;
@@ -456,6 +466,9 @@ extern "C" {
 
     #[cfg(ossl110)]
     pub fn X509_get0_extensions(req: *const X509) -> *const stack_st_X509_EXTENSION;
+
+    #[cfg(any(ossl110, libressl281))]
+    pub fn X509_CRL_get_version(crl: *const X509_CRL) -> c_long;
 
     pub fn X509_CRL_set_version(crl: *mut X509_CRL, version: c_long) -> c_int;
 }
