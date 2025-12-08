@@ -244,6 +244,21 @@ impl Signer<'_> {
         }
     }
 
+    /// Sets the SM2 ID.
+    ///
+    /// This is only useful for SM2 keys.
+    #[corresponds(EVP_PKEY_CTX_set1_id)]
+    pub fn set1_id(&mut self, id :&[u8]) -> Result<(), ErrorStack> {
+        unsafe {
+            cvt(ffi::EVP_PKEY_CTX_set1_id(
+                self.pctx,
+                id.as_ptr() as *const _,
+                id.len() as c_int,
+            ))
+            .map(|_| ())
+        }
+    }
+
     /// Feeds more data into the `Signer`.
     ///
     /// Please note that PureEdDSA (Ed25519 and Ed448 keys) do not support streaming.
@@ -504,6 +519,21 @@ impl<'a> Verifier<'a> {
             cvt(ffi::EVP_PKEY_CTX_set_rsa_mgf1_md(
                 self.pctx,
                 md.as_ptr() as *mut _,
+            ))
+            .map(|_| ())
+        }
+    }
+
+    /// Sets the SM2 ID.
+    ///
+    /// This is only useful for SM2 keys.
+    #[corresponds(EVP_PKEY_CTX_set1_id)]
+    pub fn set1_id(&mut self, id :&[u8]) -> Result<(), ErrorStack> {
+        unsafe {
+            cvt(ffi::EVP_PKEY_CTX_set1_id(
+                self.pctx,
+                id.as_ptr() as *const _,
+                id.len() as c_int,
             ))
             .map(|_| ())
         }
