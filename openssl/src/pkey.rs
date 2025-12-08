@@ -47,8 +47,12 @@ use crate::dh::Dh;
 use crate::dsa::Dsa;
 use crate::ec::EcKey;
 use crate::error::ErrorStack;
+#[cfg(ossl300)]
+use crate::ossl_param::OsslParamArray;
 #[cfg(any(ossl110, boringssl, libressl370, awslc))]
 use crate::pkey_ctx::PkeyCtx;
+#[cfg(ossl300)]
+use crate::pkey_ctx::Selection;
 use crate::rsa::Rsa;
 use crate::symm::Cipher;
 use crate::util::{invoke_passwd_cb, CallbackState};
@@ -206,6 +210,18 @@ impl<T> PKeyRef<T> {
     #[corresponds(EVP_PKEY_size)]
     pub fn size(&self) -> usize {
         unsafe { ffi::EVP_PKEY_size(self.as_ptr()) as usize }
+    }
+
+    /// Converts the `PKey` to an `OsslParamArray`.
+    ///
+    /// Use `selection` to control what parameters are included.
+    #[corresponds(EVP_PKEY_todata)]
+    #[cfg(ossl300)]
+    #[allow(dead_code)] // TODO: remove when used by non-deprecated key wrappers
+    pub(crate) fn to_data(&self, selection: Selection) -> Result<OsslParamArray, ErrorStack> {
+        let mut params = ptr::null_mut();
+        cvt(unsafe { ffi::EVP_PKEY_todata(self.as_ptr(), selection.into(), &mut params) })?;
+        Ok(unsafe { OsslParamArray::from_ptr(params) })
     }
 }
 
@@ -914,6 +930,25 @@ impl<T> TryFrom<PKey<T>> for Dh<T> {
     }
 }
 
+cfg_if! {
+    if #[cfg(ossl300)] {
+        cstr_const!(pub(crate) OSSL_PKEY_PARAM_GROUP_NAME, b"group\0");
+
+        cstr_const!(pub(crate) OSSL_PKEY_PARAM_PUB_KEY, b"pub\0");
+        cstr_const!(pub(crate) OSSL_PKEY_PARAM_PRIV_KEY, b"priv\0");
+
+        cstr_const!(pub(crate) OSSL_PKEY_PARAM_FFC_P, b"p\0");
+        cstr_const!(pub(crate) OSSL_PKEY_PARAM_FFC_G, b"g\0");
+        cstr_const!(pub(crate) OSSL_PKEY_PARAM_FFC_Q, b"q\0");
+
+        cstr_const!(pub(crate) OSSL_PKEY_PARAM_RSA_N, b"n\0");
+        cstr_const!(pub(crate) OSSL_PKEY_PARAM_RSA_E, b"e\0");
+        cstr_const!(pub(crate) OSSL_PKEY_PARAM_RSA_D, b"d\0");
+
+        cstr_const!(pub(crate) OSSL_SIGNATURE_PARAM_NONCE_TYPE, b"nonce-type\0");
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::convert::TryInto;
@@ -922,8 +957,12 @@ mod tests {
     use crate::dh::Dh;
     use crate::dsa::Dsa;
     use crate::ec::EcKey;
+    #[cfg(ossl300)]
+    use crate::encrypt::{Decrypter, Encrypter};
     use crate::error::Error;
     use crate::nid::Nid;
+    #[cfg(ossl300)]
+    use crate::pkey_ctx::pkey_from_params;
     use crate::rsa::Rsa;
     use crate::symm::Cipher;
 
@@ -1218,5 +1257,28 @@ mod tests {
 
         assert!(!pkey1.public_eq(&pkey2));
         assert!(Error::get().is_none());
+    }
+
+    #[cfg(ossl300)]
+    #[test]
+    fn test_todata() {
+        let data: &[u8] = b"hello, world";
+        let pkey1 = PKey::from_rsa(Rsa::generate(2048).unwrap()).unwrap();
+
+        // Encrypt some data using the generated pkey
+        let encrypter = Encrypter::new(&pkey1).unwrap();
+        let mut encrypted = vec![0u8; encrypter.encrypt_len(data).unwrap()];
+        encrypter.encrypt(data, &mut encrypted).unwrap();
+
+        // Convert the pkey to OSSL_PARAMs and back into a PKey
+        let params = pkey1.to_data(Selection::Keypair).unwrap();
+        let pkey2: PKey<Private> = pkey_from_params(Id::RSA, &params).unwrap();
+
+        // Decrypt the data using the new pkey
+        let decrypter = Decrypter::new(&pkey2).unwrap();
+        let mut decrypted = vec![0u8; decrypter.decrypt_len(&encrypted).unwrap()];
+        let decrypted_len = decrypter.decrypt(&encrypted, &mut decrypted).unwrap();
+        decrypted.truncate(decrypted_len);
+        assert_eq!(data, &decrypted);
     }
 }
