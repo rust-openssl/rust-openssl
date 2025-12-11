@@ -2,15 +2,18 @@ use std::cmp::Ordering;
 
 use crate::asn1::{Asn1Object, Asn1OctetString, Asn1Time};
 use crate::bn::{BigNum, MsbOption};
+use crate::error::ErrorStack;
 use crate::hash::MessageDigest;
 use crate::nid::Nid;
-use crate::pkey::{PKey, Private};
+use crate::pkey::{PKey, PKeyRef, Private};
 use crate::rsa::Rsa;
 #[cfg(not(any(boringssl, awslc)))]
 use crate::ssl::SslFiletype;
 use crate::stack::Stack;
 use crate::x509::extension::{
-    AuthorityKeyIdentifier, BasicConstraints, ExtendedKeyUsage, KeyUsage, SubjectAlternativeName,
+    AuthorityInformationAccess, AuthorityKeyIdentifier, BasicConstraints, CertificateIssuer,
+    CrlNumber, DeltaCrlIndicator, ExtendedKeyUsage, FreshestCrl, InvalidityDate,
+    IssuerAlternativeName, IssuingDistributionPoint, KeyUsage, ReasonCode, SubjectAlternativeName,
     SubjectKeyIdentifier,
 };
 #[cfg(not(any(boringssl, awslc)))]
@@ -19,7 +22,11 @@ use crate::x509::store::X509StoreBuilder;
 use crate::x509::verify::{X509VerifyFlags, X509VerifyParam};
 #[cfg(any(ossl102, boringssl, awslc))]
 use crate::x509::X509PurposeId;
-use crate::x509::X509PurposeRef;
+use crate::x509::{
+    AccessDescription, AccessDescriptionBuilder, DistPoint, DistPointBuilder, DistPointName,
+    DistPointNameBuilder, DistPointNameKind, GeneralName, X509CrlBuilder, X509PurposeRef, X509Ref,
+    X509RevokedBuilder,
+};
 #[cfg(ossl110)]
 use crate::x509::{CrlReason, X509Builder};
 use crate::x509::{
@@ -30,11 +37,42 @@ use foreign_types::ForeignType;
 use hex::{self, FromHex};
 use libc::time_t;
 
-use super::{AuthorityInformationAccess, CertificateIssuer, ReasonCode};
-
 fn pkey() -> PKey<Private> {
     let rsa = Rsa::generate(2048).unwrap();
     PKey::from_rsa(rsa).unwrap()
+}
+
+fn general_names() -> Result<Stack<GeneralName>, ErrorStack> {
+    let mut s = Stack::new()?;
+    let gn = GeneralName::new_dnsname("test.com")?;
+    s.push(gn).unwrap();
+
+    Ok(s)
+}
+
+fn dist_point_name() -> Result<DistPointName, ErrorStack> {
+    let mut s = Stack::new()?;
+    let gn = GeneralName::new_dnsname("test.com")?;
+    s.push(gn)?;
+    DistPointNameBuilder::new(DistPointNameKind::Full(s)).build()
+}
+
+fn dist_point() -> Result<DistPoint, ErrorStack> {
+    let dpn = dist_point_name()?;
+    DistPointBuilder::new(Some(dpn), None, None).build()
+}
+
+fn access_descriptions() -> Result<Stack<AccessDescription>, ErrorStack> {
+    let mut s = Stack::new()?;
+    let location = GeneralName::new_uri("http://test.com/ca.crt")?;
+    let ad = AccessDescriptionBuilder::new(location, Nid::AD_CA_ISSUERS).build()?;
+    s.push(ad)?;
+
+    let location = GeneralName::new_uri("http://ocsp.test.com")?;
+    let ad = AccessDescriptionBuilder::new(location, Nid::AD_OCSP).build()?;
+    s.push(ad)?;
+
+    Ok(s)
 }
 
 #[test]
@@ -379,6 +417,10 @@ fn x509_extension_new_from_der() {
 #[test]
 fn x509_extension_to_der() {
     let builder = X509::builder().unwrap();
+    let mut name = X509Name::builder().unwrap();
+    name.append_entry_by_nid(Nid::COMMONNAME, "foobar.com")
+        .unwrap();
+    let name = name.build();
 
     for (ext, expected) in [
         (
@@ -409,6 +451,66 @@ fn x509_extension_to_der() {
                 .unwrap(),
             b"0\x22\x06\x03U\x1d%\x04\x1b0\x19\x06\x08+\x06\x01\x05\x05\x07\x03\x01\x06\x03\x887\x01\x06\x08+\x06\x01\x05\x05\x07\x03\x02",
         ),
+        (
+            CrlNumber::new(42)
+                .build()
+                .unwrap(),
+            b"\x30\x0a\x06\x03\x55\x1d\x14\x04\x03\x02\x01\x2a",
+        ),
+        (
+            IssuerAlternativeName::new(general_names().unwrap())
+                .build()
+                .unwrap(),
+            b"\x30\x13\x06\x03\x55\x1d\x12\x04\x0c\x30\x0a\x82\x08\x74\x65\x73\x74\x2e\x63\x6f\x6d",
+        ),
+        (
+            AuthorityInformationAccess::new(access_descriptions().unwrap())
+                .build()
+                .unwrap(),
+            b"\x30\x54\x06\x08\x2b\x06\x01\x05\x05\x07\x01\x01\x04\x48\x30\x46\x30\x22\x06\x08\x2b\x06\x01\x05\x05\x07\x30\x02\x86\x16\x68\x74\x74\x70\x3a\x2f\x2f\x74\x65\x73\x74\x2e\x63\x6f\x6d\x2f\x63\x61\x2e\x63\x72\x74\x30\x20\x06\x08\x2b\x06\x01\x05\x05\x07\x30\x01\x86\x14\x68\x74\x74\x70\x3a\x2f\x2f\x6f\x63\x73\x70\x2e\x74\x65\x73\x74\x2e\x63\x6f\x6d"
+        ),
+        (
+            DeltaCrlIndicator::new(42)
+                .build()
+                .unwrap(),
+                b"\x30\x0d\x06\x03\x55\x1d\x1b\x01\x01\xff\x04\x03\x02\x01\x2a",
+        ),
+        (
+            IssuingDistributionPoint::new()
+                .distribution_point(dist_point_name().unwrap())
+                .only_contains_user_certs()
+                .indirect_crl()
+                .build()
+                .unwrap(),
+                b"\x30\x20\x06\x03\x55\x1d\x1c\x01\x01\xff\x04\x16\x30\x14\xa0\x0c\xa0\x0a\x82\x08\x74\x65\x73\x74\x2e\x63\x6f\x6d\x81\x01\x01\x84\x01\x01",
+        ),
+        (
+            FreshestCrl::new()
+                .unwrap()
+                .add_dist_point(dist_point().unwrap())
+                .unwrap()
+                .build()
+                .unwrap(),
+                b"\x30\x19\x06\x03\x55\x1d\x2e\x04\x12\x30\x10\x30\x0e\xa0\x0c\xa0\x0a\x82\x08\x74\x65\x73\x74\x2e\x63\x6f\x6d",
+        ),
+        (
+            InvalidityDate::new(Asn1Time::from_unix(0).unwrap().as_ref())
+            .build()
+            .unwrap(),
+            b"\x30\x18\x06\x03\x55\x1d\x18\x04\x11\x18\x0f\x31\x39\x37\x30\x30\x31\x30\x31\x30\x30\x30\x30\x30\x30\x5a",
+        ),
+        (
+            CertificateIssuer::new(&name)
+            .build()
+            .unwrap(),
+            b"\x30\x22\x06\x03\x55\x1d\x1d\x04\x1b\x30\x19\xa4\x17\x30\x15\x31\x13\x30\x11\x06\x03\x55\x04\x03\x0c\x0a\x66\x6f\x6f\x62\x61\x72\x2e\x63\x6f\x6d",
+        ),
+        (
+            ReasonCode::new(CrlReason::KEY_COMPROMISE)
+            .build()
+            .unwrap(),
+            b"\x30\x0a\x06\x03\x55\x1d\x15\x04\x03\x0a\x01\x01",
+        )
     ] {
         assert_eq!(&ext.to_der().unwrap(), expected);
     }
@@ -716,7 +818,7 @@ fn test_crl_entry_extensions() {
     let entry = &revoked_certs[0];
 
     let (critical, issuer) = entry
-        .extension::<CertificateIssuer>()
+        .extension::<CertificateIssuer<'_>>()
         .unwrap()
         .expect("Certificate issuer extension should be present");
     assert!(critical, "Certificate issuer extension is critical");
@@ -1250,4 +1352,331 @@ fn test_store_all_certificates() {
     };
 
     assert_eq!(store.all_certificates().len(), 1);
+}
+
+#[test]
+fn test_dist_point_name_builder() {
+    let mut name_builder = X509Name::builder().unwrap();
+    name_builder
+        .append_entry_by_nid(Nid::COMMONNAME, "foobar.com")
+        .unwrap();
+    let rl = name_builder.build();
+    let _ = DistPointNameBuilder::new(DistPointNameKind::Relative(rl))
+        .build()
+        .unwrap();
+
+    let mut full = Stack::new().unwrap();
+    full.push(GeneralName::new_uri("foo.foobar.com").unwrap())
+        .unwrap();
+    full.push(GeneralName::new_uri("foobar.com").unwrap())
+        .unwrap();
+    let dpn = DistPointNameBuilder::new(DistPointNameKind::Full(full))
+        .build()
+        .unwrap();
+
+    let mut iter = dpn.fullname().unwrap().into_iter();
+
+    let first = iter.next().unwrap();
+    let second = iter.next().unwrap();
+
+    assert_eq!(first.uri(), Some("foo.foobar.com"));
+    assert_eq!(second.uri(), Some("foobar.com"));
+
+    assert!(iter.next().is_none());
+}
+
+#[test]
+fn test_dist_point_builder() {
+    let mut name_builder = X509Name::builder().unwrap();
+    name_builder
+        .append_entry_by_nid(Nid::COMMONNAME, "foobar.com")
+        .unwrap();
+    let rl = name_builder.build();
+    let dpn = DistPointNameBuilder::new(DistPointNameKind::Relative(rl))
+        .build()
+        .unwrap();
+    let _ = DistPointBuilder::new(Some(dpn), None, None)
+        .build()
+        .unwrap();
+
+    let mut full = Stack::new().unwrap();
+    full.push(GeneralName::new_uri("foo.foobar.com").unwrap())
+        .unwrap();
+    full.push(GeneralName::new_uri("foobar.com").unwrap())
+        .unwrap();
+    let dpn = DistPointNameBuilder::new(DistPointNameKind::Full(full))
+        .build()
+        .unwrap();
+    let dp = DistPointBuilder::new(Some(dpn), None, None)
+        .build()
+        .unwrap();
+    assert_eq!(dp.distpoint().unwrap().fullname().unwrap().len(), 2);
+
+    let _ = DistPointBuilder::new(None, Some(101), None)
+        .build()
+        .unwrap();
+    let _ = DistPointBuilder::new(None, None, Some(general_names().unwrap()))
+        .build()
+        .unwrap();
+}
+
+#[test]
+fn test_access_description_builder() {
+    let uri = "http://test.com/ca.crt";
+    let location = GeneralName::new_uri(uri).unwrap();
+    let ad = AccessDescriptionBuilder::new(location, Nid::AD_CA_ISSUERS)
+        .build()
+        .unwrap();
+    assert_eq!(ad.location().uri(), Some(uri));
+    assert_eq!(ad.method().nid(), Nid::AD_CA_ISSUERS);
+
+    let uri = "http://ocsp.test.com";
+    let location = GeneralName::new_uri(uri).unwrap();
+    let ad = AccessDescriptionBuilder::new(location, Nid::AD_OCSP)
+        .build()
+        .unwrap();
+    assert_eq!(ad.location().uri(), Some(uri));
+    assert_eq!(ad.method().nid(), Nid::AD_OCSP);
+}
+
+#[test]
+fn test_x509_revoked_builder() {
+    let mut builder = X509RevokedBuilder::new().unwrap();
+    let bn = BigNum::from_u32(1024).unwrap();
+    let d = Asn1Time::from_unix(0).unwrap();
+
+    builder
+        .set_serial_number(&bn.to_asn1_integer().unwrap())
+        .unwrap();
+    builder.set_revocation_date(&d).unwrap();
+
+    let exts = {
+        let rc = ReasonCode::new(CrlReason::PRIVILEGE_WITHDRAWN)
+            .critical()
+            .build()
+            .unwrap();
+
+        let mut issuer = X509Name::builder().unwrap();
+        issuer
+            .append_entry_by_nid(Nid::COMMONNAME, "foobar.com")
+            .unwrap();
+        let issuer = issuer.build();
+        let ci = CertificateIssuer::new(&issuer).build().unwrap();
+
+        let id = InvalidityDate::new(&d).build().unwrap();
+
+        vec![rc, ci, id]
+    };
+
+    for ext in exts {
+        builder.add_extension(ext).unwrap();
+    }
+
+    let revoked = builder.build();
+
+    assert_eq!(revoked.serial_number().to_bn().unwrap(), bn);
+    assert_eq!(
+        revoked.revocation_date().compare(&d).unwrap(),
+        Ordering::Equal
+    )
+}
+
+fn build_ca() -> Result<(PKey<Private>, X509), ErrorStack> {
+    let rsa = Rsa::generate(2048)?;
+    let pkey = PKey::from_rsa(rsa)?;
+
+    let mut name = X509Name::builder()?;
+    name.append_entry_by_nid(Nid::COMMONNAME, "foorbar.com")?;
+    let name = name.build();
+
+    // Build certificate
+    let mut builder = X509::builder()?;
+    builder.set_version(2)?;
+    builder.set_subject_name(&name)?;
+    builder.set_issuer_name(&name)?;
+    builder.set_pubkey(&pkey)?;
+    builder.set_not_before(&*Asn1Time::days_from_now(0)?)?;
+    builder.set_not_after(&*Asn1Time::days_from_now(365)?)?;
+
+    let exts = {
+        let ctx = builder.x509v3_context(None, None);
+        let san = SubjectAlternativeName::new().dns("test.com").build(&ctx)?;
+        vec![san]
+    };
+
+    for ext in exts {
+        builder.append_extension(ext)?;
+    }
+
+    builder.sign(&pkey, MessageDigest::sha256())?;
+    let ca_cert = builder.build();
+    Ok((pkey, ca_cert))
+}
+
+fn build_crl(
+    key: &PKeyRef<Private>,
+    cert: &X509Ref,
+    extensions: Vec<X509Extension>,
+) -> Result<X509Crl, ErrorStack> {
+    let mut builder = X509RevokedBuilder::new()?;
+    let bn = BigNum::from_u32(1024)?;
+    let d = Asn1Time::from_unix(0)?;
+
+    builder.set_serial_number(&*bn.to_asn1_integer()?)?;
+    builder.set_revocation_date(&d)?;
+    let revoked = builder.build();
+    let revokeds = vec![revoked];
+
+    let mut builder = X509CrlBuilder::new()?;
+
+    builder.set_issuer_name(cert.issuer_name())?;
+    builder.set_version(1)?;
+    builder.set_last_update(&*Asn1Time::days_from_now(0)?)?;
+    builder.set_next_update(&*Asn1Time::days_from_now(30)?)?;
+
+    for ext in extensions {
+        builder.append_extension(ext)?;
+    }
+    for revoked in revokeds {
+        builder.add_revoked(revoked)?;
+    }
+
+    builder.sign(key, MessageDigest::sha256())?;
+
+    Ok(builder.build())
+}
+
+#[test]
+fn test_x509_crl_builder() {
+    let (pkey, ca_cert) = build_ca().unwrap();
+
+    let dummy = X509Builder::new().unwrap();
+    let ctx = dummy.x509v3_context(Some(ca_cert.as_ref()), None);
+    let aki = AuthorityKeyIdentifier::new()
+        .critical()
+        .issuer(true)
+        .build(&ctx)
+        .unwrap();
+    let n = CrlNumber::new(42).build().unwrap();
+    let ian = IssuerAlternativeName::new(ca_cert.subject_alt_names().unwrap())
+        .build()
+        .unwrap();
+    let aia = AuthorityInformationAccess::new(access_descriptions().unwrap())
+        .build()
+        .unwrap();
+
+    let mut full = Stack::new().unwrap();
+    full.push(GeneralName::new_uri("foo.foobar.com").unwrap())
+        .unwrap();
+    full.push(GeneralName::new_uri("foobar.com").unwrap())
+        .unwrap();
+    let dp = DistPointNameBuilder::new(DistPointNameKind::Full(full))
+        .build()
+        .unwrap();
+
+    let idp = IssuingDistributionPoint::new()
+        .distribution_point(dp)
+        .only_contains_attribute_certs()
+        .only_contains_ca_certs()
+        .only_contains_user_certs()
+        .only_some_reasons(vec![CrlReason::CA_COMPROMISE])
+        .indirect_crl()
+        .build()
+        .unwrap();
+
+    let mut full = Stack::new().unwrap();
+    full.push(GeneralName::new_uri("foo.foobar.com").unwrap())
+        .unwrap();
+    full.push(GeneralName::new_uri("foobar.com").unwrap())
+        .unwrap();
+    let dp = DistPointNameBuilder::new(DistPointNameKind::Full(full))
+        .build()
+        .unwrap();
+    let dp = DistPointBuilder::new(Some(dp), None, None).build().unwrap();
+
+    let fc = FreshestCrl::new()
+        .unwrap()
+        .add_dist_point(dp)
+        .unwrap()
+        .build()
+        .unwrap();
+
+    let exts = vec![aki, n, ian, aia, idp, fc];
+    let crl = build_crl(&pkey, &ca_cert, exts).unwrap();
+    assert_eq!(crl.get_revoked().unwrap().len(), 1);
+    assert!(crl.verify(&pkey).unwrap());
+}
+
+#[test]
+fn test_x509_crl_delta() {
+    let (pkey, ca_cert) = build_ca().unwrap();
+
+    let dci = DeltaCrlIndicator::new(42).build().unwrap();
+
+    let exts = vec![dci];
+    let crl = build_crl(&pkey, &ca_cert, exts).unwrap();
+    assert!(crl.verify(&pkey).unwrap());
+}
+
+#[test]
+fn test_crl_extensions() {
+    let crl = include_bytes!("../../test/crl_extensions.crl");
+    let crl = X509Crl::from_pem(crl).unwrap();
+    // AuhtorityKeyIdentifier is missing
+    let (critical, ian) = crl
+        .extension::<IssuerAlternativeName>()
+        .unwrap()
+        .expect("Issuer Alternative Name extension should be present");
+    assert!(
+        !critical,
+        "Issuer Alternative Name extension is not critical"
+    );
+    assert_eq!(
+        ian.len(),
+        1,
+        "Issuer Alternative Name should have one entry"
+    );
+    assert_eq!(ian[0].dnsname(), Some("ca.example.com"));
+
+    let (critical, n) = crl
+        .extension::<CrlNumber>()
+        .unwrap()
+        .expect("Crl Number extension should be present");
+    assert!(!critical, "Crl Number extension is not critical");
+    assert_eq!(n.to_bn().unwrap().to_dec_str().unwrap().to_string(), "1");
+
+    let (critical, access_info) = crl
+        .extension::<AuthorityInformationAccess>()
+        .unwrap()
+        .expect("Authority Information Access extension should be present");
+    assert!(
+        !critical,
+        "Authority Information Access extension is not critical"
+    );
+    assert_eq!(
+        access_info.len(),
+        2,
+        "Authority Information Access should have two entries"
+    );
+    assert_eq!(access_info[0].method().nid(), Nid::AD_CA_ISSUERS);
+    assert_eq!(
+        access_info[0].location().uri(),
+        Some("http://example.com/ca.pem")
+    );
+    assert_eq!(access_info[1].method().nid(), Nid::AD_OCSP);
+    assert_eq!(
+        access_info[1].location().uri(),
+        Some("http://ocsp.example.com")
+    );
+
+    let (critical, dps) = crl
+        .extension::<FreshestCrl>()
+        .unwrap()
+        .expect("Freshest Crl extension should be present");
+    assert!(!critical, "Freshest Crl extension is not critical");
+    assert_eq!(dps.len(), 1, "Freshest Crl should have one entry");
+    assert_eq!(
+        dps[0].distpoint().unwrap().fullname().unwrap()[0].uri(),
+        Some("http://example.com/delta.crl")
+    )
 }

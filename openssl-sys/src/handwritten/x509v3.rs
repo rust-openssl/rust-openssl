@@ -22,6 +22,7 @@ pub struct ACCESS_DESCRIPTION {
 stack!(stack_st_ACCESS_DESCRIPTION);
 
 extern "C" {
+    pub fn ACCESS_DESCRIPTION_new() -> *mut ACCESS_DESCRIPTION;
     pub fn ACCESS_DESCRIPTION_free(ad: *mut ACCESS_DESCRIPTION);
 }
 
@@ -142,9 +143,23 @@ pub struct DIST_POINT {
 }
 stack!(stack_st_DIST_POINT);
 
+#[repr(C)]
+pub struct ISSUING_DIST_POINT {
+    pub distpoint: *mut DIST_POINT_NAME,
+    pub onlyuser: ASN1_BOOLEAN,
+    pub onlyCA: ASN1_BOOLEAN,
+    pub onlysomereasons: *mut ASN1_BIT_STRING,
+    pub indirectCRL: ASN1_BOOLEAN,
+    pub onlyattr: ASN1_BOOLEAN,
+}
+
 extern "C" {
+    pub fn DIST_POINT_new() -> *mut DIST_POINT;
+    pub fn DIST_POINT_NAME_new() -> *mut DIST_POINT_NAME;
     pub fn DIST_POINT_free(dist_point: *mut DIST_POINT);
     pub fn DIST_POINT_NAME_free(dist_point: *mut DIST_POINT_NAME);
+    pub fn ISSUING_DIST_POINT_new() -> *mut ISSUING_DIST_POINT;
+    pub fn ISSUING_DIST_POINT_free(issuing_dist_point: *mut ISSUING_DIST_POINT);
 }
 
 #[cfg(ossl102)]

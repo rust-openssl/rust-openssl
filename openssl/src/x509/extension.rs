@@ -18,11 +18,15 @@
 //! ```
 use std::fmt::Write;
 
-use crate::asn1::Asn1Object;
+use crate::asn1::{Asn1Object, Asn1TimeRef};
 use crate::error::ErrorStack;
 use crate::nid::Nid;
-use crate::x509::{GeneralName, Stack, X509Extension, X509Name, X509v3Context};
-use foreign_types::ForeignType;
+use crate::x509::{
+    AccessDescription, CrlReason, DistPoint, DistPointName, GeneralName, Stack, X509Extension,
+    X509Name, X509NameRef, X509v3Context,
+};
+use crate::{cvt, cvt_p};
+use foreign_types::{ForeignType, ForeignTypeRef};
 
 /// An extension which indicates whether a certificate is a CA certificate.
 pub struct BasicConstraints {
@@ -534,23 +538,422 @@ impl SubjectAlternativeName {
         let mut stack = Stack::new()?;
         for item in &self.items {
             let gn = match item {
-                RustGeneralName::Dns(s) => GeneralName::new_dns(s.as_bytes())?,
-                RustGeneralName::Email(s) => GeneralName::new_email(s.as_bytes())?,
-                RustGeneralName::Uri(s) => GeneralName::new_uri(s.as_bytes())?,
+                RustGeneralName::Dns(s) => GeneralName::new_dnsname(s)?,
+                RustGeneralName::Email(s) => GeneralName::new_email(s)?,
+                RustGeneralName::Uri(s) => GeneralName::new_uri(s)?,
                 RustGeneralName::Ip(s) => {
-                    GeneralName::new_ip(s.parse().map_err(|_| ErrorStack::get())?)?
+                    GeneralName::new_ipaddress(s.parse().map_err(|_| ErrorStack::get())?)?
                 }
                 RustGeneralName::Rid(s) => GeneralName::new_rid(Asn1Object::from_str(s)?)?,
                 RustGeneralName::OtherName(oid, content) => {
                     GeneralName::new_other_name(oid.clone(), content)?
                 }
-                RustGeneralName::DirName(name) => GeneralName::new_dir_name(name.as_ref())?,
+                RustGeneralName::DirName(name) => GeneralName::new_directory_name(name.as_ref())?,
             };
             stack.push(gn)?;
         }
 
         unsafe {
             X509Extension::new_internal(Nid::SUBJECT_ALT_NAME, self.critical, stack.as_ptr().cast())
+        }
+    }
+}
+
+/// An extension that provides a means of versionning the CRL.
+pub struct CrlNumber(u32);
+
+impl CrlNumber {
+    /// Construct a new `CrlNumber` extension.
+    pub fn new(number: u32) -> Self {
+        Self(number)
+    }
+
+    /// Return a `CrlNumber` extension as an `X509Extension`.
+    pub fn build(self) -> Result<X509Extension, ErrorStack> {
+        unsafe {
+            ffi::init();
+
+            let int_ptr = cvt_p(ffi::ASN1_INTEGER_new())?;
+
+            if let Err(e) = cvt(ffi::ASN1_INTEGER_set(int_ptr, self.0 as i64)) {
+                ffi::ASN1_INTEGER_free(int_ptr);
+                return Err(e);
+            }
+
+            let r = cvt_p(ffi::X509V3_EXT_i2d(
+                Nid::CRL_NUMBER.as_raw(),
+                0,
+                int_ptr.cast(),
+            ))
+            .map(X509Extension);
+            ffi::ASN1_INTEGER_free(int_ptr);
+            r
+        }
+    }
+}
+
+/// An extension that allows additional identities to be associated with the issuer of the CRL.
+pub struct IssuerAlternativeName(Stack<GeneralName>, bool);
+
+impl IssuerAlternativeName {
+    /// Construct a new `IssuerAlternativeName` extension.
+    pub fn new(ian: Stack<GeneralName>) -> Self {
+        Self(ian, false)
+    }
+
+    /// Sets the `critical` flag to `true`. The extension will be critical.
+    pub fn critical(&mut self) -> &mut Self {
+        self.1 = true;
+        self
+    }
+
+    /// Return a `IssuerAlternativeName` extension as an `X509Extension`.
+    pub fn build(self) -> Result<X509Extension, ErrorStack> {
+        unsafe {
+            ffi::init();
+
+            let gns: *mut ffi::OPENSSL_STACK = self.0.as_ptr().cast();
+
+            cvt_p(ffi::X509V3_EXT_i2d(
+                Nid::ISSUER_ALT_NAME.as_raw(),
+                self.1 as i32,
+                gns.cast(),
+            ))
+            .map(X509Extension)
+        }
+    }
+}
+
+/// An extension that indicates how to access information and services for the issuer.
+pub struct AuthorityInformationAccess(Stack<AccessDescription>);
+
+impl AuthorityInformationAccess {
+    /// Construct a new `AuthorityInformationAccess` extension.
+    pub fn new(ai: Stack<AccessDescription>) -> Self {
+        Self(ai)
+    }
+
+    /// Return a `AuthorityInformationAccess` extension as an `X509Extension`.
+    pub fn build(self) -> Result<X509Extension, ErrorStack> {
+        unsafe {
+            ffi::init();
+
+            let ads = self.0.as_ptr();
+            cvt_p(ffi::X509V3_EXT_i2d(
+                Nid::INFO_ACCESS.as_raw(),
+                0,
+                ads.cast(),
+            ))
+            .map(X509Extension)
+        }
+    }
+}
+
+/// A critical extension that identifies a CRL as being a delta CRL.
+pub struct DeltaCrlIndicator(u32);
+
+impl DeltaCrlIndicator {
+    /// Construct a new `DeltaCrlIndicator` extension.
+    pub fn new(base_crl_number: u32) -> Self {
+        Self(base_crl_number)
+    }
+
+    /// Return a `DeltaCrlIndicator` extension as an `X509Extension`.
+    pub fn build(self) -> Result<X509Extension, ErrorStack> {
+        unsafe {
+            ffi::init();
+
+            let int_ptr = cvt_p(ffi::ASN1_INTEGER_new())?;
+
+            if let Err(e) = cvt(ffi::ASN1_INTEGER_set(int_ptr, self.0 as i64)) {
+                ffi::ASN1_INTEGER_free(int_ptr);
+                return Err(e);
+            }
+
+            let r = cvt_p(ffi::X509V3_EXT_i2d(
+                Nid::DELTA_CRL.as_raw(),
+                1,
+                int_ptr.cast(),
+            ))
+            .map(X509Extension);
+
+            ffi::ASN1_INTEGER_free(int_ptr);
+            r
+        }
+    }
+}
+
+/// A critical extension that identifies the CRL distribution point and scope for a particular CRL.
+pub struct IssuingDistributionPoint {
+    dp: Option<DistPointName>,
+    only_user: bool,
+    only_ca: bool,
+    only_some_reasons: Option<Vec<CrlReason>>,
+    indirect: bool,
+    only_attr: bool,
+}
+
+impl Default for IssuingDistributionPoint {
+    fn default() -> IssuingDistributionPoint {
+        IssuingDistributionPoint::new()
+    }
+}
+
+impl IssuingDistributionPoint {
+    /// Construct a new `IssuingDistributionPoint` extension.
+    pub fn new() -> Self {
+        Self {
+            dp: None,
+            only_user: false,
+            only_ca: false,
+            only_some_reasons: None,
+            indirect: false,
+            only_attr: false,
+        }
+    }
+
+    ///  Set the optionnal `distributionPoint`
+    pub fn distribution_point(mut self, dp: DistPointName) -> Self {
+        self.dp = Some(dp);
+        self
+    }
+
+    /// Sets the `onlyContainsUserCerts` flag to `true`.
+    pub fn only_contains_user_certs(mut self) -> Self {
+        self.only_user = true;
+        self
+    }
+
+    /// Sets the `onlyContainsCaCerts` flag to `true`.
+    pub fn only_contains_ca_certs(mut self) -> Self {
+        self.only_ca = true;
+        self
+    }
+
+    /// Sets the `indirectCrl` flag to `true`.
+    pub fn indirect_crl(mut self) -> Self {
+        self.indirect = true;
+        self
+    }
+
+    /// Sets the `onlyContainsAttributeCerts` flag to `true`.
+    pub fn only_contains_attribute_certs(mut self) -> Self {
+        self.only_attr = true;
+        self
+    }
+
+    ///  Set the optionnal `onlySomeReasons`
+    pub fn only_some_reasons(mut self, reasons: Vec<CrlReason>) -> Self {
+        self.only_some_reasons = Some(reasons);
+        self
+    }
+
+    /// Return a `IssuingDistributionPoint` extension as an `X509Extension`.
+    pub fn build(self) -> Result<X509Extension, ErrorStack> {
+        unsafe {
+            ffi::init();
+
+            let idp = cvt_p(ffi::ISSUING_DIST_POINT_new())?;
+
+            if let Some(dp) = self.dp {
+                (*idp).distpoint = dp.as_ptr();
+                std::mem::forget(dp);
+            }
+
+            (*idp).onlyuser = self.only_user as i32;
+            (*idp).onlyCA = self.only_ca as i32;
+            (*idp).indirectCRL = self.indirect as i32;
+            (*idp).onlyattr = self.only_attr as i32;
+
+            if let Some(reasons) = self.only_some_reasons {
+                let bitstr = match cvt_p(ffi::ASN1_BIT_STRING_new()) {
+                    Ok(p) => p,
+                    Err(e) => {
+                        ffi::ISSUING_DIST_POINT_free(idp);
+                        return Err(e);
+                    }
+                };
+
+                for r in reasons {
+                    if let Err(e) = cvt(ffi::ASN1_BIT_STRING_set_bit(bitstr, r.as_raw(), 1)) {
+                        ffi::ASN1_BIT_STRING_free(bitstr);
+                        ffi::ISSUING_DIST_POINT_free(idp);
+                        return Err(e);
+                    }
+                }
+
+                (*idp).onlysomereasons = bitstr;
+            }
+
+            let r = cvt_p(ffi::X509V3_EXT_i2d(
+                Nid::ISSUING_DISTRIBUTION_POINT.as_raw(),
+                1,
+                idp.cast(),
+            ))
+            .map(X509Extension);
+
+            ffi::ISSUING_DIST_POINT_free(idp);
+
+            r
+        }
+    }
+}
+
+/// An extension that identifies how delta CRL information for this complete CRL is obtained.
+pub struct FreshestCrl(Stack<DistPoint>);
+
+impl FreshestCrl {
+    /// Construct a new `FreshestCrl` extension.
+    pub fn new() -> Result<Self, ErrorStack> {
+        Ok(Self(Stack::new()?))
+    }
+
+    /// Add a `DistPoint`
+    pub fn add_dist_point(&mut self, dp: DistPoint) -> Result<&mut Self, ErrorStack> {
+        self.0.push(dp)?;
+        Ok(self)
+    }
+
+    /// Return a `FreshestCrl` extension as an `X509Extension`.
+    pub fn build(&self) -> Result<X509Extension, ErrorStack> {
+        unsafe {
+            ffi::init();
+
+            cvt_p(ffi::X509V3_EXT_i2d(
+                Nid::FRESHEST_CRL.as_raw(),
+                0,
+                self.0.as_ptr().cast(),
+            ))
+            .map(X509Extension)
+        }
+    }
+}
+
+/// A non-critical CRL entry extension that provides the date on which it is known or suspected
+/// that the private key was compromised or that the certificate otherwise became invalid.
+pub struct InvalidityDate<'a> {
+    date: &'a Asn1TimeRef,
+    critical: bool,
+}
+
+impl<'a> InvalidityDate<'a> {
+    /// Construct a new `InvalidityDate` extension.
+    pub fn new(date: &'a Asn1TimeRef) -> Self {
+        Self {
+            date,
+            critical: false,
+        }
+    }
+
+    /// Sets the `critical` flag to `true`. The extension will be critical.
+    pub fn critical(&mut self) -> &mut Self {
+        self.critical = true;
+        self
+    }
+
+    /// Return a `InvalidityDate` extension as an `X509Extension`.
+    pub fn build(&self) -> Result<X509Extension, ErrorStack> {
+        unsafe {
+            ffi::init();
+
+            let obj = cvt_p(ffi::ASN1_TIME_to_generalizedtime(
+                self.date.as_ptr(),
+                std::ptr::null_mut(),
+            ))?;
+
+            let r = cvt_p(ffi::X509V3_EXT_i2d(
+                Nid::INVALIDITY_DATE.as_raw(),
+                self.critical as i32,
+                obj as *mut _,
+            ))
+            .map(X509Extension);
+
+            ffi::ASN1_GENERALIZEDTIME_free(obj);
+
+            r
+        }
+    }
+}
+
+/// A CRL entry extension identifies the certificate issuer associated with an entry in an indirect CRL.
+pub struct CertificateIssuer<'a> {
+    issuer: &'a X509NameRef,
+    critical: bool,
+}
+
+impl<'a> CertificateIssuer<'a> {
+    /// Construct a new `CertificateIssuer` extension.
+    pub fn new(issuer: &'a X509NameRef) -> Self {
+        Self {
+            issuer,
+            critical: false,
+        }
+    }
+
+    /// Sets the `critical` flag to `true`. The extension will be critical.
+    pub fn critical(&mut self) -> &mut Self {
+        self.critical = true;
+        self
+    }
+
+    /// Return a `CertificateIssuer` extension as an `X509Extension`.
+    pub fn build(&self) -> Result<X509Extension, ErrorStack> {
+        unsafe {
+            ffi::init();
+
+            let gn = GeneralName::new_directory_name(self.issuer)?;
+            let mut gns = Stack::new()?;
+            gns.push(gn)?;
+
+            cvt_p(ffi::X509V3_EXT_i2d(
+                Nid::CERTIFICATE_ISSUER.as_raw(),
+                self.critical as i32,
+                gns.as_ptr() as *mut _,
+            ))
+            .map(X509Extension)
+        }
+    }
+}
+
+/// A non-critical CRL entry extension that identifies the reason for the certificate revocation.
+pub struct ReasonCode {
+    reason: CrlReason,
+    critical: bool,
+}
+
+impl ReasonCode {
+    /// Construct a new `ReasonCode` extension.
+    pub fn new(reason: CrlReason) -> Self {
+        Self {
+            reason,
+            critical: false,
+        }
+    }
+
+    /// Sets the `critical` flag to `true`. The extension will be critical.
+    pub fn critical(&mut self) -> &mut Self {
+        self.critical = true;
+        self
+    }
+
+    /// Return a `ReasonCode` extension as an `X509Extension`.
+    pub fn build(&self) -> Result<X509Extension, ErrorStack> {
+        unsafe {
+            ffi::init();
+
+            let obj = ffi::ASN1_ENUMERATED_new();
+            cvt(ffi::ASN1_ENUMERATED_set(obj, self.reason.as_raw() as i64))?;
+
+            let r = cvt_p(ffi::X509V3_EXT_i2d(
+                Nid::CRL_REASON.as_raw(),
+                self.critical as i32,
+                obj as *mut _,
+            ))
+            .map(X509Extension);
+
+            ffi::ASN1_ENUMERATED_free(obj);
+
+            r
         }
     }
 }

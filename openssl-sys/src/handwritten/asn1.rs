@@ -52,10 +52,12 @@ extern "C" {
     #[cfg(any(all(ossl102, not(ossl110)), all(libressl, not(libressl430))))]
     pub fn ASN1_STRING_data(x: *mut ASN1_STRING) -> *mut c_uchar;
     pub fn ASN1_STRING_new() -> *mut ASN1_STRING;
+    pub fn ASN1_BIT_STRING_new() -> *mut ASN1_BIT_STRING;
     pub fn ASN1_OCTET_STRING_new() -> *mut ASN1_OCTET_STRING;
     pub fn ASN1_STRING_free(x: *mut ASN1_STRING);
     pub fn ASN1_STRING_length(x: *const ASN1_STRING) -> c_int;
     pub fn ASN1_STRING_set(x: *mut ASN1_STRING, data: *const c_void, len_in: c_int) -> c_int;
+    pub fn ASN1_BIT_STRING_set_bit(x: *mut ASN1_BIT_STRING, n: c_int, value: c_int) -> c_int;
     pub fn ASN1_OCTET_STRING_set(
         x: *mut ASN1_OCTET_STRING,
         data: *const c_uchar,
@@ -79,10 +81,15 @@ extern "C" {
         from: *const ASN1_TIME,
         to: *const ASN1_TIME,
     ) -> c_int;
+    pub fn ASN1_TIME_to_generalizedtime(
+        t: *const ASN1_TIME,
+        out: *mut *mut ASN1_GENERALIZEDTIME,
+    ) -> *mut ASN1_GENERALIZEDTIME;
     pub fn ASN1_TIME_free(tm: *mut ASN1_TIME);
     pub fn ASN1_TIME_print(b: *mut BIO, tm: *const ASN1_TIME) -> c_int;
     pub fn ASN1_TIME_set(from: *mut ASN1_TIME, to: time_t) -> *mut ASN1_TIME;
 
+    pub fn ASN1_INTEGER_new() -> *mut ASN1_INTEGER;
     pub fn ASN1_INTEGER_free(x: *mut ASN1_INTEGER);
     pub fn ASN1_INTEGER_dup(a: *const ASN1_INTEGER) -> *mut ASN1_INTEGER;
     pub fn ASN1_INTEGER_get(dest: *const ASN1_INTEGER) -> c_long;
@@ -95,6 +102,8 @@ extern "C" {
     #[cfg(ossl111)]
     pub fn ASN1_TIME_set_string_X509(s: *mut ASN1_TIME, str: *const c_char) -> c_int;
 
+    pub fn ASN1_ENUMERATED_new() -> *mut ASN1_ENUMERATED;
+    pub fn ASN1_ENUMERATED_set(dest: *mut ASN1_ENUMERATED, value: c_long) -> c_int;
     pub fn ASN1_ENUMERATED_free(a: *mut ASN1_ENUMERATED);
     #[cfg(ossl110)]
     pub fn ASN1_ENUMERATED_get_int64(pr: *mut i64, a: *const ASN1_ENUMERATED) -> c_int;
