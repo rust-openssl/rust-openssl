@@ -324,7 +324,7 @@ jobs:
 
             case "${{ matrix.library.name }}" in
             "openssl")
-              ./Configure --prefix=$OPENSSL_DIR --libdir=lib $OS_COMPILER -fPIC -g $OS_FLAGS no-shared
+              ./Configure --prefix=$OPENSSL_DIR --libdir=lib $OS_COMPILER -fPIC -g $OS_FLAGS
               make
               make install_sw
               ;;
