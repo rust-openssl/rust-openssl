@@ -1251,3 +1251,19 @@ fn test_store_all_certificates() {
 
     assert_eq!(store.all_certificates().len(), 1);
 }
+
+#[test]
+fn test_check_private_key() {
+    let ca_cert = include_bytes!("../../test/root-ca.pem");
+    let ca_cert = X509::from_pem(ca_cert).unwrap();
+    let cert = include_bytes!("../../test/cert.pem");
+    let cert = X509::from_pem(cert).unwrap();
+    let csr = include_bytes!("../../test/csr.pem");
+    let csr = X509Req::from_pem(csr).unwrap();
+    let pkey = include_bytes!("../../test/key.pem");
+    let pkey = PKey::private_key_from_pem(pkey).unwrap();
+
+    assert!(ca_cert.check_private_key(&pkey).is_err());
+    assert!(cert.check_private_key(&pkey).is_ok());
+    assert!(csr.check_private_key(&pkey).is_ok());
+}
