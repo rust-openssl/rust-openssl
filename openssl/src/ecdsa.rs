@@ -3,6 +3,7 @@
 use cfg_if::cfg_if;
 use foreign_types::{ForeignType, ForeignTypeRef};
 use libc::c_int;
+use std::fmt;
 use std::mem;
 use std::ptr;
 
@@ -62,6 +63,15 @@ impl EcdsaSig {
     }
 }
 
+impl fmt::Debug for EcdsaSig {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("EcdsaSig")
+            .field("r", &self.r())
+            .field("s", &self.s())
+            .finish()
+    }
+}
+
 impl EcdsaSigRef {
     to_der! {
         /// Serializes the ECDSA signature into a DER-encoded ECDSASignature structure.
@@ -106,6 +116,15 @@ impl EcdsaSigRef {
             ECDSA_SIG_get0(self.as_ptr(), ptr::null_mut(), &mut s);
             BigNumRef::from_const_ptr(s)
         }
+    }
+}
+
+impl fmt::Debug for EcdsaSigRef {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("EcdsaSig")
+            .field("r", &self.r())
+            .field("s", &self.s())
+            .finish()
     }
 }
 
