@@ -400,6 +400,15 @@ extern "C" {
         len: c_int,
     ) -> c_int;
 }
+const_ptr_api! {
+    extern "C" {
+        pub fn X509_REQ_get_attr_by_OBJ(
+            req: *const X509_REQ,
+            obj: #[const_ptr_if(any(ossl110, libressl))] ASN1_OBJECT,
+            lastpos: c_int,
+        ) -> c_int;
+    }
+}
 extern "C" {
     pub fn X509_set_pubkey(x: *mut X509, pkey: *mut EVP_PKEY) -> c_int;
     pub fn X509_REQ_verify(req: *mut X509_REQ, pkey: *mut EVP_PKEY) -> c_int;
