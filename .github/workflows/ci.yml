@@ -36,19 +36,19 @@ jobs:
       - uses: sfackler/actions/rustup@master
       - run: echo "version=$(rustc --version)" >> $GITHUB_OUTPUT
         id: rust-version
-      - uses: actions/cache@v4
+      - uses: actions/cache@v5
         with:
           path: ~/.cargo/registry/index
           key: index-${{ runner.os }}-${{ github.run_number }}
           restore-keys: |
             index-${{ runner.os }}-
       - run: cargo generate-lockfile
-      - uses: actions/cache@v4
+      - uses: actions/cache@v5
         with:
           path: ~/.cargo/registry/cache
           key: registry-${{ runner.os }}-${{ steps.rust-version.outputs.version }}-${{ hashFiles('Cargo.lock') }}
       - run: cargo fetch
-      - uses: actions/cache@v4
+      - uses: actions/cache@v5
         with:
           path: target
           key: target-${{ github.job }}-${{ steps.rust-version.outputs.version }}-${{ hashFiles('Cargo.lock') }}
@@ -65,7 +65,7 @@ jobs:
           version: 1.70.0
       - run: echo "version=$(rustc --version)" >> $GITHUB_OUTPUT
         id: rust-version
-      - uses: actions/cache@v4
+      - uses: actions/cache@v5
         with:
           path: ~/.cargo/registry/index
           key: index-${{ runner.os }}-${{ github.run_number }}
@@ -74,12 +74,12 @@ jobs:
       - run: cargo generate-lockfile
       - run: |
           cargo update -p once_cell --precise 1.20.3
-      - uses: actions/cache@v4
+      - uses: actions/cache@v5
         with:
           path: ~/.cargo/registry/cache
           key: registry-${{ runner.os }}-${{ steps.rust-version.outputs.version }}-${{ hashFiles('Cargo.lock') }}
       - run: cargo fetch
-      - uses: actions/cache@v4
+      - uses: actions/cache@v5
         with:
           path: target
           key: target-${{ github.job }}-${{ steps.rust-version.outputs.version }}-${{ hashFiles('Cargo.lock') }}
@@ -102,19 +102,19 @@ jobs:
         id: rust-version
       - run: echo "VCPKG_ROOT=$env:VCPKG_INSTALLATION_ROOT" | Out-File -FilePath $env:GITHUB_ENV -Append
       - run: vcpkg install openssl:${{ matrix.os.arch }}-windows-static-md
-      - uses: actions/cache@v4
+      - uses: actions/cache@v5
         with:
           path: ~/.cargo/registry/index
           key: index-${{ runner.os }}-${{ github.run_number }}
           restore-keys: |
             index-${{ runner.os }}-
       - run: cargo generate-lockfile
-      - uses: actions/cache@v4
+      - uses: actions/cache@v5
         with:
           path: ~/.cargo/registry/cache
           key: registry-${{ runner.os }}-${{ steps.rust-version.outputs.version }}-${{ hashFiles('Cargo.lock') }}
       - run: cargo fetch
-      - uses: actions/cache@v4
+      - uses: actions/cache@v5
         with:
           path: target
           key: target-${{ github.job }}-${{ steps.rust-version.outputs.version }}-${{ hashFiles('Cargo.lock') }}
@@ -130,14 +130,14 @@ jobs:
       - uses: sfackler/actions/rustup@master
       - run: echo "version=$(rustc --version)" >> $GITHUB_OUTPUT
         id: rust-version
-      - uses: actions/cache@v4
+      - uses: actions/cache@v5
         with:
           path: ~/.cargo/registry/index
           key: index-${{ runner.os }}-${{ github.run_number }}
           restore-keys: |
             index-${{ runner.os }}-
       - run: cargo generate-lockfile
-      - uses: actions/cache@v4
+      - uses: actions/cache@v5
         with:
           path: ~/.cargo/registry/cache
           key: registry-${{ runner.os }}-${{ steps.rust-version.outputs.version }}-${{ hashFiles('Cargo.lock') }}
@@ -261,7 +261,7 @@ jobs:
             sudo apt-get update
             sudo apt-get install -y $packages
         - run: sudo apt-get remove -y libssl-dev
-        - uses: actions/cache@v4
+        - uses: actions/cache@v5
           with:
             path: /opt/openssl
             key: openssl-${{ matrix.target }}-${{ matrix.library.name }}-${{ matrix.library.version }}-7
@@ -380,19 +380,19 @@ jobs:
             echo '[patch.crates-io]' > .cargo/config.toml
             echo 'bssl-sys = { path = "'$OPENSSL_DIR'/rust/bssl-sys" }' >> .cargo/config.toml
           if: matrix.library.name == 'boringssl' && !matrix.bindgen
-        - uses: actions/cache@v4
+        - uses: actions/cache@v5
           with:
             path: ~/.cargo/registry/index
             key: index-${{ runner.os }}-${{ github.run_number }}
             restore-keys: |
               index-${{ runner.os }}-
         - run: cargo generate-lockfile
-        - uses: actions/cache@v4
+        - uses: actions/cache@v5
           with:
             path: ~/.cargo/registry/cache
             key: registry-${{ runner.os }}-${{ steps.rust-version.outputs.version }}-${{ hashFiles('Cargo.lock') }}
         - run: cargo fetch
-        - uses: actions/cache@v4
+        - uses: actions/cache@v5
           with:
             path: target
             key: target-${{ matrix.target }}-${{ matrix.bindgen }}-${{ matrix.library.name }}-${{ matrix.library.version }}-${{ steps.rust-version.outputs.version }}-${{ hashFiles('Cargo.lock') }}
