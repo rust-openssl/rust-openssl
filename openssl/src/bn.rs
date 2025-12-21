@@ -1125,26 +1125,20 @@ impl BigNum {
 
 impl fmt::Debug for BigNumRef {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self.to_dec_str() {
-            Ok(s) => f.write_str(&s),
-            Err(e) => Err(e.into()),
-        }
+        <BigNumRef as fmt::Display>::fmt(self, f)
     }
 }
 
 impl fmt::Debug for BigNum {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self.to_dec_str() {
-            Ok(s) => f.write_str(&s),
-            Err(e) => Err(e.into()),
-        }
+        self.as_ref().fmt(f)
     }
 }
 
 impl fmt::Display for BigNumRef {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self.to_dec_str() {
-            Ok(s) => f.write_str(&s),
+            Ok(s) => <str as fmt::Display>::fmt(&s, f),
             Err(e) => Err(e.into()),
         }
     }
@@ -1152,10 +1146,7 @@ impl fmt::Display for BigNumRef {
 
 impl fmt::Display for BigNum {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self.to_dec_str() {
-            Ok(s) => f.write_str(&s),
-            Err(e) => Err(e.into()),
-        }
+        self.as_ref().fmt(f)
     }
 }
 
@@ -1527,9 +1518,38 @@ mod tests {
 
     #[test]
     fn test_format() {
-        let a = BigNum::from_u32(12345678).unwrap();
+        // verify that BigNums format identically to integral numerics
 
-        assert_eq!(format!("{}", a), "12345678");
+        let n = 12345678;
+
+        let a = BigNum::from_u32(n).unwrap();
+
+        // "12345678"
+        assert_eq!(format!("{}", n), format!("{}", a));
+
+        // "12345678            "
+        assert_eq!(format!("{:<20}", n), format!("{:<20}", a));
+
+        // "12345678------------"
+        assert_eq!(format!("{:-<20}", n), format!("{:-<20}", a));
+
+        // "      12345678      "
+        assert_eq!(format!("{:^20}", n), format!("{:^20}", a));
+
+        // "            12345678"
+        assert_eq!(format!("{:>20}", n), format!("{:>20}", a));
+
+        // TODO: add support for sign and zero padding and enable these
+        if false {
+            // "+12345678"
+            assert_eq!(format!("{:+}", n), format!("{:+}", a));
+
+            // "00000000000012345678"
+            assert_eq!(format!("{:020}", n), format!("{:020}", a));
+
+            // "+0000000000012345678"
+            assert_eq!(format!("{:+020}", n), format!("{:+020}", a));
+        }
     }
 
     #[test]
