@@ -1027,3 +1027,5 @@ cfg_if! {
         pub const NID_ac_auditEntity: c_int = 287;
     }
 }
+#[cfg(ossl110)]
+pub const NID_tls1_prf: c_int = 1021;
