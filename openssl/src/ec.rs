@@ -702,6 +702,66 @@ impl EcPointRef {
     }
 }
 
+#[cfg(not(libressl))]
+fn builtin_ec_curves() -> Vec<Nid> {
+    let num_curves = unsafe { ffi::EC_get_builtin_curves(ptr::null_mut(), 0) };
+
+    let mut curves: Vec<ffi::EC_builtin_curve> = Vec::with_capacity(num_curves);
+
+    assert_eq!(
+        unsafe { ffi::EC_get_builtin_curves(curves.as_mut_ptr(), num_curves) },
+        num_curves
+    );
+
+    unsafe {
+        curves.set_len(num_curves);
+    }
+
+    curves
+        .into_iter()
+        .map(|curve| Nid::from_raw(curve.nid))
+        .collect::<Vec<Nid>>()
+}
+
+// LibreSSL allows you to call `EC_POINT_get_affine_coordinates()` with an incorrect
+// `EC_GROUP *` argument, but it will then return garbage coordinates, which means that we
+// can't use this approach to implement Debug for EcPoint.
+#[cfg(not(libressl))]
+impl fmt::Debug for EcPointRef {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
+        // let chains are only allowed in Rust 2024 or later
+        if let Ok(mut x) = BigNum::new() {
+            if let Ok(mut y) = BigNum::new() {
+                if let Ok(mut ctx) = BigNumContext::new() {
+                    for nid in builtin_ec_curves() {
+                        if let Ok(group) = EcGroup::from_curve_name(nid) {
+                            if self
+                                .affine_coordinates_gfp(&group, &mut x, &mut y, &mut ctx)
+                                .is_ok()
+                            {
+                                // switch to .field_with() after debug_closure_helpers stabilizes
+                                return f
+                                    .debug_struct("EcPoint")
+                                    .field("group", &group)
+                                    .field("x", &format!("{:X}", x))
+                                    .field("y", &format!("{:X}", y))
+                                    .finish();
+                            }
+                        }
+                    }
+
+                    return f
+                        .debug_struct("EcPoint")
+                        .field("group", &"unknown")
+                        .finish_non_exhaustive();
+                }
+            }
+        }
+
+        f.debug_struct("EcPoint").finish()
+    }
+}
+
 impl EcPoint {
     /// Creates a new point on the specified curve.
     #[corresponds(EC_POINT_new)]
@@ -748,6 +808,13 @@ impl EcPoint {
             ))?;
         }
         Ok(point)
+    }
+}
+
+#[cfg(not(libressl))]
+impl fmt::Debug for EcPoint {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
+        self.as_ref().fmt(f)
     }
 }
 
@@ -1458,5 +1525,25 @@ mod test {
             format!("{:?}", group),
             "EcGroup { p: \"01FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF\", a: \"01FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFC\", b: \"51953EB9618E1C9A1F929A21A0B68540EEA2DA725B99B315F3B8B489918EF109E156193951EC7E937B1652C0BD3BB1BF073573DF883D2C34F1EF451FD46B503F00\" }"
         );
+    }
+
+    #[cfg(not(libressl))]
+    #[test]
+    fn test_debug_point_secp224r1() {
+        let group = EcGroup::from_curve_name(Nid::SECP224R1).unwrap();
+
+        let g = group.generator();
+
+        assert_eq!(format!("{:?}", g), "EcPoint { group: EcGroup { curve_name: \"secp224r1\" }, x: \"B70E0CBD6BB4BF7F321390B94A03C1D356C21122343280D6115C1D21\", y: \"BD376388B5F723FB4C22DFE6CD4375A05A07476444D5819985007E34\" }");
+    }
+
+    #[cfg(not(libressl))]
+    #[test]
+    fn test_debug_point_secp521r1() {
+        let group = EcGroup::from_curve_name(Nid::SECP521R1).unwrap();
+
+        let g = group.generator();
+
+        assert_eq!(format!("{:?}", g), "EcPoint { group: EcGroup { curve_name: \"secp521r1\" }, x: \"C6858E06B70404E9CD9E3ECB662395B4429C648139053FB521F828AF606B4D3DBAA14B5E77EFE75928FE1DC127A2FFA8DE3348B3C1856A429BF97E7E31C2E5BD66\", y: \"011839296A789A3BC0045C8A5FB42C7D1BD998F54449579B446817AFBD17273E662C97EE72995EF42640C550B9013FAD0761353C7086A272C24088BE94769FD16650\" }");
     }
 }
