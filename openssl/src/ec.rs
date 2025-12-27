@@ -1136,14 +1136,9 @@ impl Iterator for BuiltinCurves {
 
     fn next(&mut self) -> Option<Self::Item> {
         if let Some(curve) = self.curves.get(self.offset) {
-            let item = BuiltinCurve {
-                nid: Nid::from_raw(curve.nid),
-                comment: unsafe { CStr::from_ptr(curve.comment) },
-            };
-
             self.offset += 1;
 
-            Some(item)
+            Some(BuiltinCurve(*curve))
         } else {
             None
         }
@@ -1156,19 +1151,24 @@ impl Iterator for BuiltinCurves {
     }
 }
 
-#[derive(Debug)]
-pub struct BuiltinCurve {
-    nid: Nid,
-    comment: &'static CStr,
-}
+pub struct BuiltinCurve(ffi::EC_builtin_curve);
 
 impl BuiltinCurve {
     pub fn nid(&self) -> Nid {
-        self.nid
+        Nid::from_raw(self.0.nid)
     }
 
     pub fn comment(&self) -> &'static CStr {
-        self.comment
+        unsafe { CStr::from_ptr(self.0.comment) }
+    }
+}
+
+impl fmt::Debug for BuiltinCurve {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
+        f.debug_struct("BuiltinCurve")
+            .field("nid", &self.nid())
+            .field("comment", &self.comment())
+            .finish()
     }
 }
 
