@@ -292,3 +292,13 @@ extern "C" {
         eckey: *mut EC_KEY,
     ) -> c_int;
 }
+
+#[repr(C)]
+pub struct EC_builtin_curve {
+    pub nid: c_int,
+    pub comment: *const c_char,
+}
+
+extern "C" {
+    pub fn EC_get_builtin_curves(r: *mut EC_builtin_curve, nitems: usize) -> usize;
+}
