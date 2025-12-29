@@ -1095,7 +1095,7 @@ impl<T> fmt::Debug for EcKey<T> {
 
 /// Returns an iterator over the built-in elliptic curves.
 #[corresponds(EC_get_builtin_curves)]
-pub fn builtin_curves() -> BuiltinCurves {
+pub fn builtin_curves() -> BuiltinCurvesIter {
     let num_curves = unsafe {
         // SAFETY: from the EC_get_builtin_curves(3ossl) man page:
         //
@@ -1122,17 +1122,17 @@ pub fn builtin_curves() -> BuiltinCurves {
 
     let curves = curves.into_boxed_slice();
 
-    BuiltinCurves { curves, offset: 0 }
+    BuiltinCurvesIter { curves, offset: 0 }
 }
 
-pub struct BuiltinCurves {
+pub struct BuiltinCurvesIter {
     curves: Box<[ffi::EC_builtin_curve]>,
     offset: usize,
 }
 
-impl ExactSizeIterator for BuiltinCurves {}
+impl ExactSizeIterator for BuiltinCurvesIter {}
 
-impl Iterator for BuiltinCurves {
+impl Iterator for BuiltinCurvesIter {
     type Item = BuiltinCurve;
 
     fn next(&mut self) -> Option<Self::Item> {
