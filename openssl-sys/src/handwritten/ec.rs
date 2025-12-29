@@ -281,7 +281,6 @@ extern "C" {
     ) -> c_int;
 }
 
-#[derive(Clone, Copy)]
 #[repr(C)]
 pub struct EC_builtin_curve {
     pub nid: c_int,

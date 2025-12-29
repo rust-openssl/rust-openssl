@@ -18,6 +18,7 @@
 use cfg_if::cfg_if;
 use foreign_types::{ForeignType, ForeignTypeRef};
 use libc::c_int;
+use std::ffi::c_char;
 use std::ffi::CStr;
 use std::fmt;
 use std::ptr;
@@ -1136,9 +1137,14 @@ impl Iterator for BuiltinCurves {
 
     fn next(&mut self) -> Option<Self::Item> {
         if let Some(curve) = self.curves.get(self.offset) {
+            let item = BuiltinCurve {
+                nid: curve.nid,
+                comment: curve.comment,
+            };
+
             self.offset += 1;
 
-            Some(BuiltinCurve(*curve))
+            Some(item)
         } else {
             None
         }
@@ -1151,15 +1157,18 @@ impl Iterator for BuiltinCurves {
     }
 }
 
-pub struct BuiltinCurve(ffi::EC_builtin_curve);
+pub struct BuiltinCurve {
+    nid: c_int,
+    comment: *const c_char,
+}
 
 impl BuiltinCurve {
     pub fn nid(&self) -> Nid {
-        Nid::from_raw(self.0.nid)
+        Nid::from_raw(self.nid)
     }
 
     pub fn comment(&self) -> &'static CStr {
-        unsafe { CStr::from_ptr(self.0.comment) }
+        unsafe { CStr::from_ptr(self.comment) }
     }
 }
 
