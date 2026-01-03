@@ -18,6 +18,7 @@
 use cfg_if::cfg_if;
 use foreign_types::{ForeignType, ForeignTypeRef};
 use libc::c_int;
+use std::ffi::CStr;
 use std::fmt;
 use std::ptr;
 
@@ -1091,6 +1092,86 @@ impl<T> fmt::Debug for EcKey<T> {
     }
 }
 
+/// Returns an iterator over the built-in elliptic curves.
+#[corresponds(EC_get_builtin_curves)]
+pub fn builtin_curves() -> BuiltinCurves {
+    let num_curves = unsafe {
+        // SAFETY: from the EC_get_builtin_curves(3ossl) man page:
+        //
+        // "Passing a NULL r, or setting nitems to 0 will do nothing other than
+        // return the total number of curves available."
+        ffi::EC_get_builtin_curves(ptr::null_mut(), 0)
+    };
+
+    let mut curves: Vec<ffi::EC_builtin_curve> = Vec::with_capacity(num_curves);
+
+    assert_eq!(
+        unsafe {
+            // SAFETY: we have enough space available in the vector
+            ffi::EC_get_builtin_curves(curves.as_mut_ptr(), num_curves)
+        },
+        num_curves
+    );
+
+    unsafe {
+        // SAFETY: we checked that EC_get_builtin_curves() returned num_curves,
+        // which means that that many elements will have been written to
+        curves.set_len(num_curves);
+    }
+
+    let curves = curves.into_boxed_slice();
+
+    BuiltinCurves { curves, offset: 0 }
+}
+
+pub struct BuiltinCurves {
+    curves: Box<[ffi::EC_builtin_curve]>,
+    offset: usize,
+}
+
+impl ExactSizeIterator for BuiltinCurves {}
+
+impl Iterator for BuiltinCurves {
+    type Item = BuiltinCurve;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if let Some(curve) = self.curves.get(self.offset) {
+            let item = BuiltinCurve {
+                nid: Nid::from_raw(curve.nid),
+                comment: unsafe { CStr::from_ptr(curve.comment) },
+            };
+
+            self.offset += 1;
+
+            Some(item)
+        } else {
+            None
+        }
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let left = self.curves.len() - self.offset;
+
+        (left, Some(left))
+    }
+}
+
+#[derive(Debug)]
+pub struct BuiltinCurve {
+    nid: Nid,
+    comment: &'static CStr,
+}
+
+impl BuiltinCurve {
+    pub fn nid(&self) -> Nid {
+        self.nid
+    }
+
+    pub fn comment(&self) -> &'static CStr {
+        self.comment
+    }
+}
+
 #[cfg(test)]
 mod test {
     use hex::FromHex;
@@ -1457,5 +1538,13 @@ mod test {
             format!("{:?}", group),
             "EcGroup { p: \"01FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF\", a: \"01FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFC\", b: \"51953EB9618E1C9A1F929A21A0B68540EEA2DA725B99B315F3B8B489918EF109E156193951EC7E937B1652C0BD3BB1BF073573DF883D2C34F1EF451FD46B503F00\" }"
         );
+    }
+
+    #[test]
+    fn test_builtin_curves() {
+        let curves = builtin_curves().collect::<Vec<_>>();
+
+        // verify that there is at least one curve, and that we can Debug-format the curves
+        assert_ne!(format!("{:?}", curves), "[]");
     }
 }
