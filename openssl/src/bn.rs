@@ -864,6 +864,11 @@ impl BigNumRef {
     ///
     /// assert_eq!(s.to_hex_str().unwrap().to_uppercase(), "-99FF");
     /// ```
+    ///
+    /// Note that whether this function returns lower-case hexadecimal or upper-case hexadecimal
+    /// depends on specifically which SSL library is being used.  Use `format!("{:x}", s)` or
+    /// `format!("{:X}", s)` to get lower-case or upper-case output in a way that is consistent
+    /// across SSL libraries.
     #[corresponds(BN_bn2hex)]
     pub fn to_hex_str(&self) -> Result<OpensslString, ErrorStack> {
         unsafe {
@@ -1156,6 +1161,29 @@ impl fmt::Display for BigNum {
             Ok(s) => f.write_str(&s),
             Err(e) => Err(e.into()),
         }
+    }
+}
+
+impl fmt::LowerHex for BigNumRef {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self.to_hex_str() {
+            Ok(s) => {
+                let s = s.to_lowercase();
+
+                if f.alternate() {
+                    <String as fmt::Display>::fmt(&format!("0x{}", &s), f)
+                } else {
+                    <str as fmt::Display>::fmt(&s, f)
+                }
+            }
+            Err(e) => Err(e.into()),
+        }
+    }
+}
+
+impl fmt::LowerHex for BigNum {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.as_ref().fmt(f)
     }
 }
 
@@ -1530,6 +1558,25 @@ mod tests {
         let a = BigNum::from_u32(12345678).unwrap();
 
         assert_eq!(format!("{}", a), "12345678");
+    }
+
+    #[test]
+    fn test_format_lowerhex() {
+        let a = BigNum::from_u32(12345678).unwrap();
+
+        assert_eq!(format!("{:x}", a), "bc614e");
+
+        assert_eq!(format!("{:<20x}", a), "bc614e              ");
+        assert_eq!(format!("{:-<20x}", a), "bc614e--------------");
+        assert_eq!(format!("{:^20x}", a), "       bc614e       ");
+        assert_eq!(format!("{:>20x}", a), "              bc614e");
+
+        assert_eq!(format!("{:#x}", a), "0xbc614e");
+
+        assert_eq!(format!("{:<#20x}", a), "0xbc614e            ");
+        assert_eq!(format!("{:-<#20x}", a), "0xbc614e------------");
+        assert_eq!(format!("{:^#20x}", a), "      0xbc614e      ");
+        assert_eq!(format!("{:>#20x}", a), "            0xbc614e");
     }
 
     #[test]
