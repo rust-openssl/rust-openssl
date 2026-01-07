@@ -147,9 +147,13 @@ unsafe extern "C" fn ctrl<S: Write>(
     let state = state::<S>(bio);
 
     if cmd == BIO_CTRL_FLUSH {
+        BIO_clear_retry_flags(bio);
         match catch_unwind(AssertUnwindSafe(|| state.stream.flush())) {
             Ok(Ok(())) => 1,
             Ok(Err(err)) => {
+                if retriable_error(&err) {
+                    BIO_set_retry_write(bio);
+                }
                 state.error = Some(err);
                 0
             }
