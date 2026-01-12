@@ -558,9 +558,18 @@ impl NameType {
     }
 }
 
+#[cfg(ossl111)]
+enum CustomExtCbType {
+    Add,
+    Parse,
+}
+
 static INDEXES: Lazy<Mutex<HashMap<TypeId, c_int>>> = Lazy::new(|| Mutex::new(HashMap::new()));
 static SSL_INDEXES: Lazy<Mutex<HashMap<TypeId, c_int>>> = Lazy::new(|| Mutex::new(HashMap::new()));
 static SESSION_CTX_INDEX: OnceCell<Index<Ssl, SslContext>> = OnceCell::new();
+#[cfg(ossl111)]
+static CUSTOM_EXT_INDEXES: Lazy<Mutex<HashMap<u64, c_int>>> =
+    Lazy::new(|| Mutex::new(HashMap::new()));
 
 fn try_get_session_ctx_index() -> Result<&'static Index<Ssl, SslContext>, ErrorStack> {
     SESSION_CTX_INDEX.get_or_try_init(Ssl::new_ex_index)
@@ -1621,8 +1630,16 @@ impl SslContextBuilder {
             + Send,
     {
         let ret = unsafe {
-            self.set_ex_data(SslContext::cached_ex_index::<AddFn>(), add_cb);
-            self.set_ex_data(SslContext::cached_ex_index::<ParseFn>(), parse_cb);
+            let add_cb_key = SslContext::get_custom_ext_cb_key(ext_type, CustomExtCbType::Add);
+            let parse_cb_key = SslContext::get_custom_ext_cb_key(ext_type, CustomExtCbType::Parse);
+            self.set_ex_data(
+                SslContext::cached_custom_ext_ex_index::<AddFn>(add_cb_key),
+                add_cb,
+            );
+            self.set_ex_data(
+                SslContext::cached_custom_ext_ex_index::<ParseFn>(parse_cb_key),
+                parse_cb,
+            );
 
             ffi::SSL_CTX_add_custom_ext(
                 self.as_ptr(),
@@ -1803,6 +1820,29 @@ impl SslContext {
             #[cfg(not(any(boringssl, awslc)))]
             let idx = cvt_n(get_new_idx(free_data_box::<T>))?;
             Ok(Index::from_raw(idx))
+        }
+    }
+
+    #[cfg(ossl111)]
+    fn get_custom_ext_cb_key(ext_type: u16, cb_type: CustomExtCbType) -> u64 {
+        match cb_type {
+            CustomExtCbType::Add => ext_type as u64,
+            CustomExtCbType::Parse => ext_type as u64 | 0x8000_0000_0000_0000,
+        }
+    }
+
+    #[cfg(ossl111)]
+    fn cached_custom_ext_ex_index<T>(key: u64) -> Index<SslContext, T>
+    where
+        T: 'static + Sync + Send,
+    {
+        unsafe {
+            let idx = *CUSTOM_EXT_INDEXES
+                .lock()
+                .unwrap_or_else(|e| e.into_inner())
+                .entry(key)
+                .or_insert_with(|| SslContext::new_ex_index::<T>().unwrap().as_raw());
+            Index::from_raw(idx)
         }
     }
 
