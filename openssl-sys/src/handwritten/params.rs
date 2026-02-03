@@ -43,6 +43,11 @@ extern "C" {
     pub fn OSSL_PARAM_BLD_new() -> *mut OSSL_PARAM_BLD;
     pub fn OSSL_PARAM_BLD_free(bld: *mut OSSL_PARAM_BLD);
     pub fn OSSL_PARAM_BLD_to_param(bld: *mut OSSL_PARAM_BLD) -> *mut OSSL_PARAM;
+    pub fn OSSL_PARAM_BLD_push_int(
+        bld: *mut OSSL_PARAM_BLD,
+        key: *const c_char,
+        val: c_int,
+    ) -> c_int;
     pub fn OSSL_PARAM_BLD_push_uint(
         bld: *mut OSSL_PARAM_BLD,
         key: *const c_char,

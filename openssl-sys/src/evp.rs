@@ -31,7 +31,7 @@ pub const EVP_PKEY_POLY1305: c_int = NID_poly1305;
 #[cfg(any(ossl110, libressl360))]
 pub const EVP_PKEY_HKDF: c_int = NID_hkdf;
 
-#[cfg(ossl102)]
+#[cfg(ossl110)]
 pub const EVP_CIPHER_CTX_FLAG_WRAP_ALLOW: c_int = 0x1;
 
 pub const EVP_CTRL_GCM_SET_IVLEN: c_int = 0x9;
@@ -44,6 +44,9 @@ cfg_if! {
         pub const EVP_PKEY_PRIVATE_KEY: c_int = EVP_PKEY_KEY_PARAMETERS | OSSL_KEYMGMT_SELECT_PRIVATE_KEY;
         pub const EVP_PKEY_PUBLIC_KEY: c_int = EVP_PKEY_KEY_PARAMETERS | OSSL_KEYMGMT_SELECT_PUBLIC_KEY;
         pub const EVP_PKEY_KEYPAIR: c_int = EVP_PKEY_PUBLIC_KEY | OSSL_KEYMGMT_SELECT_PRIVATE_KEY;
+        pub const EVP_KDF_HKDF_MODE_EXTRACT_AND_EXPAND: c_int = 0;
+        pub const EVP_KDF_HKDF_MODE_EXTRACT_ONLY: c_int = 1;
+        pub const EVP_KDF_HKDF_MODE_EXPAND_ONLY: c_int = 2;
     }
 }
 

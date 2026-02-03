@@ -334,7 +334,7 @@ extern "C" {
     pub fn EVP_aes_128_ofb() -> *const EVP_CIPHER;
     #[cfg(ossl110)]
     pub fn EVP_aes_128_ocb() -> *const EVP_CIPHER;
-    #[cfg(ossl102)]
+    #[cfg(ossl110)]
     pub fn EVP_aes_128_wrap() -> *const EVP_CIPHER;
     #[cfg(ossl110)]
     pub fn EVP_aes_128_wrap_pad() -> *const EVP_CIPHER;
@@ -349,7 +349,7 @@ extern "C" {
     pub fn EVP_aes_192_ofb() -> *const EVP_CIPHER;
     #[cfg(ossl110)]
     pub fn EVP_aes_192_ocb() -> *const EVP_CIPHER;
-    #[cfg(ossl102)]
+    #[cfg(ossl110)]
     pub fn EVP_aes_192_wrap() -> *const EVP_CIPHER;
     #[cfg(ossl110)]
     pub fn EVP_aes_192_wrap_pad() -> *const EVP_CIPHER;
@@ -365,11 +365,11 @@ extern "C" {
     pub fn EVP_aes_256_ofb() -> *const EVP_CIPHER;
     #[cfg(ossl110)]
     pub fn EVP_aes_256_ocb() -> *const EVP_CIPHER;
-    #[cfg(ossl102)]
+    #[cfg(ossl110)]
     pub fn EVP_aes_256_wrap() -> *const EVP_CIPHER;
     #[cfg(ossl110)]
     pub fn EVP_aes_256_wrap_pad() -> *const EVP_CIPHER;
-    #[cfg(all(any(ossl110, libressl), not(osslconf = "OPENSSL_NO_CHACHA")))]
+    #[cfg(not(osslconf = "OPENSSL_NO_CHACHA"))]
     pub fn EVP_chacha20() -> *const EVP_CIPHER;
     #[cfg(all(any(ossl110, libressl360), not(osslconf = "OPENSSL_NO_CHACHA")))]
     pub fn EVP_chacha20_poly1305() -> *const EVP_CIPHER;
@@ -458,13 +458,9 @@ cfg_if! {
     } else {
         extern "C" {
             pub fn EVP_PKEY_id(pkey: *const EVP_PKEY) -> c_int;
-        }
-        const_ptr_api! {
-            extern "C" {
-                pub fn EVP_PKEY_bits(key: #[const_ptr_if(any(ossl110, libressl))] EVP_PKEY) -> c_int;
-                #[cfg(any(ossl110, libressl360))]
-                pub fn EVP_PKEY_security_bits(pkey: #[const_ptr_if(any(ossl110, libressl))] EVP_PKEY) -> c_int;
-            }
+            pub fn EVP_PKEY_bits(key: *const EVP_PKEY) -> c_int;
+            #[cfg(any(ossl110, libressl360))]
+            pub fn EVP_PKEY_security_bits(pkey: *const EVP_PKEY) -> c_int;
         }
     }
 }
@@ -492,7 +488,6 @@ extern "C" {
 extern "C" {
     pub fn EVP_PKEY_new() -> *mut EVP_PKEY;
     pub fn EVP_PKEY_free(k: *mut EVP_PKEY);
-    #[cfg(any(ossl110, libressl))]
     pub fn EVP_PKEY_up_ref(pkey: *mut EVP_PKEY) -> c_int;
 
     #[cfg(ossl300)]
@@ -709,7 +704,7 @@ extern "C" {
 
 const_ptr_api! {
     extern "C" {
-        pub fn EVP_PKCS82PKEY(p8: #[const_ptr_if(any(ossl110, libressl))] PKCS8_PRIV_KEY_INFO) -> *mut EVP_PKEY;
+        pub fn EVP_PKCS82PKEY(p8: *const PKCS8_PRIV_KEY_INFO) -> *mut EVP_PKEY;
         pub fn EVP_PKEY2PKCS8(pkey: #[const_ptr_if(any(ossl300))] EVP_PKEY) -> *mut PKCS8_PRIV_KEY_INFO;
     }
 }

@@ -48,16 +48,14 @@ bitflags! {
         const USE_DELTAS = ffi::X509_V_FLAG_USE_DELTAS as _;
         const CHECK_SS_SIGNATURE = ffi::X509_V_FLAG_CHECK_SS_SIGNATURE as _;
         const TRUSTED_FIRST = ffi::X509_V_FLAG_TRUSTED_FIRST as _;
-        #[cfg(ossl102)]
+        #[cfg(ossl110)]
         const SUITEB_128_LOS_ONLY = ffi::X509_V_FLAG_SUITEB_128_LOS_ONLY;
-        #[cfg(ossl102)]
+        #[cfg(ossl110)]
         const SUITEB_192_LOS = ffi::X509_V_FLAG_SUITEB_128_LOS;
-        #[cfg(ossl102)]
+        #[cfg(ossl110)]
         const SUITEB_128_LOS = ffi::X509_V_FLAG_SUITEB_192_LOS;
         const PARTIAL_CHAIN = ffi::X509_V_FLAG_PARTIAL_CHAIN as _;
-        #[cfg(any(ossl110, boringssl, awslc, libressl))]
         const NO_ALT_CHAINS = ffi::X509_V_FLAG_NO_ALT_CHAINS as _;
-        #[cfg(any(ossl110, boringssl, awslc, libressl))]
         const NO_CHECK_TIME = ffi::X509_V_FLAG_NO_CHECK_TIME as _;
     }
 }

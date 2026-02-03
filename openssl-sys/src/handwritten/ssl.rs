@@ -3,76 +3,7 @@ use libc::*;
 
 pub enum SSL_METHOD {}
 pub enum SSL_CIPHER {}
-cfg_if! {
-    if #[cfg(any(ossl110, libressl))] {
-        pub enum SSL_SESSION {}
-    } else {
-        #[repr(C)]
-        pub struct SSL_SESSION {
-            ssl_version: c_int,
-            key_arg_length: c_uint,
-            key_arg: [c_uchar; SSL_MAX_KEY_ARG_LENGTH as usize],
-            pub master_key_length: c_int,
-            pub master_key: [c_uchar; 48],
-            session_id_length: c_uint,
-            session_id: [c_uchar; SSL_MAX_SSL_SESSION_ID_LENGTH as usize],
-            sid_ctx_length: c_uint,
-            sid_ctx: [c_uchar; SSL_MAX_SID_CTX_LENGTH as usize],
-            #[cfg(not(osslconf = "OPENSSL_NO_KRB5"))]
-            krb5_client_princ_len: c_uint,
-            #[cfg(not(osslconf = "OPENSSL_NO_KRB5"))]
-            krb5_client_princ: [c_uchar; SSL_MAX_KRB5_PRINCIPAL_LENGTH as usize],
-            #[cfg(not(osslconf = "OPENSSL_NO_PSK"))]
-            psk_identity_hint: *mut c_char,
-            #[cfg(not(osslconf = "OPENSSL_NO_PSK"))]
-            psk_identity: *mut c_char,
-            not_resumable: c_int,
-            sess_cert: *mut c_void,
-            peer: *mut X509,
-            verify_result: c_long,
-            pub references: c_int,
-            timeout: c_long,
-            time: c_long,
-            compress_meth: c_uint,
-            cipher: *const c_void,
-            cipher_id: c_ulong,
-            ciphers: *mut c_void,
-            ex_data: CRYPTO_EX_DATA,
-            prev: *mut c_void,
-            next: *mut c_void,
-            #[cfg(not(osslconf = "OPENSSL_NO_TLSEXT"))]
-            tlsext_hostname: *mut c_char,
-            #[cfg(all(
-                not(osslconf = "OPENSSL_NO_TLSEXT"),
-                not(osslconf = "OPENSSL_NO_EC")
-            ))]
-            tlsext_ecpointformatlist_length: size_t,
-            #[cfg(all(
-                not(osslconf = "OPENSSL_NO_TLSEXT"),
-                not(osslconf = "OPENSSL_NO_EC")
-            ))]
-            tlsext_ecpointformatlist: *mut c_uchar,
-            #[cfg(all(
-                not(osslconf = "OPENSSL_NO_TLSEXT"),
-                not(osslconf = "OPENSSL_NO_EC")
-            ))]
-            tlsext_ellipticcurvelist_length: size_t,
-            #[cfg(all(
-                not(osslconf = "OPENSSL_NO_TLSEXT"),
-                not(osslconf = "OPENSSL_NO_EC")
-            ))]
-            tlsext_ellipticcurvelist: *mut c_uchar,
-            #[cfg(not(osslconf = "OPENSSL_NO_TLSEXT"))]
-            tlsext_tick: *mut c_uchar,
-            #[cfg(not(osslconf = "OPENSSL_NO_TLSEXT"))]
-            tlsext_ticklen: size_t,
-            #[cfg(not(osslconf = "OPENSSL_NO_TLSEXT"))]
-            tlsext_tick_lifetime_hint: c_long,
-            #[cfg(not(osslconf = "OPENSSL_NO_SRP"))]
-            srp_username: *mut c_char,
-        }
-    }
-}
+pub enum SSL_SESSION {}
 
 stack!(stack_st_SSL_CIPHER);
 
@@ -167,27 +98,13 @@ extern "C" {
         remove_session_cb: Option<unsafe extern "C" fn(*mut SSL_CTX, *mut SSL_SESSION)>,
     );
 }
-cfg_if! {
-    // const change in passed function pointer signature
-    if #[cfg(any(ossl110, libressl))] {
-        extern "C" {
-            pub fn SSL_CTX_sess_set_get_cb(
-                ctx: *mut SSL_CTX,
-                get_session_cb: Option<
-                    unsafe extern "C" fn(*mut SSL, *const c_uchar, c_int, *mut c_int) -> *mut SSL_SESSION,
-                >,
-            );
-        }
-    } else {
-        extern "C" {
-            pub fn SSL_CTX_sess_set_get_cb(
-                ctx: *mut SSL_CTX,
-                get_session_cb: Option<
-                    unsafe extern "C" fn(*mut SSL, *mut c_uchar, c_int, *mut c_int) -> *mut SSL_SESSION,
-                >,
-            );
-        }
-    }
+extern "C" {
+    pub fn SSL_CTX_sess_set_get_cb(
+        ctx: *mut SSL_CTX,
+        get_session_cb: Option<
+            unsafe extern "C" fn(*mut SSL, *const c_uchar, c_int, *mut c_int) -> *mut SSL_SESSION,
+        >,
+    );
 }
 extern "C" {
     // FIXME change to unsafe extern "C" fn
@@ -198,26 +115,13 @@ extern "C" {
         >,
     );
 }
-
-cfg_if! {
-    // const change in passed function pointer signature
-    if #[cfg(any(ossl110, libressl))] {
-        extern "C" {
-            pub fn SSL_CTX_set_cookie_verify_cb(
-                s: *mut SSL_CTX,
-                cb: Option<
-                    extern "C" fn(ssl: *mut SSL, cookie: *const c_uchar, cookie_len: c_uint) -> c_int,
-                >,
-            );
-        }
-    } else {
-        extern "C" {
-            pub fn SSL_CTX_set_cookie_verify_cb(
-                s: *mut SSL_CTX,
-                cb: Option<extern "C" fn(ssl: *mut SSL, cookie: *mut c_uchar, cookie_len: c_uint) -> c_int>,
-            );
-        }
-    }
+extern "C" {
+    pub fn SSL_CTX_set_cookie_verify_cb(
+        s: *mut SSL_CTX,
+        cb: Option<
+            extern "C" fn(ssl: *mut SSL, cookie: *const c_uchar, cookie_len: c_uint) -> c_int,
+        >,
+    );
 }
 
 extern "C" {
@@ -341,7 +245,7 @@ extern "C" {
         parse_arg: *mut c_void,
     ) -> c_int;
 
-    #[cfg(ossl102)]
+    #[cfg(ossl110)]
     pub fn SSL_extension_supported(ext_type: c_uint) -> c_int;
 }
 
@@ -396,18 +300,13 @@ extern "C" {
     pub fn SSL_CTX_set_cipher_list(ssl: *mut SSL_CTX, s: *const c_char) -> c_int;
     pub fn SSL_CTX_new(method: *const SSL_METHOD) -> *mut SSL_CTX;
     pub fn SSL_CTX_free(ctx: *mut SSL_CTX);
-    #[cfg(any(ossl110, libressl))]
     pub fn SSL_CTX_up_ref(x: *mut SSL_CTX) -> c_int;
     pub fn SSL_CTX_get_cert_store(ctx: *const SSL_CTX) -> *mut X509_STORE;
     pub fn SSL_CTX_set_cert_store(ctx: *mut SSL_CTX, store: *mut X509_STORE);
 
     pub fn SSL_get_current_cipher(ssl: *const SSL) -> *const SSL_CIPHER;
     pub fn SSL_CIPHER_get_bits(cipher: *const SSL_CIPHER, alg_bits: *mut c_int) -> c_int;
-}
-const_ptr_api! {
-    extern "C" {
-        pub fn SSL_CIPHER_get_version(cipher: *const SSL_CIPHER) -> #[const_ptr_if(any(ossl110, libressl))] c_char;
-    }
+    pub fn SSL_CIPHER_get_version(cipher: *const SSL_CIPHER) -> *const c_char;
 }
 extern "C" {
     #[cfg(ossl111)]
@@ -456,7 +355,6 @@ extern "C" {
     pub fn SSL_use_PrivateKey_file(ssl: *mut SSL, file: *const c_char, type_: c_int) -> c_int;
     pub fn SSL_use_PrivateKey(ssl: *mut SSL, pkey: *mut EVP_PKEY) -> c_int;
     pub fn SSL_use_certificate(ssl: *mut SSL, x: *mut X509) -> c_int;
-    #[cfg(any(ossl110, libressl))]
     pub fn SSL_use_certificate_chain_file(ssl: *mut SSL, file: *const c_char) -> c_int;
     pub fn SSL_set_client_CA_list(s: *mut SSL, name_list: *mut stack_st_X509_NAME);
     pub fn SSL_add_client_CA(ssl: *mut SSL, x: *mut X509) -> c_int;
@@ -469,7 +367,6 @@ extern "C" {
 
     pub fn SSL_SESSION_get_time(s: *const SSL_SESSION) -> c_long;
     pub fn SSL_SESSION_get_timeout(s: *const SSL_SESSION) -> c_long;
-    #[cfg(any(ossl110, libressl))]
     pub fn SSL_SESSION_get_protocol_version(s: *const SSL_SESSION) -> c_int;
 
     #[cfg(any(ossl111, libressl))]
@@ -478,7 +375,6 @@ extern "C" {
     pub fn SSL_SESSION_get_max_early_data(ctx: *const SSL_SESSION) -> u32;
 
     pub fn SSL_SESSION_get_id(s: *const SSL_SESSION, len: *mut c_uint) -> *const c_uchar;
-    #[cfg(any(ossl110, libressl))]
     pub fn SSL_SESSION_up_ref(ses: *mut SSL_SESSION) -> c_int;
     pub fn SSL_SESSION_free(s: *mut SSL_SESSION);
 }
@@ -625,44 +521,18 @@ extern "C" {
     ) -> c_long;
 }
 
-cfg_if! {
-    if #[cfg(any(ossl110, libressl))] {
-        extern "C" {
-            pub fn TLS_method() -> *const SSL_METHOD;
+extern "C" {
+    pub fn TLS_method() -> *const SSL_METHOD;
 
-            pub fn DTLS_method() -> *const SSL_METHOD;
+    pub fn DTLS_method() -> *const SSL_METHOD;
 
-            pub fn TLS_server_method() -> *const SSL_METHOD;
+    pub fn TLS_server_method() -> *const SSL_METHOD;
 
-            pub fn TLS_client_method() -> *const SSL_METHOD;
+    pub fn TLS_client_method() -> *const SSL_METHOD;
 
-            pub fn DTLS_server_method() -> *const SSL_METHOD;
+    pub fn DTLS_server_method() -> *const SSL_METHOD;
 
-            pub fn DTLS_client_method() -> *const SSL_METHOD;
-        }
-    } else {
-        extern "C" {
-            #[cfg(not(osslconf = "OPENSSL_NO_SSL3_METHOD"))]
-            pub fn SSLv3_method() -> *const SSL_METHOD;
-
-            pub fn SSLv23_method() -> *const SSL_METHOD;
-
-            pub fn SSLv23_client_method() -> *const SSL_METHOD;
-
-            pub fn SSLv23_server_method() -> *const SSL_METHOD;
-
-            pub fn TLSv1_method() -> *const SSL_METHOD;
-
-            pub fn TLSv1_1_method() -> *const SSL_METHOD;
-
-            pub fn TLSv1_2_method() -> *const SSL_METHOD;
-
-            pub fn DTLSv1_method() -> *const SSL_METHOD;
-
-            #[cfg(ossl102)]
-            pub fn DTLSv1_2_method() -> *const SSL_METHOD;
-        }
-    }
+    pub fn DTLS_client_method() -> *const SSL_METHOD;
 }
 
 extern "C" {
@@ -722,11 +592,8 @@ extern "C" {
     #[cfg(ossl110)]
     pub fn SSL_get0_verified_chain(ssl: *const SSL) -> *mut stack_st_X509;
 
-    #[cfg(any(ossl110, libressl))]
     pub fn SSL_get_client_random(ssl: *const SSL, out: *mut c_uchar, len: size_t) -> size_t;
-    #[cfg(any(ossl110, libressl))]
     pub fn SSL_get_server_random(ssl: *const SSL, out: *mut c_uchar, len: size_t) -> size_t;
-    #[cfg(any(ossl110, libressl))]
     pub fn SSL_SESSION_get_master_key(
         session: *const SSL_SESSION,
         out: *mut c_uchar,
@@ -828,9 +695,7 @@ extern "C" {
 }
 
 extern "C" {
-    #[cfg(any(ossl110, libressl))]
     pub fn SSL_CIPHER_get_cipher_nid(c: *const SSL_CIPHER) -> c_int;
-    #[cfg(any(ossl110, libressl))]
     pub fn SSL_CIPHER_get_digest_nid(c: *const SSL_CIPHER) -> c_int;
 }
 
