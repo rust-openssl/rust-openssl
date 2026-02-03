@@ -71,9 +71,12 @@ jobs:
           key: index-${{ runner.os }}-${{ github.run_number }}
           restore-keys: |
             index-${{ runner.os }}-
+      # ctest 0.5 uses edition 2024 which Rust 1.70's cargo can't parse
+      - run: sed -i '/"systest",/d' Cargo.toml
       - run: cargo generate-lockfile
       - run: |
           cargo update -p once_cell --precise 1.20.3
+          cargo update -p wasip2 --precise 1.0.1+wasi-0.2.4
       - uses: actions/cache@v5
         with:
           path: ~/.cargo/registry/cache
