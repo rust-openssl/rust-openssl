@@ -77,13 +77,13 @@ use std::ptr;
 use crate::error::ErrorStack;
 use crate::hash::MessageDigest;
 use crate::pkey::{HasPrivate, HasPublic, PKeyRef};
+#[cfg(ossl320)]
+use crate::pkey_ctx::NonceType;
 use crate::rsa::Padding;
 use crate::{cvt, cvt_p};
 use openssl_macros::corresponds;
 #[cfg(ossl320)]
 use std::ffi::CStr;
-#[cfg(ossl320)]
-use crate::pkey_ctx::NonceType;
 
 cfg_if! {
     if #[cfg(any(ossl110, libressl382))] {
@@ -852,28 +852,44 @@ mod test {
     #[cfg(ossl320)]
     fn ecdsa_deterministic_signature_validation() {
         // test vector details
-        let x = crate::bn::BigNum::from_hex_str("EC3A4E415B4E19A4568618029F427FA5DA9A8BC4AE92E02E06AAE5286B3\
-                00C64DEF8F0EA9055866064A254515480BC13").unwrap();
-        let y = crate::bn::BigNum::from_hex_str("8015D9B72D7D57244EA8EF9AC0C621896708A59367F9DFB9F54CA84B3F1\
-                C9DB1288B231C3AE0D4FE7344FD2533264720").unwrap();
-        let d = crate::bn::BigNum::from_hex_str("6B9D3DAD2E1B8C1C05B19875B6659F4DE23C3B667BF297BA\
-                9AA47740787137D896D5724E4C70A825F872C9EA60D2EDF5").unwrap();
+        let x = crate::bn::BigNum::from_hex_str(
+            "EC3A4E415B4E19A4568618029F427FA5DA9A8BC4AE92E02E06AAE5286B3\
+                00C64DEF8F0EA9055866064A254515480BC13",
+        )
+        .unwrap();
+        let y = crate::bn::BigNum::from_hex_str(
+            "8015D9B72D7D57244EA8EF9AC0C621896708A59367F9DFB9F54CA84B3F1\
+                C9DB1288B231C3AE0D4FE7344FD2533264720",
+        )
+        .unwrap();
+        let d = crate::bn::BigNum::from_hex_str(
+            "6B9D3DAD2E1B8C1C05B19875B6659F4DE23C3B667BF297BA\
+                9AA47740787137D896D5724E4C70A825F872C9EA60D2EDF5",
+        )
+        .unwrap();
         let message_bytes = b"sample".to_vec();
-        let r = crate::bn::BigNum::from_hex_str("94EDBB92A5ECB8AAD4736E56C691916B3F88140666CE9FA73D64C4EA95A\
-                D133C81A648152E44ACF96E36DD1E80FABE46").unwrap();
-        let s = crate::bn::BigNum::from_hex_str("99EF4AEB15F178CEA1FE40DB2603138F130E740A19624526203B6351D0A\
-                3A94FA329C145786E679E7B82C71A38628AC8").unwrap();
-        
+        let r = crate::bn::BigNum::from_hex_str(
+            "94EDBB92A5ECB8AAD4736E56C691916B3F88140666CE9FA73D64C4EA95A\
+                D133C81A648152E44ACF96E36DD1E80FABE46",
+        )
+        .unwrap();
+        let s = crate::bn::BigNum::from_hex_str(
+            "99EF4AEB15F178CEA1FE40DB2603138F130E740A19624526203B6351D0A\
+                3A94FA329C145786E679E7B82C71A38628AC8",
+        )
+        .unwrap();
+
         let ec_group = EcGroup::from_curve_name(Nid::SECP384R1).unwrap();
-        let ec_pub_key = EcKey::from_public_key_affine_coordinates(
-            &ec_group, &x, &y).unwrap();
-        let ec_priv_key = EcKey::from_private_components(
-            &ec_group, &d, ec_pub_key.public_key()).unwrap();
+        let ec_pub_key = EcKey::from_public_key_affine_coordinates(&ec_group, &x, &y).unwrap();
+        let ec_priv_key =
+            EcKey::from_private_components(&ec_group, &d, ec_pub_key.public_key()).unwrap();
         let pkey: PKey<crate::pkey::Private> = PKey::from_ec_key(ec_priv_key).unwrap();
 
         // Confirm random nonce
         let mut signer = Signer::new(MessageDigest::sha384(), &pkey).unwrap();
-        signer.set_nonce_type(crate::pkey_ctx::NonceType::RANDOM_K).unwrap();
+        signer
+            .set_nonce_type(crate::pkey_ctx::NonceType::RANDOM_K)
+            .unwrap();
         signer.update(&message_bytes).unwrap();
         let ec_sig = signer.sign_to_vec().unwrap();
         let ecdsa_sig = crate::ecdsa::EcdsaSig::from_der(&ec_sig).unwrap();
@@ -881,7 +897,9 @@ mod test {
         assert_ne!(&s, ecdsa_sig.s());
 
         let mut signer = Signer::new(MessageDigest::sha384(), &pkey).unwrap();
-        signer.set_nonce_type(crate::pkey_ctx::NonceType::DETERMINISTIC_K).unwrap();
+        signer
+            .set_nonce_type(crate::pkey_ctx::NonceType::DETERMINISTIC_K)
+            .unwrap();
         signer.update(&message_bytes).unwrap();
         let ec_sig = signer.sign_to_vec().unwrap();
         let ecdsa_sig = crate::ecdsa::EcdsaSig::from_der(&ec_sig).unwrap();
