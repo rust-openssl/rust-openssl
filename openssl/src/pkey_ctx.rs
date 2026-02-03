@@ -125,6 +125,17 @@ impl NonceType {
 
     /// Uses a deterministic value for the nonce k as defined in RFC #6979 (See Section 3.2 “Generation of k”).
     pub const DETERMINISTIC_K: Self = NonceType(1);
+
+    /// Creates a `NonceType` from an integer representation.
+    pub fn from_raw(value: c_uint) -> Self {
+        Self(value)
+    }
+
+    /// Returns the integer representation of `NonceType`.
+    #[allow(clippy::trivially_copy_pass_by_ref)]
+    pub fn as_raw(&self) -> c_uint {
+        self.0
+    }
 }
 
 generic_foreign_type_and_impl_send_sync! {

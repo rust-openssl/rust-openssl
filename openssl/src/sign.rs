@@ -80,6 +80,10 @@ use crate::pkey::{HasPrivate, HasPublic, PKeyRef};
 use crate::rsa::Padding;
 use crate::{cvt, cvt_p};
 use openssl_macros::corresponds;
+#[cfg(ossl320)]
+use std::ffi::CStr;
+#[cfg(ossl320)]
+use crate::pkey_ctx::NonceType;
 
 cfg_if! {
     if #[cfg(any(ossl110, libressl382))] {
@@ -242,6 +246,28 @@ impl Signer<'_> {
             ))
             .map(|_| ())
         }
+    }
+
+    /// Sets the nonce type for a private key context.
+    ///
+    /// The nonce for DSA and ECDSA can be either random (the default) or deterministic (as defined by RFC 6979).
+    ///
+    /// This is only useful for DSA and ECDSA.
+    /// Requires OpenSSL 3.2.0 or newer.
+    #[cfg(ossl320)]
+    #[corresponds(EVP_PKEY_CTX_set_params)]
+    pub fn set_nonce_type(&mut self, nonce_type: NonceType) -> Result<(), ErrorStack> {
+        let nonce_field_name = CStr::from_bytes_with_nul(b"nonce-type\0").unwrap();
+        let mut nonce_type = nonce_type.as_raw();
+        unsafe {
+            let param_nonce =
+                ffi::OSSL_PARAM_construct_uint(nonce_field_name.as_ptr(), &mut nonce_type);
+            let param_end = ffi::OSSL_PARAM_construct_end();
+
+            let params = [param_nonce, param_end];
+            cvt(ffi::EVP_PKEY_CTX_set_params(self.pctx, params.as_ptr()))?;
+        }
+        Ok(())
     }
 
     /// Feeds more data into the `Signer`.
@@ -820,5 +846,46 @@ mod test {
         verifier.set_rsa_mgf1_md(MessageDigest::sha256()).unwrap();
         verifier.update(&Vec::from_hex(INPUT).unwrap()).unwrap();
         assert!(verifier.verify(&signature).unwrap());
+    }
+
+    #[test]
+    #[cfg(ossl320)]
+    fn ecdsa_deterministic_signature_validation() {
+        // test vector details
+        let x = crate::bn::BigNum::from_hex_str("EC3A4E415B4E19A4568618029F427FA5DA9A8BC4AE92E02E06AAE5286B3\
+                00C64DEF8F0EA9055866064A254515480BC13").unwrap();
+        let y = crate::bn::BigNum::from_hex_str("8015D9B72D7D57244EA8EF9AC0C621896708A59367F9DFB9F54CA84B3F1\
+                C9DB1288B231C3AE0D4FE7344FD2533264720").unwrap();
+        let d = crate::bn::BigNum::from_hex_str("6B9D3DAD2E1B8C1C05B19875B6659F4DE23C3B667BF297BA\
+                9AA47740787137D896D5724E4C70A825F872C9EA60D2EDF5").unwrap();
+        let message_bytes = b"sample".to_vec();
+        let r = crate::bn::BigNum::from_hex_str("94EDBB92A5ECB8AAD4736E56C691916B3F88140666CE9FA73D64C4EA95A\
+                D133C81A648152E44ACF96E36DD1E80FABE46").unwrap();
+        let s = crate::bn::BigNum::from_hex_str("99EF4AEB15F178CEA1FE40DB2603138F130E740A19624526203B6351D0A\
+                3A94FA329C145786E679E7B82C71A38628AC8").unwrap();
+        
+        let ec_group = EcGroup::from_curve_name(Nid::SECP384R1).unwrap();
+        let ec_pub_key = EcKey::from_public_key_affine_coordinates(
+            &ec_group, &x, &y).unwrap();
+        let ec_priv_key = EcKey::from_private_components(
+            &ec_group, &d, ec_pub_key.public_key()).unwrap();
+        let pkey: PKey<crate::pkey::Private> = PKey::from_ec_key(ec_priv_key).unwrap();
+
+        // Confirm random nonce
+        let mut signer = Signer::new(MessageDigest::sha384(), &pkey).unwrap();
+        signer.set_nonce_type(crate::pkey_ctx::NonceType::RANDOM_K).unwrap();
+        signer.update(&message_bytes).unwrap();
+        let ec_sig = signer.sign_to_vec().unwrap();
+        let ecdsa_sig = crate::ecdsa::EcdsaSig::from_der(&ec_sig).unwrap();
+        assert_ne!(&r, ecdsa_sig.r());
+        assert_ne!(&s, ecdsa_sig.s());
+
+        let mut signer = Signer::new(MessageDigest::sha384(), &pkey).unwrap();
+        signer.set_nonce_type(crate::pkey_ctx::NonceType::DETERMINISTIC_K).unwrap();
+        signer.update(&message_bytes).unwrap();
+        let ec_sig = signer.sign_to_vec().unwrap();
+        let ecdsa_sig = crate::ecdsa::EcdsaSig::from_der(&ec_sig).unwrap();
+        assert_eq!(&r, ecdsa_sig.r());
+        assert_eq!(&s, ecdsa_sig.s());
     }
 }
