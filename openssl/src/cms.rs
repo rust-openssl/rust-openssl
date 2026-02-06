@@ -43,9 +43,7 @@ bitflags! {
         const REUSE_DIGEST = ffi::CMS_REUSE_DIGEST;
         const USE_KEYID = ffi::CMS_USE_KEYID;
         const DEBUG_DECRYPT = ffi::CMS_DEBUG_DECRYPT;
-        #[cfg(all(not(libressl), not(ossl101)))]
         const KEY_PARAM = ffi::CMS_KEY_PARAM;
-        #[cfg(all(not(libressl), not(ossl101), not(ossl102)))]
         const ASCIICRLF = ffi::CMS_ASCIICRLF;
     }
 }
@@ -206,9 +204,6 @@ impl CmsContentInfo {
     /// Given a certificate stack `certs`, data `data`, cipher `cipher` and flags `flags`,
     /// create a CmsContentInfo struct.
     ///
-    /// OpenSSL documentation at [`CMS_encrypt`]
-    ///
-    /// [`CMS_encrypt`]: https://www.openssl.org/docs/manmaster/man3/CMS_encrypt.html
     #[corresponds(CMS_encrypt)]
     pub fn encrypt(
         certs: &StackRef<X509>,
@@ -231,7 +226,7 @@ impl CmsContentInfo {
     }
 
     /// Verify this CmsContentInfo's signature,
-    /// This will search the 'certs' list for the signing certificate.      
+    /// This will search the 'certs' list for the signing certificate.
     /// Additional certificates, needed for building the certificate chain, may be
     /// given in 'store' as well as additional CRLs.
     /// A detached signature may be passed in `detached_data`. The signed content

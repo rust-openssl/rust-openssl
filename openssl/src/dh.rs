@@ -1,6 +1,5 @@
 //! Diffie-Hellman key agreement.
 
-use cfg_if::cfg_if;
 use foreign_types::{ForeignType, ForeignTypeRef};
 use std::mem;
 use std::ptr;
@@ -153,9 +152,9 @@ impl Dh<Params> {
         ffi::d2i_DHparams
     }
 
-    /// Requires OpenSSL 1.0.2 or newer.
+    /// Requires OpenSSL 1.1.0 or newer.
     #[corresponds(DH_get_1024_160)]
-    #[cfg(any(ossl102, ossl110))]
+    #[cfg(ossl110)]
     pub fn get_1024_160() -> Result<Dh<Params>, ErrorStack> {
         unsafe {
             ffi::init();
@@ -163,9 +162,9 @@ impl Dh<Params> {
         }
     }
 
-    /// Requires OpenSSL 1.0.2 or newer.
+    /// Requires OpenSSL 1.1.0 or newer.
     #[corresponds(DH_get_2048_224)]
-    #[cfg(any(ossl102, ossl110))]
+    #[cfg(ossl110)]
     pub fn get_2048_224() -> Result<Dh<Params>, ErrorStack> {
         unsafe {
             ffi::init();
@@ -173,9 +172,9 @@ impl Dh<Params> {
         }
     }
 
-    /// Requires OpenSSL 1.0.2 or newer.
+    /// Requires OpenSSL 1.1.0 or newer.
     #[corresponds(DH_get_2048_256)]
-    #[cfg(any(ossl102, ossl110))]
+    #[cfg(ossl110)]
     pub fn get_2048_256() -> Result<Dh<Params>, ErrorStack> {
         unsafe {
             ffi::init();
@@ -268,67 +267,7 @@ where
     }
 }
 
-cfg_if! {
-    if #[cfg(any(ossl110, libressl270, boringssl, awslc))] {
-        use ffi::{DH_set0_pqg, DH_get0_pqg, DH_get0_key, DH_set0_key};
-    } else {
-        #[allow(bad_style)]
-        unsafe fn DH_set0_pqg(
-            dh: *mut ffi::DH,
-            p: *mut ffi::BIGNUM,
-            q: *mut ffi::BIGNUM,
-            g: *mut ffi::BIGNUM,
-        ) -> ::libc::c_int {
-            (*dh).p = p;
-            (*dh).q = q;
-            (*dh).g = g;
-            1
-        }
-
-        #[allow(bad_style)]
-        unsafe fn DH_get0_pqg(
-            dh: *mut ffi::DH,
-            p: *mut *const ffi::BIGNUM,
-            q: *mut *const ffi::BIGNUM,
-            g: *mut *const ffi::BIGNUM,
-        ) {
-            if !p.is_null() {
-                *p = (*dh).p;
-            }
-            if !q.is_null() {
-                *q = (*dh).q;
-            }
-            if !g.is_null() {
-                *g = (*dh).g;
-            }
-        }
-
-        #[allow(bad_style)]
-        unsafe fn DH_set0_key(
-            dh: *mut ffi::DH,
-            pub_key: *mut ffi::BIGNUM,
-            priv_key: *mut ffi::BIGNUM,
-        ) -> ::libc::c_int {
-            (*dh).pub_key = pub_key;
-            (*dh).priv_key = priv_key;
-            1
-        }
-
-        #[allow(bad_style)]
-        unsafe fn DH_get0_key(
-            dh: *mut ffi::DH,
-            pub_key: *mut *const ffi::BIGNUM,
-            priv_key: *mut *const ffi::BIGNUM,
-        ) {
-            if !pub_key.is_null() {
-                *pub_key = (*dh).pub_key;
-            }
-            if !priv_key.is_null() {
-                *priv_key = (*dh).priv_key;
-            }
-        }
-    }
-}
+use ffi::{DH_get0_key, DH_get0_pqg, DH_set0_key, DH_set0_pqg};
 
 #[cfg(test)]
 mod tests {
@@ -339,7 +278,7 @@ mod tests {
     use crate::ssl::{SslContext, SslMethod};
 
     #[test]
-    #[cfg(ossl102)]
+    #[cfg(ossl110)]
     fn test_dh_rfc5114() {
         let mut ctx = SslContext::builder(SslMethod::tls()).unwrap();
         let dh2 = Dh::get_2048_224().unwrap();
@@ -402,7 +341,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(ossl102)]
+    #[cfg(ossl110)]
     fn test_dh_stored_restored() {
         let dh1 = Dh::get_2048_256().unwrap();
         let key1 = dh1.generate_key().unwrap();
@@ -417,7 +356,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(ossl102)]
+    #[cfg(ossl110)]
     fn test_set_keys() {
         let dh1 = Dh::get_2048_256().unwrap();
         let key1 = dh1.generate_key().unwrap();
@@ -457,7 +396,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(ossl102)]
+    #[cfg(ossl110)]
     fn test_dh_generate_key_compute_key() {
         let dh1 = Dh::get_2048_224().unwrap().generate_key().unwrap();
         let dh2 = Dh::get_2048_224().unwrap().generate_key().unwrap();

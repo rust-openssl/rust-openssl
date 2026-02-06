@@ -24,7 +24,6 @@
 //! use openssl::asn1::Asn1Time;
 //! let tomorrow = Asn1Time::days_from_now(1);
 //! ```
-use cfg_if::cfg_if;
 use foreign_types::{ForeignType, ForeignTypeRef};
 use libc::{c_char, c_int, c_long, time_t};
 use std::cmp::Ordering;
@@ -57,7 +56,7 @@ foreign_type_and_impl_send_sync! {
     /// further details of implementation.  Note: these docs are from the master
     /// branch as documentation on the 1.1.0 branch did not include this page.
     ///
-    /// [ASN1_GENERALIZEDTIME_set]: https://www.openssl.org/docs/manmaster/man3/ASN1_GENERALIZEDTIME_set.html
+    /// [ASN1_GENERALIZEDTIME_set]: https://docs.openssl.org/master/man3/ASN1_GENERALIZEDTIME_set/
     pub struct Asn1GeneralizedTime;
     /// Reference to a [`Asn1GeneralizedTime`]
     ///
@@ -80,6 +79,29 @@ impl fmt::Display for Asn1GeneralizedTimeRef {
                 Err(_) => f.write_str("error"),
                 Ok(_) => f.write_str(str::from_utf8_unchecked(mem_bio.get_buf())),
             }
+        }
+    }
+}
+
+impl Asn1GeneralizedTime {
+    /// Creates a new generalized time corresponding to the specified ASN1 time
+    /// string.
+    #[corresponds(ASN1_GENERALIZEDTIME_set_string)]
+    #[allow(clippy::should_implement_trait)]
+    pub fn from_str(s: &str) -> Result<Asn1GeneralizedTime, ErrorStack> {
+        unsafe {
+            ffi::init();
+
+            let time_str = CString::new(s).unwrap();
+            let ptr = cvt_p(ffi::ASN1_GENERALIZEDTIME_new())?;
+            let time = Asn1GeneralizedTime::from_ptr(ptr);
+
+            cvt(ffi::ASN1_GENERALIZEDTIME_set_string(
+                time.as_ptr(),
+                time_str.as_ptr(),
+            ))?;
+
+            Ok(time)
         }
     }
 }
@@ -165,7 +187,6 @@ impl Asn1Type {
 /// [`diff`]: struct.Asn1TimeRef.html#method.diff
 /// [`Asn1TimeRef`]: struct.Asn1TimeRef.html
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-#[cfg(any(ossl102, boringssl, awslc))]
 pub struct TimeDiff {
     /// Difference in days
     pub days: c_int,
@@ -187,7 +208,7 @@ foreign_type_and_impl_send_sync! {
     /// [ASN_TIME_set] documentation at OpenSSL explains the ASN.1 implementation
     /// used by OpenSSL.
     ///
-    /// [ASN_TIME_set]: https://www.openssl.org/docs/manmaster/crypto/ASN1_TIME_set.html
+    /// [ASN_TIME_set]: https://docs.openssl.org/master/man3/ASN1_TIME_set/
     pub struct Asn1Time;
     /// Reference to an [`Asn1Time`]
     ///
@@ -198,7 +219,6 @@ foreign_type_and_impl_send_sync! {
 impl Asn1TimeRef {
     /// Find difference between two times
     #[corresponds(ASN1_TIME_diff)]
-    #[cfg(any(ossl102, boringssl, awslc))]
     pub fn diff(&self, compare: &Self) -> Result<TimeDiff, ErrorStack> {
         let mut days = 0;
         let mut secs = 0;
@@ -214,7 +234,6 @@ impl Asn1TimeRef {
 
     /// Compare two times
     #[corresponds(ASN1_TIME_compare)]
-    #[cfg(any(ossl102, boringssl, awslc))]
     pub fn compare(&self, other: &Self) -> Result<Ordering, ErrorStack> {
         let d = self.diff(other)?;
         if d.days > 0 || d.secs > 0 {
@@ -228,7 +247,6 @@ impl Asn1TimeRef {
     }
 }
 
-#[cfg(any(ossl102, boringssl, awslc))]
 impl PartialEq for Asn1TimeRef {
     fn eq(&self, other: &Asn1TimeRef) -> bool {
         self.diff(other)
@@ -237,7 +255,6 @@ impl PartialEq for Asn1TimeRef {
     }
 }
 
-#[cfg(any(ossl102, boringssl, awslc))]
 impl PartialEq<Asn1Time> for Asn1TimeRef {
     fn eq(&self, other: &Asn1Time) -> bool {
         self.diff(other)
@@ -246,7 +263,6 @@ impl PartialEq<Asn1Time> for Asn1TimeRef {
     }
 }
 
-#[cfg(any(ossl102, boringssl, awslc))]
 impl PartialEq<Asn1Time> for &Asn1TimeRef {
     fn eq(&self, other: &Asn1Time) -> bool {
         self.diff(other)
@@ -255,21 +271,18 @@ impl PartialEq<Asn1Time> for &Asn1TimeRef {
     }
 }
 
-#[cfg(any(ossl102, boringssl, awslc))]
 impl PartialOrd for Asn1TimeRef {
     fn partial_cmp(&self, other: &Asn1TimeRef) -> Option<Ordering> {
         self.compare(other).ok()
     }
 }
 
-#[cfg(any(ossl102, boringssl, awslc))]
 impl PartialOrd<Asn1Time> for Asn1TimeRef {
     fn partial_cmp(&self, other: &Asn1Time) -> Option<Ordering> {
         self.compare(other).ok()
     }
 }
 
-#[cfg(any(ossl102, boringssl, awslc))]
 impl PartialOrd<Asn1Time> for &Asn1TimeRef {
     fn partial_cmp(&self, other: &Asn1Time) -> Option<Ordering> {
         self.compare(other).ok()
@@ -351,9 +364,9 @@ impl Asn1Time {
 
     /// Creates a new time corresponding to the specified X509 time string.
     ///
-    /// Requires BoringSSL or OpenSSL 1.1.1 or newer.
+    /// Requires BoringSSL, AWS-LC, OpenSSL 1.1.1, LibreSSL 3.6.0, or newer.
     #[corresponds(ASN1_TIME_set_string_X509)]
-    #[cfg(any(ossl111, boringssl, awslc))]
+    #[cfg(any(ossl111, boringssl, libressl360, awslc))]
     pub fn from_str_x509(s: &str) -> Result<Asn1Time, ErrorStack> {
         unsafe {
             let s = CString::new(s).unwrap();
@@ -366,7 +379,6 @@ impl Asn1Time {
     }
 }
 
-#[cfg(any(ossl102, boringssl, awslc))]
 impl PartialEq for Asn1Time {
     fn eq(&self, other: &Asn1Time) -> bool {
         self.diff(other)
@@ -375,7 +387,6 @@ impl PartialEq for Asn1Time {
     }
 }
 
-#[cfg(any(ossl102, boringssl, awslc))]
 impl PartialEq<Asn1TimeRef> for Asn1Time {
     fn eq(&self, other: &Asn1TimeRef) -> bool {
         self.diff(other)
@@ -384,7 +395,6 @@ impl PartialEq<Asn1TimeRef> for Asn1Time {
     }
 }
 
-#[cfg(any(ossl102, boringssl, awslc))]
 impl<'a> PartialEq<&'a Asn1TimeRef> for Asn1Time {
     fn eq(&self, other: &&'a Asn1TimeRef) -> bool {
         self.diff(other)
@@ -393,21 +403,18 @@ impl<'a> PartialEq<&'a Asn1TimeRef> for Asn1Time {
     }
 }
 
-#[cfg(any(ossl102, boringssl, awslc))]
 impl PartialOrd for Asn1Time {
     fn partial_cmp(&self, other: &Asn1Time) -> Option<Ordering> {
         self.compare(other).ok()
     }
 }
 
-#[cfg(any(ossl102, boringssl, awslc))]
 impl PartialOrd<Asn1TimeRef> for Asn1Time {
     fn partial_cmp(&self, other: &Asn1TimeRef) -> Option<Ordering> {
         self.compare(other).ok()
     }
 }
 
-#[cfg(any(ossl102, boringssl, awslc))]
 impl<'a> PartialOrd<&'a Asn1TimeRef> for Asn1Time {
     fn partial_cmp(&self, other: &&'a Asn1TimeRef) -> Option<Ordering> {
         self.compare(other).ok()
@@ -423,7 +430,7 @@ foreign_type_and_impl_send_sync! {
     /// structures.  This implementation uses [ASN1_STRING-to_UTF8] to preserve
     /// compatibility with Rust's String.
     ///
-    /// [ASN1_STRING-to_UTF8]: https://www.openssl.org/docs/manmaster/crypto/ASN1_STRING_to_UTF8.html
+    /// [ASN1_STRING-to_UTF8]: https://docs.openssl.org/master/man3/ASN1_STRING_to_UTF8/
     pub struct Asn1String;
     /// A reference to an [`Asn1String`].
     pub struct Asn1StringRef;
@@ -492,7 +499,7 @@ foreign_type_and_impl_send_sync! {
     /// OpenSSL documentation includes [`ASN1_INTEGER_set`].
     ///
     /// [`bn`]: ../bn/index.html
-    /// [`ASN1_INTEGER_set`]: https://www.openssl.org/docs/manmaster/crypto/ASN1_INTEGER_set.html
+    /// [`ASN1_INTEGER_set`]: https://docs.openssl.org/master/man3/ASN1_INTEGER_set/
     pub struct Asn1Integer;
     /// A reference to an [`Asn1Integer`].
     pub struct Asn1IntegerRef;
@@ -504,7 +511,7 @@ impl Asn1Integer {
     /// Corresponds to [`BN_to_ASN1_INTEGER`]. Also see
     /// [`BigNumRef::to_asn1_integer`].
     ///
-    /// [`BN_to_ASN1_INTEGER`]: https://www.openssl.org/docs/manmaster/crypto/BN_to_ASN1_INTEGER.html
+    /// [`BN_to_ASN1_INTEGER`]: https://docs.openssl.org/master/man3/BN_to_ASN1_INTEGER/
     /// [`BigNumRef::to_asn1_integer`]: ../bn/struct.BigNumRef.html#method.to_asn1_integer
     pub fn from_bn(bn: &BigNumRef) -> Result<Self, ErrorStack> {
         bn.to_asn1_integer()
@@ -668,7 +675,7 @@ foreign_type_and_impl_send_sync! {
     ///
     /// [`Nid`]: ../nid/index.html
     /// [`nid::COMMONNAME`]: ../nid/constant.COMMONNAME.html
-    /// [`OBJ_nid2obj`]: https://www.openssl.org/docs/manmaster/crypto/OBJ_obj2nid.html
+    /// [`OBJ_nid2obj`]: https://docs.openssl.org/master/man3/OBJ_obj2nid/
     pub struct Asn1Object;
     /// A reference to an [`Asn1Object`].
     pub struct Asn1ObjectRef;
@@ -736,16 +743,7 @@ impl fmt::Debug for Asn1ObjectRef {
     }
 }
 
-cfg_if! {
-    if #[cfg(any(ossl110, libressl273, boringssl, awslc))] {
-        use ffi::ASN1_STRING_get0_data;
-    } else {
-        #[allow(bad_style)]
-        unsafe fn ASN1_STRING_get0_data(s: *mut ffi::ASN1_STRING) -> *const ::libc::c_uchar {
-            ffi::ASN1_STRING_data(s)
-        }
-    }
-}
+use ffi::ASN1_STRING_get0_data;
 
 foreign_type_and_impl_send_sync! {
     type CType = ffi::ASN1_ENUMERATED;
@@ -797,8 +795,14 @@ mod tests {
     #[test]
     fn time_from_str() {
         Asn1Time::from_str("99991231235959Z").unwrap();
-        #[cfg(ossl111)]
+        #[cfg(any(ossl111, boringssl, libressl360, awslc))]
         Asn1Time::from_str_x509("99991231235959Z").unwrap();
+    }
+
+    #[test]
+    fn generalized_time_from_str() {
+        let time = Asn1GeneralizedTime::from_str("99991231235959Z").unwrap();
+        assert_eq!("Dec 31 23:59:59 9999 GMT", time.to_string());
     }
 
     #[test]
@@ -808,7 +812,6 @@ mod tests {
     }
 
     #[test]
-    #[cfg(any(ossl102, boringssl, awslc))]
     fn time_eq() {
         let a = Asn1Time::from_str("99991231235959Z").unwrap();
         let b = Asn1Time::from_str("99991231235959Z").unwrap();
@@ -827,7 +830,6 @@ mod tests {
     }
 
     #[test]
-    #[cfg(any(ossl102, boringssl, awslc))]
     fn time_ord() {
         let a = Asn1Time::from_str("99991231235959Z").unwrap();
         let b = Asn1Time::from_str("99991231235959Z").unwrap();

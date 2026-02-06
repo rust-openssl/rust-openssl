@@ -22,7 +22,7 @@ use crate::ocsp::{OcspResponse, OcspResponseStatus};
 use crate::pkey::{Id, PKey};
 use crate::srtp::SrtpProfileId;
 use crate::ssl::test::server::Server;
-#[cfg(any(ossl110, ossl111, libressl261))]
+#[cfg(any(ossl110, libressl))]
 use crate::ssl::SslVersion;
 use crate::ssl::{self, NameType, SslConnectorBuilder};
 #[cfg(ossl111)]
@@ -32,9 +32,9 @@ use crate::ssl::{
     SslAcceptorBuilder, SslConnector, SslContext, SslContextBuilder, SslFiletype, SslMethod,
     SslOptions, SslSessionCacheMode, SslStream, SslVerifyMode, StatusType,
 };
-#[cfg(ossl102)]
+#[cfg(ossl110)]
 use crate::x509::store::X509StoreBuilder;
-#[cfg(ossl102)]
+#[cfg(ossl110)]
 use crate::x509::verify::X509CheckFlags;
 use crate::x509::{X509Name, X509StoreContext, X509VerifyResult, X509};
 
@@ -67,7 +67,7 @@ fn verify_trusted() {
 }
 
 #[test]
-#[cfg(ossl102)]
+#[cfg(ossl110)]
 fn verify_trusted_with_set_cert() {
     let server = Server::builder().build();
 
@@ -504,7 +504,6 @@ fn test_connect_with_srtp_ssl() {
 /// Tests that when the `SslStream` is created as a server stream, the protocols
 /// are correctly advertised to the client.
 #[test]
-#[cfg(any(ossl102, libressl261, boringssl, awslc))]
 fn test_alpn_server_advertise_multiple() {
     let mut server = Server::builder();
     server.ctx().set_alpn_select_callback(|_, client| {
@@ -535,7 +534,6 @@ fn test_alpn_server_select_none_fatal() {
 }
 
 #[test]
-#[cfg(any(ossl102, libressl261, boringssl, awslc))]
 fn test_alpn_server_select_none() {
     static CALLED_BACK: AtomicBool = AtomicBool::new(false);
 
@@ -554,7 +552,6 @@ fn test_alpn_server_select_none() {
 }
 
 #[test]
-#[cfg(any(boringssl, ossl102, libressl261, awslc))]
 fn test_alpn_server_unilateral() {
     let server = Server::builder().build();
 
@@ -627,7 +624,6 @@ fn read_panic() {
 }
 
 #[test]
-#[cfg_attr(all(libressl321, not(libressl340)), ignore)]
 #[should_panic(expected = "blammo")]
 fn flush_panic() {
     struct ExplodingStream(TcpStream);
@@ -672,7 +668,7 @@ fn refcount_ssl_context() {
 }
 
 #[test]
-#[cfg_attr(libressl250, ignore)]
+#[cfg_attr(libressl, ignore)]
 #[cfg_attr(target_os = "windows", ignore)]
 #[cfg_attr(all(target_os = "macos", feature = "vendored"), ignore)]
 fn default_verify_paths() {
@@ -705,7 +701,7 @@ fn add_extra_chain_cert() {
 }
 
 #[test]
-#[cfg(ossl102)]
+#[cfg(ossl110)]
 fn verify_valid_hostname() {
     let server = Server::builder().build();
 
@@ -723,7 +719,7 @@ fn verify_valid_hostname() {
 }
 
 #[test]
-#[cfg(ossl102)]
+#[cfg(ossl110)]
 fn verify_invalid_hostname() {
     let mut server = Server::builder();
     server.should_error();
@@ -921,7 +917,7 @@ fn connector_client_server_mozilla_intermediate_v5() {
 }
 
 #[test]
-#[cfg(any(ossl111, libressl340))]
+#[cfg(any(ossl111, libressl))]
 fn connector_client_server_mozilla_modern_v5() {
     test_mozilla_server(SslAcceptor::mozilla_modern_v5);
 }
@@ -969,7 +965,7 @@ fn cert_store() {
 }
 
 #[test]
-#[cfg_attr(any(all(libressl321, not(libressl340)), boringssl, awslc), ignore)]
+#[cfg_attr(any(boringssl, awslc), ignore)]
 fn tmp_dh_callback() {
     static CALLED_BACK: AtomicBool = AtomicBool::new(false);
 
@@ -984,7 +980,7 @@ fn tmp_dh_callback() {
 
     let mut client = server.client();
     // TLS 1.3 has no DH suites, so make sure we don't pick that version
-    #[cfg(any(ossl111, libressl340))]
+    #[cfg(any(ossl111, libressl))]
     client.ctx().set_options(super::SslOptions::NO_TLSV1_3);
     client.ctx().set_cipher_list("EDH").unwrap();
     client.connect();
@@ -993,31 +989,7 @@ fn tmp_dh_callback() {
 }
 
 #[test]
-#[cfg(all(ossl101, not(ossl110)))]
-#[allow(deprecated)]
-fn tmp_ecdh_callback() {
-    use crate::ec::EcKey;
-    use crate::nid::Nid;
-
-    static CALLED_BACK: AtomicBool = AtomicBool::new(false);
-
-    let mut server = Server::builder();
-    server.ctx().set_tmp_ecdh_callback(|_, _, _| {
-        CALLED_BACK.store(true, Ordering::SeqCst);
-        EcKey::from_curve_name(Nid::X9_62_PRIME256V1)
-    });
-
-    let server = server.build();
-
-    let mut client = server.client();
-    client.ctx().set_cipher_list("ECDH").unwrap();
-    client.connect();
-
-    assert!(CALLED_BACK.load(Ordering::SeqCst));
-}
-
-#[test]
-#[cfg_attr(any(all(libressl321, not(libressl340)), boringssl, awslc), ignore)]
+#[cfg_attr(any(boringssl, awslc), ignore)]
 fn tmp_dh_callback_ssl() {
     static CALLED_BACK: AtomicBool = AtomicBool::new(false);
 
@@ -1034,35 +1006,9 @@ fn tmp_dh_callback_ssl() {
 
     let mut client = server.client();
     // TLS 1.3 has no DH suites, so make sure we don't pick that version
-    #[cfg(any(ossl111, libressl340))]
+    #[cfg(any(ossl111, libressl))]
     client.ctx().set_options(super::SslOptions::NO_TLSV1_3);
     client.ctx().set_cipher_list("EDH").unwrap();
-    client.connect();
-
-    assert!(CALLED_BACK.load(Ordering::SeqCst));
-}
-
-#[test]
-#[cfg(all(ossl101, not(ossl110)))]
-#[allow(deprecated)]
-fn tmp_ecdh_callback_ssl() {
-    use crate::ec::EcKey;
-    use crate::nid::Nid;
-
-    static CALLED_BACK: AtomicBool = AtomicBool::new(false);
-
-    let mut server = Server::builder();
-    server.ssl_cb(|ssl| {
-        ssl.set_tmp_ecdh_callback(|_, _, _| {
-            CALLED_BACK.store(true, Ordering::SeqCst);
-            EcKey::from_curve_name(Nid::X9_62_PRIME256V1)
-        });
-    });
-
-    let server = server.build();
-
-    let mut client = server.client();
-    client.ctx().set_cipher_list("ECDH").unwrap();
     client.connect();
 
     assert!(CALLED_BACK.load(Ordering::SeqCst));
@@ -1079,7 +1025,7 @@ fn idle_session() {
 /// not work due to lack of PSK support. The test passes with NO_TLSV1_3,
 /// but let's ignore it until LibreSSL supports it out of the box.
 #[test]
-#[cfg_attr(libressl321, ignore)]
+#[cfg_attr(libressl, ignore)]
 fn active_session() {
     let server = Server::builder().build();
 
@@ -1139,7 +1085,7 @@ fn status_callbacks() {
 /// not work due to lack of PSK support. The test passes with NO_TLSV1_3,
 /// but let's ignore it until LibreSSL supports it out of the box.
 #[test]
-#[cfg_attr(libressl321, ignore)]
+#[cfg_attr(libressl, ignore)]
 fn new_session_callback() {
     static CALLED_BACK: AtomicBool = AtomicBool::new(false);
 
@@ -1166,7 +1112,7 @@ fn new_session_callback() {
 /// not work due to lack of PSK support. The test passes with NO_TLSV1_3,
 /// but let's ignore it until LibreSSL supports it out of the box.
 #[test]
-#[cfg_attr(libressl321, ignore)]
+#[cfg_attr(libressl, ignore)]
 fn new_session_callback_swapped_ctx() {
     static CALLED_BACK: AtomicBool = AtomicBool::new(false);
 
@@ -1242,7 +1188,7 @@ fn keying_export() {
 }
 
 #[test]
-#[cfg(any(ossl110, libressl261))]
+#[cfg(any(ossl110, libressl))]
 fn no_version_overlap() {
     let mut server = Server::builder();
     server.ctx().set_min_proto_version(None).unwrap();
@@ -1250,7 +1196,7 @@ fn no_version_overlap() {
         .ctx()
         .set_max_proto_version(Some(SslVersion::TLS1_1))
         .unwrap();
-    #[cfg(any(ossl110g, libressl270))]
+    #[cfg(any(ossl110g, libressl))]
     assert_eq!(server.ctx().max_proto_version(), Some(SslVersion::TLS1_1));
     server.should_error();
     let server = server.build();
@@ -1550,7 +1496,7 @@ fn session_cache_size() {
 }
 
 #[test]
-#[cfg(ossl102)]
+#[cfg(ossl110)]
 fn add_chain_cert() {
     let ctx = SslContext::builder(SslMethod::tls()).unwrap().build();
     let cert = X509::from_pem(CERT).unwrap();
@@ -1686,4 +1632,22 @@ fn ssl_ex_data_leak() {
 
     drop(ssl);
     assert_eq!(DROPS.load(Ordering::Relaxed), 2);
+}
+
+#[test]
+#[cfg(ossl111)]
+fn cipher_id() {
+    let mut server = Server::builder();
+    server
+        .ctx()
+        .set_ciphersuites("TLS_AES_256_GCM_SHA384")
+        .unwrap();
+    let server = server.build();
+
+    let client = server.client();
+    let s = client.connect();
+    let ssl = s.ssl();
+    let cipher = ssl.current_cipher().unwrap();
+    let cipher_id = cipher.protocol_id();
+    assert_eq!(cipher_id, [0x13, 0x02]);
 }

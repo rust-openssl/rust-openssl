@@ -21,7 +21,7 @@ use libc::c_int;
 use std::fmt;
 use std::ptr;
 
-use crate::bn::{BigNum, BigNumContextRef, BigNumRef};
+use crate::bn::{BigNum, BigNumContext, BigNumContextRef, BigNumRef};
 use crate::error::ErrorStack;
 use crate::nid::Nid;
 use crate::pkey::{HasParams, HasPrivate, HasPublic, Params, Private, Public};
@@ -81,7 +81,7 @@ impl Asn1Flag {
     ///
     /// OpenSSL documentation at [`EC_GROUP`]
     ///
-    /// [`EC_GROUP`]: https://www.openssl.org/docs/manmaster/crypto/EC_GROUP_get_seed_len.html
+    /// [`EC_GROUP`]: https://docs.openssl.org/master/man3/EC_GROUP_get_seed_len/
     pub const EXPLICIT_CURVE: Asn1Flag = Asn1Flag(0);
 
     /// Standard Curves
@@ -91,7 +91,7 @@ impl Asn1Flag {
     ///
     /// OpenSSL documentation at [`EC_GROUP`]
     ///
-    /// [`EC_GROUP`]: https://www.openssl.org/docs/manmaster/man3/EC_GROUP_order_bits.html
+    /// [`EC_GROUP`]: https://docs.openssl.org/master/man3/EC_GROUP_order_bits/
     pub const NAMED_CURVE: Asn1Flag = Asn1Flag(ffi::OPENSSL_EC_NAMED_CURVE);
 }
 
@@ -162,6 +162,12 @@ impl EcGroup {
             ))
             .map(EcGroup)
         }
+    }
+}
+
+impl fmt::Debug for EcGroup {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
+        self.as_ref().fmt(f)
     }
 }
 
@@ -240,7 +246,6 @@ impl EcGroupRef {
 
     /// Returns the number of bits in the group order.
     #[corresponds(EC_GROUP_order_bits)]
-    #[cfg(ossl110)]
     pub fn order_bits(&self) -> u32 {
         unsafe { ffi::EC_GROUP_order_bits(self.as_ptr()) as u32 }
     }
@@ -293,7 +298,7 @@ impl EcGroupRef {
     /// Sets the flag determining if the group corresponds to a named curve or must be explicitly
     /// parameterized.
     ///
-    /// This defaults to `EXPLICIT_CURVE` in OpenSSL 1.0.1 and 1.0.2, but `NAMED_CURVE` in OpenSSL
+    /// This defaults to `EXPLICIT_CURVE` in OpenSSL 1.0.2, but `NAMED_CURVE` in OpenSSL
     /// 1.1.0.
     #[corresponds(EC_GROUP_set_asn1_flag)]
     pub fn set_asn1_flag(&mut self, flag: Asn1Flag) {
@@ -316,6 +321,46 @@ impl EcGroupRef {
             Some(Nid::from_raw(nid))
         } else {
             None
+        }
+    }
+}
+
+impl fmt::Debug for EcGroupRef {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
+        if let Some(curve_name) = self.curve_name() {
+            if let Ok(name) = curve_name.short_name() {
+                f.debug_struct("EcGroup")
+                    .field("curve_name", &name)
+                    .finish()
+            } else {
+                f.debug_struct("EcGroup")
+                    .field("curve", &curve_name)
+                    .finish()
+            }
+        } else {
+            // let chains are only allowed in Rust 2024 or later
+            if let Ok(mut p) = BigNum::new() {
+                if let Ok(mut a) = BigNum::new() {
+                    if let Ok(mut b) = BigNum::new() {
+                        if let Ok(mut ctx) = BigNumContext::new() {
+                            if self
+                                .components_gfp(&mut p, &mut a, &mut b, &mut ctx)
+                                .is_ok()
+                            {
+                                // switch to .field_with() after debug_closure_helpers stabilizes
+                                return f
+                                    .debug_struct("EcGroup")
+                                    .field("p", &format!("{:X}", p))
+                                    .field("a", &format!("{:X}", a))
+                                    .field("b", &format!("{:X}", b))
+                                    .finish();
+                            }
+                        }
+                    }
+                }
+            }
+
+            f.debug_struct("EcGroup").finish()
         }
     }
 }
@@ -519,7 +564,7 @@ impl EcPointRef {
     /// Places affine coordinates of a curve over a prime field in the provided
     /// `x` and `y` `BigNum`s.
     #[corresponds(EC_POINT_get_affine_coordinates)]
-    #[cfg(any(ossl111, boringssl, libressl350, awslc))]
+    #[cfg(any(ossl111, boringssl, libressl, awslc))]
     pub fn affine_coordinates(
         &self,
         group: &EcGroupRef,
@@ -551,6 +596,29 @@ impl EcPointRef {
     ) -> Result<(), ErrorStack> {
         unsafe {
             cvt(ffi::EC_POINT_get_affine_coordinates_GFp(
+                group.as_ptr(),
+                self.as_ptr(),
+                x.as_ptr(),
+                y.as_ptr(),
+                ctx.as_ptr(),
+            ))
+            .map(|_| ())
+        }
+    }
+
+    /// Sets affine coordinates of a point on an elliptic curve using the provided
+    /// `x` and `y` `BigNum`s
+    #[corresponds(EC_POINT_set_affine_coordinates)]
+    #[cfg(any(ossl111, boringssl, libressl, awslc))]
+    pub fn set_affine_coordinates(
+        &mut self,
+        group: &EcGroupRef,
+        x: &BigNumRef,
+        y: &BigNumRef,
+        ctx: &mut BigNumContextRef,
+    ) -> Result<(), ErrorStack> {
+        unsafe {
+            cvt(ffi::EC_POINT_set_affine_coordinates(
                 group.as_ptr(),
                 self.as_ptr(),
                 x.as_ptr(),
@@ -1062,8 +1130,15 @@ mod test {
         let _curve = EcGroup::from_components(p, a, b, &mut ctx).unwrap();
     }
 
-    #[test]
-    fn ec_point_set_affine() {
+    fn set_affine_coords_test(
+        set_affine_coords: fn(
+            &mut EcPointRef,
+            &EcGroupRef,
+            &BigNumRef,
+            &BigNumRef,
+            &mut BigNumContextRef,
+        ) -> Result<(), ErrorStack>,
+    ) {
         // parameters are from secp256r1
         let group = EcGroup::from_curve_name(Nid::X9_62_PRIME256V1).unwrap();
         let mut ctx = BigNumContext::new().unwrap();
@@ -1076,10 +1151,20 @@ mod test {
             "4FE342E2FE1A7F9B8EE7EB4A7C0F9E162BCE33576B315ECECBB6406837BF51F5",
         )
         .unwrap();
-        gen_point
-            .set_affine_coordinates_gfp(&group, &gen_x, &gen_y, &mut ctx)
-            .unwrap();
+        set_affine_coords(&mut gen_point, &group, &gen_x, &gen_y, &mut ctx).unwrap();
+
         assert!(gen_point.is_on_curve(&group, &mut ctx).unwrap());
+    }
+
+    #[test]
+    fn ec_point_set_affine_gfp() {
+        set_affine_coords_test(EcPointRef::set_affine_coordinates_gfp)
+    }
+
+    #[test]
+    #[cfg(any(ossl111, boringssl, libressl, awslc))]
+    fn ec_point_set_affine() {
+        set_affine_coords_test(EcPointRef::set_affine_coordinates)
     }
 
     #[test]
@@ -1260,7 +1345,7 @@ mod test {
         assert!(ec_key.check_key().is_ok());
     }
 
-    #[cfg(any(ossl111, boringssl, libressl350, awslc))]
+    #[cfg(any(ossl111, boringssl, libressl, awslc))]
     #[test]
     fn get_affine_coordinates() {
         let group = EcGroup::from_curve_name(Nid::X9_62_PRIME256V1).unwrap();
@@ -1336,10 +1421,41 @@ mod test {
     }
 
     #[test]
-    #[cfg(any(boringssl, ossl111, libressl350, awslc))]
+    #[cfg(any(ossl111, boringssl, libressl, awslc))]
     fn asn1_flag() {
         let group = EcGroup::from_curve_name(Nid::X9_62_PRIME256V1).unwrap();
         let flag = group.asn1_flag();
         assert_eq!(flag, Asn1Flag::NAMED_CURVE);
+    }
+
+    #[test]
+    fn test_debug_standard_group() {
+        let group = EcGroup::from_curve_name(Nid::SECP521R1).unwrap();
+
+        assert_eq!(
+            format!("{:?}", group),
+            "EcGroup { curve_name: \"secp521r1\" }"
+        );
+    }
+
+    #[test]
+    fn test_debug_custom_group() {
+        let mut p = BigNum::new().unwrap();
+        let mut a = BigNum::new().unwrap();
+        let mut b = BigNum::new().unwrap();
+        let mut ctx = BigNumContext::new().unwrap();
+
+        EcGroup::from_curve_name(Nid::SECP521R1)
+            .unwrap()
+            .components_gfp(&mut p, &mut a, &mut b, &mut ctx)
+            .unwrap();
+
+        // reconstruct the group from its components
+        let group = EcGroup::from_components(p, a, b, &mut ctx).unwrap();
+
+        assert_eq!(
+            format!("{:?}", group),
+            "EcGroup { p: \"01FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF\", a: \"01FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFC\", b: \"51953EB9618E1C9A1F929A21A0B68540EEA2DA725B99B315F3B8B489918EF109E156193951EC7E937B1652C0BD3BB1BF073573DF883D2C34F1EF451FD46B503F00\" }"
+        );
     }
 }

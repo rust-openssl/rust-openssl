@@ -53,7 +53,6 @@ use crate::rsa::Rsa;
 use crate::symm::Cipher;
 use crate::util::{invoke_passwd_cb, CallbackState};
 use crate::{cvt, cvt_p};
-use cfg_if::cfg_if;
 use foreign_types::{ForeignType, ForeignTypeRef};
 use libc::{c_int, c_long};
 use openssl_macros::corresponds;
@@ -79,7 +78,7 @@ pub struct Id(c_int);
 
 impl Id {
     pub const RSA: Id = Id(ffi::EVP_PKEY_RSA);
-    #[cfg(any(ossl111, libressl310, boringssl, awslc))]
+    #[cfg(any(ossl111, libressl, boringssl, awslc))]
     pub const RSA_PSS: Id = Id(ffi::EVP_PKEY_RSA_PSS);
     #[cfg(not(boringssl))]
     pub const HMAC: Id = Id(ffi::EVP_PKEY_HMAC);
@@ -384,7 +383,7 @@ impl<T> fmt::Debug for PKey<T> {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         let alg = match self.id() {
             Id::RSA => "RSA",
-            #[cfg(any(ossl111, libressl310, boringssl, awslc))]
+            #[cfg(any(ossl111, libressl, boringssl, awslc))]
             Id::RSA_PSS => "RSA-PSS",
             #[cfg(not(boringssl))]
             Id::HMAC => "HMAC",
@@ -832,22 +831,7 @@ impl PKey<Public> {
     }
 }
 
-cfg_if! {
-    if #[cfg(any(boringssl, ossl110, libressl270, awslc))] {
-        use ffi::EVP_PKEY_up_ref;
-    } else {
-        #[allow(bad_style)]
-        unsafe extern "C" fn EVP_PKEY_up_ref(pkey: *mut ffi::EVP_PKEY) {
-            ffi::CRYPTO_add_lock(
-                &mut (*pkey).references,
-                1,
-                ffi::CRYPTO_LOCK_EVP_PKEY,
-                "pkey.rs\0".as_ptr() as *const _,
-                line!() as c_int,
-            );
-        }
-    }
-}
+use ffi::EVP_PKEY_up_ref;
 
 impl<T> TryFrom<EcKey<T>> for PKey<T> {
     type Error = ErrorStack;

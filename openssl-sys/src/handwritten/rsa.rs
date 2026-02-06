@@ -4,6 +4,9 @@ use libc::*;
 cfg_if! {
     if #[cfg(ossl300)] {
         extern "C" {
+            pub fn EVP_PKEY_CTX_set_rsa_keygen_bits(ctx: *mut EVP_PKEY_CTX, bits: c_int) -> c_int;
+            pub fn EVP_PKEY_CTX_set1_rsa_keygen_pubexp(ctx: *mut EVP_PKEY_CTX, pubexp: *mut BIGNUM) -> c_int;
+
             pub fn EVP_PKEY_CTX_set_rsa_padding(ctx: *mut EVP_PKEY_CTX, pad_mode: c_int) -> c_int;
             pub fn EVP_PKEY_CTX_get_rsa_padding(ctx: *mut EVP_PKEY_CTX, pad_mode: *mut c_int) -> c_int;
 
@@ -13,31 +16,26 @@ cfg_if! {
     }
 }
 
+#[cfg(not(osslconf = "OPENSSL_NO_DEPRECATED_3_0"))]
 extern "C" {
     pub fn RSA_new() -> *mut RSA;
     pub fn RSA_size(k: *const RSA) -> c_int;
 
-    #[cfg(any(ossl110, libressl273))]
     pub fn RSA_set0_key(r: *mut RSA, n: *mut BIGNUM, e: *mut BIGNUM, d: *mut BIGNUM) -> c_int;
-    #[cfg(any(ossl110, libressl273))]
     pub fn RSA_set0_factors(r: *mut RSA, p: *mut BIGNUM, q: *mut BIGNUM) -> c_int;
-    #[cfg(any(ossl110, libressl273))]
     pub fn RSA_set0_crt_params(
         r: *mut RSA,
         dmp1: *mut BIGNUM,
         dmq1: *mut BIGNUM,
         iqmp: *mut BIGNUM,
     ) -> c_int;
-    #[cfg(any(ossl110, libressl273))]
     pub fn RSA_get0_key(
         r: *const RSA,
         n: *mut *const BIGNUM,
         e: *mut *const BIGNUM,
         d: *mut *const BIGNUM,
     );
-    #[cfg(any(ossl110, libressl273))]
     pub fn RSA_get0_factors(r: *const RSA, p: *mut *const BIGNUM, q: *mut *const BIGNUM);
-    #[cfg(any(ossl110, libressl273))]
     pub fn RSA_get0_crt_params(
         r: *const RSA,
         dmp1: *mut *const BIGNUM,

@@ -1,7 +1,7 @@
 //! Bindings to OpenSSL
 //!
-//! This crate provides a safe interface to the popular OpenSSL cryptography library. OpenSSL versions 1.0.1 through
-//! 3.x.x and LibreSSL versions 2.5 through 3.7.x are supported.
+//! This crate provides a safe interface to the popular OpenSSL cryptography library. OpenSSL versions 1.0.2 through
+//! 3.x.x and LibreSSL versions 3.5 through 4.2.x are supported.
 //!
 //! # Building
 //!
@@ -177,6 +177,8 @@ pub mod memcmp;
 pub mod nid;
 #[cfg(not(osslconf = "OPENSSL_NO_OCSP"))]
 pub mod ocsp;
+#[cfg(ossl300)]
+mod ossl_param;
 pub mod pkcs12;
 pub mod pkcs5;
 #[cfg(not(any(boringssl, awslc)))]

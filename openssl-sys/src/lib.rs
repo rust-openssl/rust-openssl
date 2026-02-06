@@ -35,10 +35,13 @@ extern crate aws_lc_sys;
 #[cfg(awslc)]
 #[path = "."]
 mod aws_lc {
-    #[cfg(feature = "aws-lc")]
+    #[cfg(all(feature = "aws-lc", not(feature = "aws-lc-fips")))]
     pub use aws_lc_sys::*;
 
-    #[cfg(not(feature = "aws-lc"))]
+    #[cfg(feature = "aws-lc-fips")]
+    pub use aws_lc_fips_sys::*;
+
+    #[cfg(not(any(feature = "aws-lc", feature = "aws-lc-fips")))]
     include!(concat!(env!("OUT_DIR"), "/bindgen.rs"));
 
     use libc::{c_char, c_long, c_void};
@@ -69,7 +72,11 @@ mod openssl {
     pub use self::bio::*;
     pub use self::bn::*;
     pub use self::cms::*;
+    #[cfg(ossl300)]
+    pub use self::core_dispatch::*;
     pub use self::crypto::*;
+    pub use self::dh::*;
+    pub use self::dsa::*;
     pub use self::dtls1::*;
     pub use self::ec::*;
     pub use self::err::*;
@@ -99,7 +106,11 @@ mod openssl {
     mod bio;
     mod bn;
     mod cms;
+    #[cfg(ossl300)]
+    mod core_dispatch;
     mod crypto;
+    mod dh;
+    mod dsa;
     mod dtls1;
     mod ec;
     mod err;
@@ -147,74 +158,8 @@ mod openssl {
         })
     }
 
-    #[cfg(not(ossl110))]
-    pub fn init() {
-        use std::io::{self, Write};
-        use std::mem;
-        use std::process;
-        use std::sync::{Mutex, MutexGuard};
-
-        static mut MUTEXES: *mut Vec<Mutex<()>> = 0 as *mut Vec<Mutex<()>>;
-        static mut GUARDS: *mut Vec<Option<MutexGuard<'static, ()>>> =
-            0 as *mut Vec<Option<MutexGuard<'static, ()>>>;
-
-        unsafe extern "C" fn locking_function(
-            mode: c_int,
-            n: c_int,
-            _file: *const c_char,
-            _line: c_int,
-        ) {
-            let mutex = &(*MUTEXES)[n as usize];
-
-            if mode & CRYPTO_LOCK != 0 {
-                (*GUARDS)[n as usize] = Some(mutex.lock().unwrap());
-            } else {
-                if let None = (*GUARDS)[n as usize].take() {
-                    let _ = writeln!(
-                        io::stderr(),
-                        "BUG: rust-openssl lock {} already unlocked, aborting",
-                        n
-                    );
-                    process::abort();
-                }
-            }
-        }
-
-        cfg_if! {
-            if #[cfg(unix)] {
-                fn set_id_callback() {
-                    unsafe extern "C" fn thread_id() -> c_ulong {
-                        ::libc::pthread_self() as c_ulong
-                    }
-
-                    unsafe {
-                        CRYPTO_set_id_callback__fixed_rust(Some(thread_id));
-                    }
-                }
-            } else {
-                fn set_id_callback() {}
-            }
-        }
-
-        INIT.call_once(|| unsafe {
-            SSL_library_init();
-            SSL_load_error_strings();
-            OPENSSL_add_all_algorithms_noconf();
-
-            let num_locks = CRYPTO_num_locks();
-            let mut mutexes = Box::new(Vec::new());
-            for _ in 0..num_locks {
-                mutexes.push(Mutex::new(()));
-            }
-            MUTEXES = mem::transmute(mutexes);
-            let guards: Box<Vec<Option<MutexGuard<()>>>> =
-                Box::new((0..num_locks).map(|_| None).collect());
-            GUARDS = mem::transmute(guards);
-
-            CRYPTO_set_locking_callback__fixed_rust(Some(locking_function));
-            set_id_callback();
-        })
-    }
+    #[cfg(libressl)]
+    pub fn init() {}
 
     /// Disable explicit initialization of the openssl libs.
     ///

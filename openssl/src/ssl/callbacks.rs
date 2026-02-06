@@ -1,4 +1,3 @@
-use cfg_if::cfg_if;
 use foreign_types::ForeignType;
 use foreign_types::ForeignTypeRef;
 #[cfg(any(ossl111, not(osslconf = "OPENSSL_NO_PSK")))]
@@ -15,11 +14,8 @@ use std::str;
 use std::sync::Arc;
 
 use crate::dh::Dh;
-#[cfg(all(ossl101, not(ossl110)))]
-use crate::ec::EcKey;
 use crate::error::ErrorStack;
 use crate::pkey::Params;
-#[cfg(any(ossl102, libressl261, boringssl, awslc))]
 use crate::ssl::AlpnError;
 use crate::ssl::{
     try_get_session_ctx_index, SniError, Ssl, SslAlert, SslContext, SslContextRef, SslRef,
@@ -178,7 +174,6 @@ where
     }
 }
 
-#[cfg(any(ossl102, libressl261, boringssl, awslc))]
 pub extern "C" fn raw_alpn_select<F>(
     ssl: *mut ffi::SSL,
     out: *mut *const c_uchar,
@@ -237,34 +232,6 @@ where
     }
 }
 
-#[cfg(all(ossl101, not(ossl110)))]
-pub unsafe extern "C" fn raw_tmp_ecdh<F>(
-    ssl: *mut ffi::SSL,
-    is_export: c_int,
-    keylength: c_int,
-) -> *mut ffi::EC_KEY
-where
-    F: Fn(&mut SslRef, bool, u32) -> Result<EcKey<Params>, ErrorStack> + 'static + Sync + Send,
-{
-    let ssl = SslRef::from_ptr_mut(ssl);
-    let callback = ssl
-        .ssl_context()
-        .ex_data(SslContext::cached_ex_index::<F>())
-        .expect("BUG: tmp ecdh callback missing") as *const F;
-
-    match (*callback)(ssl, is_export != 0, keylength as u32) {
-        Ok(ec_key) => {
-            let ptr = ec_key.as_ptr();
-            mem::forget(ec_key);
-            ptr
-        }
-        Err(e) => {
-            e.put();
-            ptr::null_mut()
-        }
-    }
-}
-
 pub unsafe extern "C" fn raw_tmp_dh_ssl<F>(
     ssl: *mut ffi::SSL,
     is_export: c_int,
@@ -283,34 +250,6 @@ where
         Ok(dh) => {
             let ptr = dh.as_ptr();
             mem::forget(dh);
-            ptr
-        }
-        Err(e) => {
-            e.put();
-            ptr::null_mut()
-        }
-    }
-}
-
-#[cfg(all(ossl101, not(ossl110)))]
-pub unsafe extern "C" fn raw_tmp_ecdh_ssl<F>(
-    ssl: *mut ffi::SSL,
-    is_export: c_int,
-    keylength: c_int,
-) -> *mut ffi::EC_KEY
-where
-    F: Fn(&mut SslRef, bool, u32) -> Result<EcKey<Params>, ErrorStack> + 'static + Sync + Send,
-{
-    let ssl = SslRef::from_ptr_mut(ssl);
-    let callback = ssl
-        .ex_data(Ssl::cached_ex_index::<Arc<F>>())
-        .expect("BUG: ssl tmp ecdh callback missing")
-        .clone();
-
-    match callback(ssl, is_export != 0, keylength as u32) {
-        Ok(ec_key) => {
-            let ptr = ec_key.as_ptr();
-            mem::forget(ec_key);
             ptr
         }
         Err(e) => {
@@ -390,17 +329,9 @@ pub unsafe extern "C" fn raw_remove_session<F>(
     callback(ctx, session)
 }
 
-cfg_if! {
-    if #[cfg(any(ossl110, libressl280, boringssl, awslc))] {
-        type DataPtr = *const c_uchar;
-    } else {
-        type DataPtr = *mut c_uchar;
-    }
-}
-
 pub unsafe extern "C" fn raw_get_session<F>(
     ssl: *mut ffi::SSL,
-    data: DataPtr,
+    data: *const c_uchar,
     len: c_int,
     copy: *mut c_int,
 ) -> *mut ffi::SSL_SESSION
@@ -526,18 +457,9 @@ where
 }
 
 #[cfg(not(any(boringssl, awslc)))]
-cfg_if! {
-    if #[cfg(any(ossl110, libressl280))] {
-        type CookiePtr = *const c_uchar;
-    } else {
-        type CookiePtr = *mut c_uchar;
-    }
-}
-
-#[cfg(not(any(boringssl, awslc)))]
 pub extern "C" fn raw_cookie_verify<F>(
     ssl: *mut ffi::SSL,
-    cookie: CookiePtr,
+    cookie: *const c_uchar,
     cookie_len: c_uint,
 ) -> c_int
 where

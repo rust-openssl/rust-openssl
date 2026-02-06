@@ -36,21 +36,19 @@ extern "C" {
     pub fn AUTHORITY_KEYID_free(akid: *mut AUTHORITY_KEYID);
 }
 
-const_ptr_api! {
-    extern "C" {
-        pub fn X509V3_EXT_nconf_nid(
-            conf: *mut CONF,
-            ctx: *mut X509V3_CTX,
-            ext_nid: c_int,
-            value: #[const_ptr_if(any(ossl110, libressl280))] c_char,
-        ) -> *mut X509_EXTENSION;
-        pub fn X509V3_EXT_nconf(
-            conf: *mut CONF,
-            ctx: *mut X509V3_CTX,
-            name: #[const_ptr_if(any(ossl110, libressl280))] c_char,
-            value: #[const_ptr_if(any(ossl110, libressl280))] c_char,
-        ) -> *mut X509_EXTENSION;
-    }
+extern "C" {
+    pub fn X509V3_EXT_nconf_nid(
+        conf: *mut CONF,
+        ctx: *mut X509V3_CTX,
+        ext_nid: c_int,
+        value: *const c_char,
+    ) -> *mut X509_EXTENSION;
+    pub fn X509V3_EXT_nconf(
+        conf: *mut CONF,
+        ctx: *mut X509V3_CTX,
+        name: *const c_char,
+        value: *const c_char,
+    ) -> *mut X509_EXTENSION;
 }
 
 extern "C" {
@@ -71,16 +69,20 @@ extern "C" {
     pub fn X509_get1_ocsp(x: *mut X509) -> *mut stack_st_OPENSSL_STRING;
 }
 
-const_ptr_api! {
-    extern "C" {
-        pub fn X509V3_get_d2i(
-            x: #[const_ptr_if(any(ossl110, libressl280))] stack_st_X509_EXTENSION,
-            nid: c_int,
-            crit: *mut c_int,
-            idx: *mut c_int,
-        ) -> *mut c_void;
-        pub fn X509V3_extensions_print(out: *mut BIO, title: #[const_ptr_if(any(ossl110, libressl280))] c_char, exts: #[const_ptr_if(any(ossl110, libressl280))] stack_st_X509_EXTENSION, flag: c_ulong, indent: c_int) -> c_int;
-    }
+extern "C" {
+    pub fn X509V3_get_d2i(
+        x: *const stack_st_X509_EXTENSION,
+        nid: c_int,
+        crit: *mut c_int,
+        idx: *mut c_int,
+    ) -> *mut c_void;
+    pub fn X509V3_extensions_print(
+        out: *mut BIO,
+        title: *const c_char,
+        exts: *const stack_st_X509_EXTENSION,
+        flag: c_ulong,
+        indent: c_int,
+    ) -> c_int;
 }
 
 extern "C" {
@@ -147,7 +149,7 @@ extern "C" {
     pub fn DIST_POINT_NAME_free(dist_point: *mut DIST_POINT_NAME);
 }
 
-#[cfg(ossl102)]
+#[cfg(ossl110)]
 extern "C" {
     pub fn X509_check_host(
         x: *mut X509,

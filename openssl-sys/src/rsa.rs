@@ -7,6 +7,26 @@ pub const RSA_F4: c_long = 0x10001;
 
 cfg_if! {
     if #[cfg(not(ossl300))] {
+        pub unsafe fn EVP_PKEY_CTX_set_rsa_keygen_bits(ctx: *mut EVP_PKEY_CTX, bits: c_int) -> c_int {
+            EVP_PKEY_CTX_ctrl(
+                ctx,
+                EVP_PKEY_RSA,
+                EVP_PKEY_OP_KEYGEN,
+                EVP_PKEY_CTRL_RSA_KEYGEN_BITS,
+                bits,
+                ptr::null_mut(),
+            )
+        }
+        pub unsafe fn EVP_PKEY_CTX_set_rsa_keygen_pubexp(ctx: *mut EVP_PKEY_CTX, pubexp: *mut BIGNUM) -> c_int {
+            EVP_PKEY_CTX_ctrl(
+                ctx,
+                EVP_PKEY_RSA,
+                EVP_PKEY_OP_KEYGEN,
+                EVP_PKEY_CTRL_RSA_KEYGEN_PUBEXP,
+                0,
+                pubexp as *mut _,
+            )
+        }
         pub unsafe fn EVP_PKEY_CTX_set_rsa_padding(ctx: *mut EVP_PKEY_CTX, pad: c_int) -> c_int {
             EVP_PKEY_CTX_ctrl(
                 ctx,
@@ -52,7 +72,6 @@ cfg_if! {
     }
 }
 
-#[cfg(any(ossl102, libressl310))]
 pub unsafe fn EVP_PKEY_CTX_set_rsa_oaep_md(ctx: *mut EVP_PKEY_CTX, md: *mut EVP_MD) -> c_int {
     EVP_PKEY_CTX_ctrl(
         ctx,
@@ -64,7 +83,6 @@ pub unsafe fn EVP_PKEY_CTX_set_rsa_oaep_md(ctx: *mut EVP_PKEY_CTX, md: *mut EVP_
     )
 }
 
-#[cfg(any(ossl102, libressl310))]
 pub unsafe fn EVP_PKEY_CTX_set0_rsa_oaep_label(
     ctx: *mut EVP_PKEY_CTX,
     label: *mut c_void,
@@ -82,14 +100,14 @@ pub unsafe fn EVP_PKEY_CTX_set0_rsa_oaep_label(
 
 pub const EVP_PKEY_CTRL_RSA_PADDING: c_int = EVP_PKEY_ALG_CTRL + 1;
 pub const EVP_PKEY_CTRL_RSA_PSS_SALTLEN: c_int = EVP_PKEY_ALG_CTRL + 2;
+pub const EVP_PKEY_CTRL_RSA_KEYGEN_BITS: c_int = EVP_PKEY_ALG_CTRL + 3;
+pub const EVP_PKEY_CTRL_RSA_KEYGEN_PUBEXP: c_int = EVP_PKEY_ALG_CTRL + 4;
 
 pub const EVP_PKEY_CTRL_RSA_MGF1_MD: c_int = EVP_PKEY_ALG_CTRL + 5;
 
 pub const EVP_PKEY_CTRL_GET_RSA_PADDING: c_int = EVP_PKEY_ALG_CTRL + 6;
 
-#[cfg(any(ossl102, libressl310))]
 pub const EVP_PKEY_CTRL_RSA_OAEP_MD: c_int = EVP_PKEY_ALG_CTRL + 9;
-#[cfg(any(ossl102, libressl310))]
 pub const EVP_PKEY_CTRL_RSA_OAEP_LABEL: c_int = EVP_PKEY_ALG_CTRL + 10;
 
 pub const RSA_PKCS1_PADDING: c_int = 1;

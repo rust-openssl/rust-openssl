@@ -4,8 +4,8 @@ version = "0.1.1"
 edition = "2021"
 license = "MIT OR Apache-2.0"
 description = "Internal macros used by the openssl crate."
-repository = "https://github.com/sfackler/rust-openssl"
-rust-version = "1.63.0"
+repository = "https://github.com/rust-openssl/rust-openssl"
+rust-version = "1.70.0"
 
 [lib]
 proc-macro = true

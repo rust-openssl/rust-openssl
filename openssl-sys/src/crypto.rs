@@ -115,20 +115,11 @@ cfg_if! {
     }
 }
 
-cfg_if! {
-    if #[cfg(any(ossl110, libressl271))] {
-        pub const OPENSSL_VERSION: c_int = 0;
-        pub const OPENSSL_CFLAGS: c_int = 1;
-        pub const OPENSSL_BUILT_ON: c_int = 2;
-        pub const OPENSSL_PLATFORM: c_int = 3;
-        pub const OPENSSL_DIR: c_int = 4;
-    } else {
-        pub const SSLEAY_VERSION: c_int = 0;
-        pub const SSLEAY_CFLAGS: c_int = 2;
-        pub const SSLEAY_BUILT_ON: c_int = 3;
-        pub const SSLEAY_PLATFORM: c_int = 4;
-        pub const SSLEAY_DIR: c_int = 5;
-    }
-}
+pub const OPENSSL_VERSION: c_int = 0;
+pub const OPENSSL_CFLAGS: c_int = 1;
+pub const OPENSSL_BUILT_ON: c_int = 2;
+pub const OPENSSL_PLATFORM: c_int = 3;
+pub const OPENSSL_DIR: c_int = 4;
 
+#[cfg(not(osslconf = "OPENSSL_NO_DEPRECATED_3_0"))]
 pub const CRYPTO_LOCK: c_int = 1;

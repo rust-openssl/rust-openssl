@@ -55,7 +55,6 @@ use crate::cipher::CipherRef;
 use crate::cipher_ctx::{CipherCtx, CipherCtxRef};
 use crate::error::ErrorStack;
 use crate::nid::Nid;
-use cfg_if::cfg_if;
 use foreign_types::ForeignTypeRef;
 use openssl_macros::corresponds;
 
@@ -69,7 +68,7 @@ pub enum Mode {
 ///
 /// See OpenSSL doc at [`EVP_EncryptInit`] for more information on each algorithms.
 ///
-/// [`EVP_EncryptInit`]: https://www.openssl.org/docs/manmaster/crypto/EVP_EncryptInit.html
+/// [`EVP_EncryptInit`]: https://docs.openssl.org/master/man3/EVP_EncryptInit/
 #[derive(Copy, Clone, PartialEq, Eq)]
 pub struct Cipher(*const ffi::EVP_CIPHER);
 
@@ -114,6 +113,7 @@ impl Cipher {
         unsafe { Cipher(ffi::EVP_aes_128_cfb1()) }
     }
 
+    #[cfg(not(boringssl))]
     pub fn aes_128_cfb128() -> Cipher {
         unsafe { Cipher(ffi::EVP_aes_128_cfb128()) }
     }
@@ -159,6 +159,7 @@ impl Cipher {
         unsafe { Cipher(ffi::EVP_aes_192_cfb1()) }
     }
 
+    #[cfg(not(boringssl))]
     pub fn aes_192_cfb128() -> Cipher {
         unsafe { Cipher(ffi::EVP_aes_192_cfb128()) }
     }
@@ -209,6 +210,7 @@ impl Cipher {
         unsafe { Cipher(ffi::EVP_aes_256_cfb1()) }
     }
 
+    #[cfg(not(boringssl))]
     pub fn aes_256_cfb128() -> Cipher {
         unsafe { Cipher(ffi::EVP_aes_256_cfb128()) }
     }
@@ -378,7 +380,7 @@ impl Cipher {
     }
 
     /// Requires OpenSSL 1.1.0 or newer.
-    #[cfg(all(any(ossl110, libressl310), not(osslconf = "OPENSSL_NO_CHACHA")))]
+    #[cfg(all(any(ossl110, libressl), not(osslconf = "OPENSSL_NO_CHACHA")))]
     pub fn chacha20() -> Cipher {
         unsafe { Cipher(ffi::EVP_chacha20()) }
     }
@@ -429,27 +431,27 @@ impl Cipher {
         unsafe { Cipher(ffi::EVP_seed_ofb()) }
     }
 
-    #[cfg(all(any(ossl111, libressl291), not(osslconf = "OPENSSL_NO_SM4")))]
+    #[cfg(all(any(ossl111, libressl), not(osslconf = "OPENSSL_NO_SM4")))]
     pub fn sm4_ecb() -> Cipher {
         unsafe { Cipher(ffi::EVP_sm4_ecb()) }
     }
 
-    #[cfg(all(any(ossl111, libressl291), not(osslconf = "OPENSSL_NO_SM4")))]
+    #[cfg(all(any(ossl111, libressl), not(osslconf = "OPENSSL_NO_SM4")))]
     pub fn sm4_cbc() -> Cipher {
         unsafe { Cipher(ffi::EVP_sm4_cbc()) }
     }
 
-    #[cfg(all(any(ossl111, libressl291), not(osslconf = "OPENSSL_NO_SM4")))]
+    #[cfg(all(any(ossl111, libressl), not(osslconf = "OPENSSL_NO_SM4")))]
     pub fn sm4_ctr() -> Cipher {
         unsafe { Cipher(ffi::EVP_sm4_ctr()) }
     }
 
-    #[cfg(all(any(ossl111, libressl291), not(osslconf = "OPENSSL_NO_SM4")))]
+    #[cfg(all(any(ossl111, libressl), not(osslconf = "OPENSSL_NO_SM4")))]
     pub fn sm4_cfb128() -> Cipher {
         unsafe { Cipher(ffi::EVP_sm4_cfb128()) }
     }
 
-    #[cfg(all(any(ossl111, libressl291), not(osslconf = "OPENSSL_NO_SM4")))]
+    #[cfg(all(any(ossl111, libressl), not(osslconf = "OPENSSL_NO_SM4")))]
     pub fn sm4_ofb() -> Cipher {
         unsafe { Cipher(ffi::EVP_sm4_ofb()) }
     }
@@ -511,8 +513,10 @@ impl Cipher {
     /// Determines whether the cipher is using CCM mode
     #[cfg(not(any(boringssl, awslc)))]
     fn is_ccm(self) -> bool {
-        // NOTE: OpenSSL returns pointers to static structs, which makes this work as expected
-        self == Cipher::aes_128_ccm() || self == Cipher::aes_256_ccm()
+        matches!(
+            self.nid(),
+            Nid::AES_128_CCM | Nid::AES_192_CCM | Nid::AES_256_CCM
+        )
     }
 
     #[cfg(any(boringssl, awslc))]
@@ -523,9 +527,10 @@ impl Cipher {
     /// Determines whether the cipher is using OCB mode
     #[cfg(all(ossl110, not(osslconf = "OPENSSL_NO_OCB")))]
     fn is_ocb(self) -> bool {
-        self == Cipher::aes_128_ocb()
-            || self == Cipher::aes_192_ocb()
-            || self == Cipher::aes_256_ocb()
+        matches!(
+            self.nid(),
+            Nid::AES_128_OCB | Nid::AES_192_OCB | Nid::AES_256_OCB
+        )
     }
 
     #[cfg(any(not(ossl110), osslconf = "OPENSSL_NO_OCB"))]
@@ -915,28 +920,7 @@ pub fn decrypt_aead(
     Ok(out)
 }
 
-cfg_if! {
-    if #[cfg(any(boringssl, ossl110, libressl273, awslc))] {
-        use ffi::{EVP_CIPHER_block_size, EVP_CIPHER_iv_length, EVP_CIPHER_key_length};
-    } else {
-        use crate::LenType;
-
-        #[allow(bad_style)]
-        pub unsafe fn EVP_CIPHER_iv_length(ptr: *const ffi::EVP_CIPHER) -> LenType {
-            (*ptr).iv_len
-        }
-
-        #[allow(bad_style)]
-        pub unsafe fn EVP_CIPHER_block_size(ptr: *const ffi::EVP_CIPHER) -> LenType {
-            (*ptr).block_size
-        }
-
-        #[allow(bad_style)]
-        pub unsafe fn EVP_CIPHER_key_length(ptr: *const ffi::EVP_CIPHER) -> LenType {
-            (*ptr).key_len
-        }
-    }
-}
+use ffi::{EVP_CIPHER_block_size, EVP_CIPHER_iv_length, EVP_CIPHER_key_length};
 
 #[cfg(test)]
 mod tests {
@@ -1618,7 +1602,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(any(ossl110, libressl310))]
+    #[cfg(any(ossl110, libressl))]
     fn test_chacha20() {
         let key = "0000000000000000000000000000000000000000000000000000000000000000";
         let iv = "00000000000000000000000000000000";
@@ -1732,7 +1716,7 @@ mod tests {
     // GB/T 32907-2016
     // http://openstd.samr.gov.cn/bzgk/gb/newGbInfo?hcno=7803DE42D3BC5E80B0C3E5D8E873D56A
     #[test]
-    #[cfg(all(any(ossl111, libressl291), not(osslconf = "OPENSSL_NO_SM4")))]
+    #[cfg(all(any(ossl111, libressl), not(osslconf = "OPENSSL_NO_SM4")))]
     fn test_sm4_ecb() {
         use std::mem;
 

@@ -7,11 +7,12 @@
 use std::env;
 
 fn main() {
-    println!("cargo:rustc-check-cfg=cfg(osslconf, values(\"OPENSSL_NO_OCB\", \"OPENSSL_NO_SM4\", \"OPENSSL_NO_SEED\", \"OPENSSL_NO_CHACHA\", \"OPENSSL_NO_CAST\", \"OPENSSL_NO_IDEA\", \"OPENSSL_NO_CAMELLIA\", \"OPENSSL_NO_RC4\", \"OPENSSL_NO_BF\", \"OPENSSL_NO_PSK\", \"OPENSSL_NO_DEPRECATED_3_0\", \"OPENSSL_NO_SCRYPT\", \"OPENSSL_NO_SM3\", \"OPENSSL_NO_RMD160\", \"OPENSSL_NO_EC2M\", \"OPENSSL_NO_OCSP\", \"OPENSSL_NO_CMS\", \"OPENSSL_NO_EC\", \"OPENSSL_NO_ARGON2\", \"OPENSSL_NO_RC2\"))");
+    println!("cargo:rustc-check-cfg=cfg(osslconf, values(\"OPENSSL_NO_OCB\", \"OPENSSL_NO_SM4\", \"OPENSSL_NO_SEED\", \"OPENSSL_NO_CHACHA\", \"OPENSSL_NO_CAST\", \"OPENSSL_NO_IDEA\", \"OPENSSL_NO_CAMELLIA\", \"OPENSSL_NO_RC4\", \"OPENSSL_NO_BF\", \"OPENSSL_NO_PSK\", \"OPENSSL_NO_DEPRECATED_3_0\", \"OPENSSL_NO_SCRYPT\", \"OPENSSL_NO_SM3\", \"OPENSSL_NO_RMD160\", \"OPENSSL_NO_EC2M\", \"OPENSSL_NO_OCSP\", \"OPENSSL_NO_SRTP\", \"OPENSSL_NO_CMS\", \"OPENSSL_NO_EC\", \"OPENSSL_NO_ARGON2\", \"OPENSSL_NO_RC2\"))");
 
     println!("cargo:rustc-check-cfg=cfg(libressl)");
     println!("cargo:rustc-check-cfg=cfg(boringssl)");
     println!("cargo:rustc-check-cfg=cfg(awslc)");
+    println!("cargo:rustc-check-cfg=cfg(awslc_fips)");
 
     println!("cargo:rustc-check-cfg=cfg(libressl250)");
     println!("cargo:rustc-check-cfg=cfg(libressl251)");
@@ -34,6 +35,7 @@ fn main() {
     println!("cargo:rustc-check-cfg=cfg(libressl390)");
     println!("cargo:rustc-check-cfg=cfg(libressl400)");
     println!("cargo:rustc-check-cfg=cfg(libressl410)");
+    println!("cargo:rustc-check-cfg=cfg(libressl420)");
 
     println!("cargo:rustc-check-cfg=cfg(ossl101)");
     println!("cargo:rustc-check-cfg=cfg(ossl102)");
@@ -46,6 +48,8 @@ fn main() {
     println!("cargo:rustc-check-cfg=cfg(ossl310)");
     println!("cargo:rustc-check-cfg=cfg(ossl320)");
     println!("cargo:rustc-check-cfg=cfg(ossl330)");
+    println!("cargo:rustc-check-cfg=cfg(ossl340)");
+    println!("cargo:rustc-check-cfg=cfg(ossl350)");
 
     if env::var("DEP_OPENSSL_LIBRESSL").is_ok() {
         println!("cargo:rustc-cfg=libressl");
@@ -59,48 +63,28 @@ fn main() {
         println!("cargo:rustc-cfg=awslc");
     }
 
+    if env::var("DEP_OPENSSL_AWSLC_FIPS").is_ok() {
+        println!("cargo:rustc-cfg=awslc");
+        println!("cargo:rustc-cfg=awslc_fips");
+    }
+
     if let Ok(v) = env::var("DEP_OPENSSL_LIBRESSL_VERSION_NUMBER") {
         let version = u64::from_str_radix(&v, 16).unwrap();
 
-        if version >= 0x2_05_00_00_0 {
-            println!("cargo:rustc-cfg=libressl250");
-        }
-        if version >= 0x2_05_01_00_0 {
-            println!("cargo:rustc-cfg=libressl251");
-        }
-        if version >= 0x2_06_01_00_0 {
-            println!("cargo:rustc-cfg=libressl261");
-        }
-        if version >= 0x2_07_00_00_0 {
-            println!("cargo:rustc-cfg=libressl270");
-        }
-        if version >= 0x2_07_01_00_0 {
-            println!("cargo:rustc-cfg=libressl271");
-        }
-        if version >= 0x2_07_03_00_0 {
-            println!("cargo:rustc-cfg=libressl273");
-        }
-        if version >= 0x2_08_00_00_0 {
-            println!("cargo:rustc-cfg=libressl280");
-        }
-        if version >= 0x2_09_01_00_0 {
-            println!("cargo:rustc-cfg=libressl291");
-        }
-        if version >= 0x3_01_00_00_0 {
-            println!("cargo:rustc-cfg=libressl310");
-        }
-        if version >= 0x3_02_01_00_0 {
-            println!("cargo:rustc-cfg=libressl321");
-        }
-        if version >= 0x3_03_02_00_0 {
-            println!("cargo:rustc-cfg=libressl332");
-        }
-        if version >= 0x3_04_00_00_0 {
-            println!("cargo:rustc-cfg=libressl340");
-        }
-        if version >= 0x3_05_00_00_0 {
-            println!("cargo:rustc-cfg=libressl350");
-        }
+        println!("cargo:rustc-cfg=libressl250");
+        println!("cargo:rustc-cfg=libressl251");
+        println!("cargo:rustc-cfg=libressl261");
+        println!("cargo:rustc-cfg=libressl270");
+        println!("cargo:rustc-cfg=libressl271");
+        println!("cargo:rustc-cfg=libressl273");
+        println!("cargo:rustc-cfg=libressl280");
+        println!("cargo:rustc-cfg=libressl291");
+        println!("cargo:rustc-cfg=libressl310");
+        println!("cargo:rustc-cfg=libressl321");
+        println!("cargo:rustc-cfg=libressl332");
+        println!("cargo:rustc-cfg=libressl340");
+        println!("cargo:rustc-cfg=libressl350");
+
         if version >= 0x3_06_00_00_0 {
             println!("cargo:rustc-cfg=libressl360");
         }
@@ -125,6 +109,9 @@ fn main() {
         if version >= 0x4_01_00_00_0 {
             println!("cargo:rustc-cfg=libressl410");
         }
+        if version >= 0x4_02_00_00_0 {
+            println!("cargo:rustc-cfg=libressl420");
+        }
     }
 
     if let Ok(vars) = env::var("DEP_OPENSSL_CONF") {
@@ -135,16 +122,9 @@ fn main() {
 
     if let Ok(version) = env::var("DEP_OPENSSL_VERSION_NUMBER") {
         let version = u64::from_str_radix(&version, 16).unwrap();
-
-        if version >= 0x1_00_01_00_0 {
-            println!("cargo:rustc-cfg=ossl101");
-        }
-        if version >= 0x1_00_02_00_0 {
-            println!("cargo:rustc-cfg=ossl102");
-        }
-        if version >= 0x1_01_00_00_0 {
-            println!("cargo:rustc-cfg=ossl110");
-        }
+        println!("cargo:rustc-cfg=ossl101");
+        println!("cargo:rustc-cfg=ossl102");
+        println!("cargo:rustc-cfg=ossl110");
         if version >= 0x1_01_00_07_0 {
             println!("cargo:rustc-cfg=ossl110g");
         }
@@ -168,6 +148,12 @@ fn main() {
         }
         if version >= 0x3_03_00_00_0 {
             println!("cargo:rustc-cfg=ossl330");
+        }
+        if version >= 0x3_04_00_00_0 {
+            println!("cargo:rustc-cfg=ossl340");
+        }
+        if version >= 0x3_05_00_00_0 {
+            println!("cargo:rustc-cfg=ossl350");
         }
     }
 }

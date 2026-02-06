@@ -27,118 +27,21 @@ pub enum X509_ATTRIBUTE {}
 
 stack!(stack_st_X509_ATTRIBUTE);
 
-cfg_if! {
-    if #[cfg(any(ossl110, libressl350))] {
-        pub enum X509_REQ_INFO {}
-    } else {
-        #[repr(C)]
-        pub struct X509_REQ_INFO {
-            pub enc: ASN1_ENCODING,
-            pub version: *mut ASN1_INTEGER,
-            pub subject: *mut X509_NAME,
-            pubkey: *mut c_void,
-            pub attributes: *mut stack_st_X509_ATTRIBUTE,
-        }
-    }
-}
+pub enum X509_REQ_INFO {}
 
-cfg_if! {
-    if #[cfg(any(ossl110, libressl350))] {
-        pub enum X509_CRL {}
-    } else {
-        #[repr(C)]
-        pub struct X509_CRL {
-            pub crl: *mut X509_CRL_INFO,
-            sig_alg: *mut X509_ALGOR,
-            signature: *mut c_void,
-            references: c_int,
-            flags: c_int,
-            akid: *mut c_void,
-            idp: *mut c_void,
-            idp_flags: c_int,
-            idp_reasons: c_int,
-            crl_number: *mut ASN1_INTEGER,
-            base_crl_number: *mut ASN1_INTEGER,
-            sha1_hash: [c_uchar; 20],
-            issuers: *mut c_void,
-            meth: *const c_void,
-            meth_data: *mut c_void,
-        }
-    }
-}
+pub enum X509_CRL {}
 
 stack!(stack_st_X509_CRL);
 
-cfg_if! {
-    if #[cfg(any(ossl110, libressl350))] {
-        pub enum X509_CRL_INFO {}
-    } else {
-        #[repr(C)]
-        pub struct X509_CRL_INFO {
-            version: *mut ASN1_INTEGER,
-            sig_alg: *mut X509_ALGOR,
-            pub issuer: *mut X509_NAME,
-            pub lastUpdate: *mut ASN1_TIME,
-            pub nextUpdate: *mut ASN1_TIME,
-            pub revoked: *mut stack_st_X509_REVOKED,
-            extensions: *mut stack_st_X509_EXTENSION,
-            enc: ASN1_ENCODING,
-        }
-    }
-}
+pub enum X509_CRL_INFO {}
 
-cfg_if! {
-    if #[cfg(any(ossl110, libressl350))] {
-        pub enum X509_REVOKED {}
-    } else {
-        #[repr(C)]
-        pub struct X509_REVOKED {
-            pub serialNumber: *mut ASN1_INTEGER,
-            pub revocationDate: *mut ASN1_TIME,
-            pub extensions: *mut stack_st_X509_EXTENSION,
-            issuer: *mut stack_st_GENERAL_NAME,
-            reason: c_int,
-            sequence: c_int,
-        }
-    }
-}
+pub enum X509_REVOKED {}
 
 stack!(stack_st_X509_REVOKED);
 
-cfg_if! {
-    if #[cfg(any(ossl110, libressl350))] {
-        pub enum X509_REQ {}
-    } else {
-        #[repr(C)]
-        pub struct X509_REQ {
-            pub req_info: *mut X509_REQ_INFO,
-            sig_alg: *mut c_void,
-            signature: *mut c_void,
-            references: c_int,
-        }
-    }
-}
+pub enum X509_REQ {}
 
-cfg_if! {
-    if #[cfg(any(ossl110, libressl350))] {
-        pub enum X509_CINF {}
-    } else {
-        #[repr(C)]
-        pub struct X509_CINF {
-            version: *mut c_void,
-            serialNumber: *mut c_void,
-            signature: *mut c_void,
-            issuer: *mut c_void,
-            pub validity: *mut X509_VAL,
-            subject: *mut c_void,
-            key: *mut c_void,
-            issuerUID: *mut c_void,
-            subjectUID: *mut c_void,
-            pub extensions: *mut stack_st_X509_EXTENSION,
-            enc: ASN1_ENCODING,
-        }
-    }
-}
+pub enum X509_CINF {}
 
 stack!(stack_st_X509);
 
@@ -169,15 +72,25 @@ const_ptr_api! {
         pub fn i2d_PUBKEY_bio(b: *mut BIO, x: #[const_ptr_if(ossl300)] EVP_PKEY) -> c_int;
 
         pub fn i2d_PUBKEY(k: #[const_ptr_if(ossl300)] EVP_PKEY, buf: *mut *mut u8) -> c_int;
+        pub fn i2d_PrivateKey(k: #[const_ptr_if(ossl300)] EVP_PKEY, buf: *mut *mut u8) -> c_int;
+    }
+}
+
+#[cfg(not(osslconf = "OPENSSL_NO_DEPRECATED_3_0"))]
+const_ptr_api! {
+    extern "C" {
         pub fn i2d_RSA_PUBKEY(k: #[const_ptr_if(ossl300)] RSA, buf: *mut *mut u8) -> c_int;
         pub fn i2d_DSA_PUBKEY(a: #[const_ptr_if(ossl300)] DSA, pp: *mut *mut c_uchar) -> c_int;
-        pub fn i2d_PrivateKey(k: #[const_ptr_if(ossl300)] EVP_PKEY, buf: *mut *mut u8) -> c_int;
         pub fn i2d_ECPrivateKey(ec_key: #[const_ptr_if(ossl300)] EC_KEY, pp: *mut *mut c_uchar) -> c_int;
         pub fn i2d_EC_PUBKEY(a: #[const_ptr_if(ossl300)] EC_KEY, pp: *mut *mut c_uchar) -> c_int;
     }
 }
 extern "C" {
     pub fn d2i_PUBKEY(k: *mut *mut EVP_PKEY, buf: *mut *const u8, len: c_long) -> *mut EVP_PKEY;
+}
+
+#[cfg(not(osslconf = "OPENSSL_NO_DEPRECATED_3_0"))]
+extern "C" {
     pub fn d2i_RSA_PUBKEY(k: *mut *mut RSA, buf: *mut *const u8, len: c_long) -> *mut RSA;
     pub fn d2i_DSA_PUBKEY(k: *mut *mut DSA, pp: *mut *const c_uchar, length: c_long) -> *mut DSA;
     pub fn d2i_EC_PUBKEY(
@@ -193,16 +106,13 @@ extern "C" {
     ) -> *mut EC_KEY;
 }
 
-const_ptr_api! {
-    extern "C" {
-        #[cfg(any(ossl102, libressl350))]
-        pub fn X509_ALGOR_get0(
-            paobj: *mut #[const_ptr_if(any(ossl110, libressl350))] ASN1_OBJECT,
-            pptype: *mut c_int,
-            ppval: *mut #[const_ptr_if(any(ossl110, libressl350))] c_void,
-            alg: #[const_ptr_if(any(ossl110, libressl350))] X509_ALGOR,
-        );
-    }
+extern "C" {
+    pub fn X509_ALGOR_get0(
+        paobj: *mut *const ASN1_OBJECT,
+        pptype: *mut c_int,
+        ppval: *mut *const c_void,
+        alg: *const X509_ALGOR,
+    );
 }
 
 extern "C" {
@@ -217,7 +127,6 @@ extern "C" {
 }
 const_ptr_api! {
     extern "C" {
-        #[cfg(any(ossl110, libressl270))]
         pub fn X509_REVOKED_dup(rev: #[const_ptr_if(ossl300)] X509_REVOKED) -> *mut X509_REVOKED;
     }
 }
@@ -246,7 +155,6 @@ extern "C" {
 const_ptr_api! {
     extern "C" {
         pub fn i2d_X509_CRL(x: #[const_ptr_if(ossl300)] X509_CRL, buf: *mut *mut u8) -> c_int;
-        #[cfg(any(ossl110, libressl270))]
         pub fn X509_CRL_dup(x: #[const_ptr_if(ossl300)] X509_CRL) -> *mut X509_CRL;
     }
 }
@@ -264,19 +172,17 @@ const_ptr_api! {
     extern "C" {
         pub fn i2d_X509_REQ(x: #[const_ptr_if(ossl300)] X509_REQ, buf: *mut *mut u8) -> c_int;
 
-        #[cfg(any(ossl102, libressl273))]
         pub fn X509_get0_signature(
-            psig: *mut #[const_ptr_if(any(ossl110, libressl273))] ASN1_BIT_STRING,
-            palg: *mut #[const_ptr_if(any(ossl110, libressl273))] X509_ALGOR,
+            psig: *mut *const ASN1_BIT_STRING,
+            palg: *mut *const X509_ALGOR,
             x: *const X509,
         );
 
-        #[cfg(any(ossl110, libressl270))]
         pub fn X509_REQ_dup(x: #[const_ptr_if(ossl300)] X509_REQ) -> *mut X509_REQ;
     }
 }
 extern "C" {
-    #[cfg(ossl102)]
+    #[cfg(ossl110)]
     pub fn X509_get_signature_nid(x: *const X509) -> c_int;
 
     pub fn X509_EXTENSION_free(ext: *mut X509_EXTENSION);
@@ -293,14 +199,11 @@ extern "C" {
 const_ptr_api! {
     extern "C" {
         pub fn i2d_X509(x: #[const_ptr_if(ossl300)] X509, buf: *mut *mut u8) -> c_int;
-        #[cfg(any(ossl110, libressl270))]
         pub fn X509_NAME_dup(x: #[const_ptr_if(ossl300)] X509_NAME) -> *mut X509_NAME;
-        #[cfg(any(ossl110, libressl270))]
         pub fn X509_dup(x: #[const_ptr_if(ossl300)] X509) -> *mut X509;
-        #[cfg(any(ossl101, libressl350))]
         pub fn X509_NAME_add_entry(
             name: *mut X509_NAME,
-            ne: #[const_ptr_if(any(ossl110, libressl))] X509_NAME_ENTRY,
+            ne: *const X509_NAME_ENTRY,
             loc: c_int,
             set: c_int,
             ) -> c_int;
@@ -330,29 +233,18 @@ extern "C" {
 }
 const_ptr_api! {
     extern "C" {
-        pub fn X509_get_issuer_name(x: #[const_ptr_if(any(ossl110, libressl280))] X509) -> *mut X509_NAME;
+        pub fn X509_get_issuer_name(x: *const X509) -> *mut X509_NAME;
         pub fn X509_set_subject_name(x: *mut X509, name: #[const_ptr_if(ossl300)] X509_NAME) -> c_int;
-        pub fn X509_get_subject_name(x: #[const_ptr_if(any(ossl110, libressl280))] X509) -> *mut X509_NAME;
-    }
-}
-cfg_if! {
-    if #[cfg(any(ossl110, libressl350))] {
-        extern "C" {
-            pub fn X509_set1_notBefore(x: *mut X509, tm: *const ASN1_TIME) -> c_int;
-            pub fn X509_set1_notAfter(x: *mut X509, tm: *const ASN1_TIME) -> c_int;
-        }
-    } else {
-        extern "C" {
-            pub fn X509_set_notBefore(x: *mut X509, tm: *const ASN1_TIME) -> c_int;
-            pub fn X509_set_notAfter(x: *mut X509, tm: *const ASN1_TIME) -> c_int;
-        }
+        pub fn X509_get_subject_name(x: *const X509) -> *mut X509_NAME;
     }
 }
 extern "C" {
-    #[cfg(any(ossl110, libressl350))]
+    pub fn X509_set1_notBefore(x: *mut X509, tm: *const ASN1_TIME) -> c_int;
+    pub fn X509_set1_notAfter(x: *mut X509, tm: *const ASN1_TIME) -> c_int;
+}
+extern "C" {
     pub fn X509_REQ_get_version(req: *const X509_REQ) -> c_long;
     pub fn X509_REQ_set_version(req: *mut X509_REQ, version: c_long) -> c_int;
-    #[cfg(any(ossl110, libressl350))]
     pub fn X509_REQ_get_subject_name(req: *const X509_REQ) -> *mut X509_NAME;
 }
 const_ptr_api! {
@@ -401,18 +293,12 @@ extern "C" {
 extern "C" {
     pub fn X509_set_pubkey(x: *mut X509, pkey: *mut EVP_PKEY) -> c_int;
     pub fn X509_REQ_verify(req: *mut X509_REQ, pkey: *mut EVP_PKEY) -> c_int;
-    #[cfg(any(ossl110, libressl273))]
     pub fn X509_getm_notBefore(x: *const X509) -> *mut ASN1_TIME;
-    #[cfg(any(ossl110, libressl273))]
     pub fn X509_getm_notAfter(x: *const X509) -> *mut ASN1_TIME;
-    #[cfg(any(ossl110, libressl273))]
     pub fn X509_up_ref(x: *mut X509) -> c_int;
 
-    #[cfg(any(ossl110, libressl270))]
     pub fn X509_REVOKED_get0_serialNumber(req: *const X509_REVOKED) -> *const ASN1_INTEGER;
-    #[cfg(any(ossl110, libressl270))]
     pub fn X509_REVOKED_get0_revocationDate(req: *const X509_REVOKED) -> *const ASN1_TIME;
-    #[cfg(any(ossl110, libressl270))]
     pub fn X509_REVOKED_get0_extensions(r: *const X509_REVOKED) -> *const stack_st_X509_EXTENSION;
 
     pub fn X509_REVOKED_set_serialNumber(r: *mut X509_REVOKED, serial: *mut ASN1_INTEGER) -> c_int;
@@ -443,13 +329,9 @@ const_ptr_api! {
 }
 
 extern "C" {
-    #[cfg(any(ossl110, libressl281))]
     pub fn X509_CRL_get_REVOKED(crl: *mut X509_CRL) -> *mut stack_st_X509_REVOKED;
-    #[cfg(any(ossl110, libressl281))]
     pub fn X509_CRL_get0_nextUpdate(x: *const X509_CRL) -> *const ASN1_TIME;
-    #[cfg(any(ossl110, libressl281))]
     pub fn X509_CRL_get0_lastUpdate(x: *const X509_CRL) -> *const ASN1_TIME;
-    #[cfg(any(ossl110, libressl281))]
     pub fn X509_CRL_get_issuer(x: *const X509_CRL) -> *mut X509_NAME;
 
     #[cfg(ossl110)]
@@ -465,42 +347,31 @@ const_ptr_api! {
 extern "C" {
     pub fn X509_CRL_sort(crl: *mut X509_CRL) -> c_int;
 
-    #[cfg(any(ossl110, libressl270))]
     pub fn X509_CRL_up_ref(crl: *mut X509_CRL) -> c_int;
     pub fn X509_CRL_add0_revoked(crl: *mut X509_CRL, rev: *mut X509_REVOKED) -> c_int;
 }
-cfg_if! {
-    if #[cfg(any(ossl110, libressl270))] {
-        extern "C" {
-            pub fn X509_CRL_set1_lastUpdate(crl: *mut X509_CRL, tm: *const ASN1_TIME) -> c_int;
-            pub fn X509_CRL_set1_nextUpdate(crl: *mut X509_CRL, tm: *const ASN1_TIME) -> c_int;
-        }
-    } else {
-        // libressl270 kept them, ossl110 "#define"s them to the variants above
-        extern "C" {
-            pub fn X509_CRL_set_lastUpdate(crl: *mut X509_CRL, tm: *const ASN1_TIME) -> c_int;
-            pub fn X509_CRL_set_nextUpdate(crl: *mut X509_CRL, tm: *const ASN1_TIME) -> c_int;
-        }
-    }
+extern "C" {
+    pub fn X509_CRL_set1_lastUpdate(crl: *mut X509_CRL, tm: *const ASN1_TIME) -> c_int;
+    pub fn X509_CRL_set1_nextUpdate(crl: *mut X509_CRL, tm: *const ASN1_TIME) -> c_int;
 }
 
 const_ptr_api! {
     extern "C" {
-        pub fn X509_NAME_entry_count(n: #[const_ptr_if(any(ossl110, libressl280))] X509_NAME) -> c_int;
-        pub fn X509_NAME_get_index_by_NID(n: #[const_ptr_if(any(ossl300, libressl280))] X509_NAME, nid: c_int, last_pos: c_int) -> c_int;
-        pub fn X509_NAME_get_entry(n: #[const_ptr_if(any(ossl110, libressl280))] X509_NAME, loc: c_int) -> *mut X509_NAME_ENTRY;
+        pub fn X509_NAME_entry_count(n: *const X509_NAME) -> c_int;
+        pub fn X509_NAME_get_index_by_NID(n: #[const_ptr_if(any(ossl300, libressl))] X509_NAME, nid: c_int, last_pos: c_int) -> c_int;
+        pub fn X509_NAME_get_entry(n: *const X509_NAME, loc: c_int) -> *mut X509_NAME_ENTRY;
         pub fn X509_NAME_add_entry_by_NID(
             x: *mut X509_NAME,
             field: c_int,
             ty: c_int,
-            bytes: #[const_ptr_if(any(ossl110, libressl280))] c_uchar,
+            bytes: *const c_uchar,
             len: c_int,
             loc: c_int,
             set: c_int,
         ) -> c_int;
         pub fn i2d_X509_NAME(n: #[const_ptr_if(ossl300)] X509_NAME, buf: *mut *mut u8) -> c_int;
-        pub fn X509_NAME_ENTRY_get_object(ne: #[const_ptr_if(any(ossl110, libressl280))] X509_NAME_ENTRY) -> *mut ASN1_OBJECT;
-        pub fn X509_NAME_ENTRY_get_data(ne: #[const_ptr_if(any(ossl110, libressl280))] X509_NAME_ENTRY) -> *mut ASN1_STRING;
+        pub fn X509_NAME_ENTRY_get_object(ne: *const X509_NAME_ENTRY) -> *mut ASN1_OBJECT;
+        pub fn X509_NAME_ENTRY_get_data(ne: *const X509_NAME_ENTRY) -> *mut ASN1_STRING;
     }
 }
 extern "C" {
@@ -596,51 +467,71 @@ const_ptr_api! {
     }
 }
 
-const_ptr_api! {
-    extern "C" {
-        // in X509
-        pub fn X509_get_ext_count(x: #[const_ptr_if(any(ossl110, libressl280))] X509) -> c_int;
-        pub fn X509_get_ext_by_NID(x: #[const_ptr_if(any(ossl110, libressl280))] X509, nid: c_int, lastpos: c_int) -> c_int;
-        pub fn X509_get_ext_by_OBJ(x: #[const_ptr_if(any(ossl110, libressl280))] X509, obj: #[const_ptr_if(any(ossl110, libressl280))] ASN1_OBJECT, lastpos: c_int) -> c_int;
-        pub fn X509_get_ext_by_critical(x: #[const_ptr_if(any(ossl110, libressl280))] X509, crit: c_int, lastpos: c_int) -> c_int;
-        pub fn X509_get_ext(x: #[const_ptr_if(any(ossl110, libressl280))] X509, loc: c_int) -> *mut X509_EXTENSION;
-        pub fn X509_get_ext_d2i(
-            x: #[const_ptr_if(any(ossl110, libressl280))] X509,
-            nid: c_int,
-            crit: *mut c_int,
-            idx: *mut c_int,
-        ) -> *mut c_void;
-        // in X509_CRL
-        pub fn X509_CRL_get_ext_count(x: #[const_ptr_if(any(ossl110, libressl280))] X509_CRL) -> c_int;
-        pub fn X509_CRL_get_ext_by_NID(x: #[const_ptr_if(any(ossl110, libressl280))] X509_CRL, nid: c_int, lastpos: c_int) -> c_int;
-        pub fn X509_CRL_get_ext_by_OBJ(x: #[const_ptr_if(any(ossl110, libressl280))] X509_CRL, obj: #[const_ptr_if(any(ossl110, libressl280))] ASN1_OBJECT, lastpos: c_int) -> c_int;
-        pub fn X509_CRL_get_ext_by_critical(x: #[const_ptr_if(any(ossl110, libressl280))] X509_CRL, crit: c_int, lastpos: c_int) -> c_int;
-        pub fn X509_CRL_get_ext(x: #[const_ptr_if(any(ossl110, libressl280))] X509_CRL, loc: c_int) -> *mut X509_EXTENSION;
-        pub fn X509_CRL_get_ext_d2i(
-            x: #[const_ptr_if(any(ossl110, libressl280))] X509_CRL,
-            nid: c_int,
-            crit: *mut c_int,
-            idx: *mut c_int,
-        ) -> *mut c_void;
-        // in X509_REVOKED
-        pub fn X509_REVOKED_get_ext_count(x: #[const_ptr_if(any(ossl110, libressl280))] X509_REVOKED) -> c_int;
-        pub fn X509_REVOKED_get_ext_by_NID(x: #[const_ptr_if(any(ossl110, libressl280))] X509_REVOKED, nid: c_int, lastpos: c_int) -> c_int;
-        pub fn X509_REVOKED_get_ext_by_OBJ(x: #[const_ptr_if(any(ossl110, libressl280))] X509_REVOKED, obj: #[const_ptr_if(any(ossl110, libressl280))] ASN1_OBJECT, lastpos: c_int) -> c_int;
-        pub fn X509_REVOKED_get_ext_by_critical(x: #[const_ptr_if(any(ossl110, libressl280))] X509_REVOKED, crit: c_int, lastpos: c_int) -> c_int;
-        pub fn X509_REVOKED_get_ext(x: #[const_ptr_if(any(ossl110, libressl280))] X509_REVOKED, loc: c_int) -> *mut X509_EXTENSION;
-        pub fn X509_REVOKED_get_ext_d2i(
-            x: #[const_ptr_if(any(ossl110, libressl280))] X509_REVOKED,
-            nid: c_int,
-            crit: *mut c_int,
-            idx: *mut c_int,
-        ) -> *mut c_void;
-        // X509_EXTENSION stack
-        pub fn X509v3_get_ext_by_OBJ(x: *const stack_st_X509_EXTENSION, obj: #[const_ptr_if(any(ossl110, libressl280))] ASN1_OBJECT, lastpos: c_int) -> c_int;
-        // X509_EXTENSION itself
-        pub fn X509_EXTENSION_create_by_OBJ(ex: *mut *mut X509_EXTENSION, obj: #[const_ptr_if(any(ossl110, libressl280))] ASN1_OBJECT, crit: c_int, data: *mut ASN1_OCTET_STRING) -> *mut X509_EXTENSION;
-        pub fn X509_EXTENSION_set_object(ex: *mut X509_EXTENSION, obj: #[const_ptr_if(any(ossl110, libressl280))] ASN1_OBJECT) -> c_int;
-        pub fn X509_EXTENSION_get_critical(ex: #[const_ptr_if(any(ossl110, libressl280))] X509_EXTENSION) -> c_int;
-    }
+extern "C" {
+    // in X509
+    pub fn X509_get_ext_count(x: *const X509) -> c_int;
+    pub fn X509_get_ext_by_NID(x: *const X509, nid: c_int, lastpos: c_int) -> c_int;
+    pub fn X509_get_ext_by_OBJ(x: *const X509, obj: *const ASN1_OBJECT, lastpos: c_int) -> c_int;
+    pub fn X509_get_ext_by_critical(x: *const X509, crit: c_int, lastpos: c_int) -> c_int;
+    pub fn X509_get_ext(x: *const X509, loc: c_int) -> *mut X509_EXTENSION;
+    pub fn X509_get_ext_d2i(
+        x: *const X509,
+        nid: c_int,
+        crit: *mut c_int,
+        idx: *mut c_int,
+    ) -> *mut c_void;
+    // in X509_CRL
+    pub fn X509_CRL_get_ext_count(x: *const X509_CRL) -> c_int;
+    pub fn X509_CRL_get_ext_by_NID(x: *const X509_CRL, nid: c_int, lastpos: c_int) -> c_int;
+    pub fn X509_CRL_get_ext_by_OBJ(
+        x: *const X509_CRL,
+        obj: *const ASN1_OBJECT,
+        lastpos: c_int,
+    ) -> c_int;
+    pub fn X509_CRL_get_ext_by_critical(x: *const X509_CRL, crit: c_int, lastpos: c_int) -> c_int;
+    pub fn X509_CRL_get_ext(x: *const X509_CRL, loc: c_int) -> *mut X509_EXTENSION;
+    pub fn X509_CRL_get_ext_d2i(
+        x: *const X509_CRL,
+        nid: c_int,
+        crit: *mut c_int,
+        idx: *mut c_int,
+    ) -> *mut c_void;
+    // in X509_REVOKED
+    pub fn X509_REVOKED_get_ext_count(x: *const X509_REVOKED) -> c_int;
+    pub fn X509_REVOKED_get_ext_by_NID(x: *const X509_REVOKED, nid: c_int, lastpos: c_int)
+        -> c_int;
+    pub fn X509_REVOKED_get_ext_by_OBJ(
+        x: *const X509_REVOKED,
+        obj: *const ASN1_OBJECT,
+        lastpos: c_int,
+    ) -> c_int;
+    pub fn X509_REVOKED_get_ext_by_critical(
+        x: *const X509_REVOKED,
+        crit: c_int,
+        lastpos: c_int,
+    ) -> c_int;
+    pub fn X509_REVOKED_get_ext(x: *const X509_REVOKED, loc: c_int) -> *mut X509_EXTENSION;
+    pub fn X509_REVOKED_get_ext_d2i(
+        x: *const X509_REVOKED,
+        nid: c_int,
+        crit: *mut c_int,
+        idx: *mut c_int,
+    ) -> *mut c_void;
+    // X509_EXTENSION stack
+    pub fn X509v3_get_ext_by_OBJ(
+        x: *const stack_st_X509_EXTENSION,
+        obj: *const ASN1_OBJECT,
+        lastpos: c_int,
+    ) -> c_int;
+    // X509_EXTENSION itself
+    pub fn X509_EXTENSION_create_by_OBJ(
+        ex: *mut *mut X509_EXTENSION,
+        obj: *const ASN1_OBJECT,
+        crit: c_int,
+        data: *mut ASN1_OCTET_STRING,
+    ) -> *mut X509_EXTENSION;
+    pub fn X509_EXTENSION_set_object(ex: *mut X509_EXTENSION, obj: *const ASN1_OBJECT) -> c_int;
+    pub fn X509_EXTENSION_get_critical(ex: *const X509_EXTENSION) -> c_int;
 }
 
 extern "C" {
@@ -649,28 +540,18 @@ extern "C" {
 
 const_ptr_api! {
     extern "C" {
-        #[cfg(any(ossl110, libressl270))]
         pub fn X509_STORE_get0_objects(ctx: #[const_ptr_if(ossl300)] X509_STORE) -> *mut stack_st_X509_OBJECT;
         #[cfg(ossl300)]
         pub fn X509_STORE_get1_all_certs(ctx: *mut X509_STORE) -> *mut stack_st_X509;
     }
 }
 
-#[cfg(any(ossl110, libressl270))]
 extern "C" {
     pub fn X509_OBJECT_get0_X509(x: *const X509_OBJECT) -> *mut X509;
 }
 
-cfg_if! {
-    if #[cfg(any(ossl110, libressl350))] {
-        extern "C" {
-            pub fn X509_OBJECT_free(a: *mut X509_OBJECT);
-        }
-    } else {
-        extern "C" {
-            pub fn X509_OBJECT_free_contents(a: *mut X509_OBJECT);
-        }
-    }
+extern "C" {
+    pub fn X509_OBJECT_free(a: *mut X509_OBJECT);
 }
 
 extern "C" {
@@ -714,8 +595,8 @@ cfg_if! {
 
 const_ptr_api! {
     extern "C" {
-        pub fn X509_PURPOSE_get_by_sname(sname: #[const_ptr_if(any(ossl110, libressl280))] c_char) -> c_int;
-        pub fn X509_PURPOSE_get_id(purpose: #[const_ptr_if(any(ossl110, libressl280))] X509_PURPOSE) -> c_int;
+        pub fn X509_PURPOSE_get_by_sname(sname: *const c_char) -> c_int;
+        pub fn X509_PURPOSE_get_id(purpose: *const X509_PURPOSE) -> c_int;
         pub fn X509_PURPOSE_get0(idx: c_int) -> #[const_ptr_if(libressl390)] X509_PURPOSE;
     }
 }
@@ -772,9 +653,7 @@ extern "C" {
 }
 const_ptr_api! {
     extern "C" {
-        pub fn X509_ATTRIBUTE_count(
-            attr: #[const_ptr_if(any(ossl110, libressl280))] X509_ATTRIBUTE // const since OpenSSL v1.1.0
-        ) -> c_int;
+        pub fn X509_ATTRIBUTE_count(attr: *const X509_ATTRIBUTE) -> c_int;
         pub fn i2d_X509_ATTRIBUTE(x: #[const_ptr_if(ossl300)] X509_ATTRIBUTE, buf: *mut *mut u8) -> c_int;
         pub fn X509_ATTRIBUTE_dup(x: #[const_ptr_if(ossl300)] X509_ATTRIBUTE) -> *mut X509_ATTRIBUTE;
     }

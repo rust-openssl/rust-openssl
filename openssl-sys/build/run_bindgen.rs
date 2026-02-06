@@ -1,5 +1,5 @@
 #[cfg(feature = "bindgen")]
-use bindgen::callbacks::{MacroParsingBehavior, ParseCallbacks};
+use bindgen::callbacks::{ItemInfo, MacroParsingBehavior, ParseCallbacks};
 #[cfg(feature = "bindgen")]
 use bindgen::{MacroTypeVariation, RustTarget};
 use std::io::Write;
@@ -41,11 +41,11 @@ const INCLUDES: &str = "
 #include <openssl/srtp.h>
 #endif
 
-#if !(defined(LIBRESSL_VERSION_NUMBER) || defined(OPENSSL_IS_BORINGSSL) || defined(OPENSSL_IS_AWSLC))
+#if !(defined(OPENSSL_IS_BORINGSSL) || defined(OPENSSL_IS_AWSLC))
 #include <openssl/cms.h>
 #endif
 
-#if !(defined(OPENSSL_IS_BORINGSSL) || defined(OPENSSL_IS_AWSLC))
+#if !defined(OPENSSL_NO_COMP) && !(defined(OPENSSL_IS_BORINGSSL) || defined(OPENSSL_IS_AWSLC))
 #include <openssl/comp.h>
 #endif
 
@@ -58,7 +58,11 @@ const INCLUDES: &str = "
 #endif
 
 #if OPENSSL_VERSION_NUMBER >= 0x30000000
+#include <openssl/decoder.h>
+#include <openssl/encoder.h>
 #include <openssl/provider.h>
+#include <openssl/params.h>
+#include <openssl/param_build.h>
 #endif
 
 #if OPENSSL_VERSION_NUMBER >= 0x30200000
@@ -67,6 +71,10 @@ const INCLUDES: &str = "
 
 #if defined(LIBRESSL_VERSION_NUMBER) || defined(OPENSSL_IS_BORINGSSL) || defined(OPENSSL_IS_AWSLC)
 #include <openssl/poly1305.h>
+#endif
+
+#if defined(OPENSSL_IS_BORINGSSL)
+#include <openssl/mlkem.h>
 #endif
 
 #if OPENSSL_VERSION_NUMBER >= 0x30200000
@@ -80,7 +88,7 @@ pub fn run(include_dirs: &[PathBuf]) {
 
     let mut builder = bindgen::builder()
         .parse_callbacks(Box::new(OpensslCallbacks))
-        .rust_target(RustTarget::Stable_1_47)
+        .rust_target(RustTarget::stable(70, 0).unwrap())
         .ctypes_prefix("::libc")
         .raw_line("use libc::*;")
         .raw_line("#[cfg(windows)] use std::os::windows::raw::HANDLE;")
@@ -134,7 +142,7 @@ pub fn run_boringssl(include_dirs: &[PathBuf]) {
         .expect("Failed to write contents to boring_static_wrapper.h");
 
     let mut builder = bindgen::builder()
-        .rust_target(RustTarget::Stable_1_47)
+        .rust_target(RustTarget::stable(70, 0).unwrap())
         .ctypes_prefix("::libc")
         .raw_line("use libc::*;")
         .derive_default(false)
@@ -186,9 +194,7 @@ pub fn run_boringssl(include_dirs: &[PathBuf]) {
     bindgen_cmd
         .arg("-o")
         .arg(out_dir.join("bindgen.rs"))
-        // Must be a valid version from
-        // https://docs.rs/bindgen/latest/bindgen/enum.RustTarget.html
-        .arg("--rust-target=1.47")
+        .arg("--rust-target=1.70")
         .arg("--ctypes-prefix=::libc")
         .arg("--raw-line=use libc::*;")
         .arg("--no-derive-default")
@@ -257,7 +263,7 @@ pub fn run_awslc(include_dirs: &[PathBuf], symbol_prefix: Option<String>) {
         .expect("Failed to write contents to awslc_static_wrapper.h");
 
     let mut builder = bindgen::builder()
-        .rust_target(RustTarget::Stable_1_47)
+        .rust_target(RustTarget::stable(70, 0).unwrap())
         .ctypes_prefix("::libc")
         .raw_line("use libc::*;")
         .derive_default(false)
@@ -312,9 +318,7 @@ pub fn run_awslc(include_dirs: &[PathBuf], symbol_prefix: Option<String>) {
     bindgen_cmd
         .arg("-o")
         .arg(out_dir.join("bindgen.rs"))
-        // Must be a valid version from
-        // https://docs.rs/bindgen/latest/bindgen/enum.RustTarget.html
-        .arg("--rust-target=1.47")
+        .arg("--rust-target=1.70")
         .arg("--ctypes-prefix=::libc")
         .arg("--raw-line=use libc::*;")
         .arg("--no-derive-default")
@@ -354,8 +358,8 @@ impl ParseCallbacks for OpensslCallbacks {
         MacroParsingBehavior::Ignore
     }
 
-    fn item_name(&self, original_item_name: &str) -> Option<String> {
-        match original_item_name {
+    fn item_name(&self, item_info: ItemInfo) -> Option<String> {
+        match item_info.name {
             // Our original definitions of these are wrong, so rename to avoid breakage
             "CRYPTO_EX_new"
             | "CRYPTO_EX_dup"
@@ -373,7 +377,9 @@ impl ParseCallbacks for OpensslCallbacks {
             | "SSL_CTX_set_tmp_ecdh_callback"
             | "SSL_set_tmp_ecdh_callback"
             | "SSL_CTX_callback_ctrl"
-            | "SSL_CTX_set_alpn_select_cb" => Some(format!("{}__fixed_rust", original_item_name)),
+            | "SSL_CTX_set_alpn_select_cb" => Some(format!("{}__fixed_rust", item_info.name)),
+            // On NetBSD, "off_t" is generated as "__off_t".
+            "__off_t" => Some("off_t".to_string()),
             _ => None,
         }
     }

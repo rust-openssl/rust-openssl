@@ -5,7 +5,6 @@
 //! using the private key that can be validated with the public key but not be generated
 //! without the private key.
 
-use cfg_if::cfg_if;
 use foreign_types::{ForeignType, ForeignTypeRef};
 #[cfg(not(any(boringssl, awslc)))]
 use libc::c_int;
@@ -38,7 +37,7 @@ generic_foreign_type_and_impl_send_sync! {
     ///
     /// OpenSSL documentation at [`DSA_new`]
     ///
-    /// [`DSA_new`]: https://www.openssl.org/docs/manmaster/crypto/DSA_new.html
+    /// [`DSA_new`]: https://docs.openssl.org/master/man3/DSA_new/
     ///
     /// # Examples
     ///
@@ -314,67 +313,7 @@ impl<T> fmt::Debug for Dsa<T> {
     }
 }
 
-cfg_if! {
-    if #[cfg(any(ossl110, libressl273, boringssl, awslc))] {
-        use ffi::{DSA_get0_key, DSA_get0_pqg, DSA_set0_key, DSA_set0_pqg};
-    } else {
-        #[allow(bad_style)]
-        unsafe fn DSA_get0_pqg(
-            d: *mut ffi::DSA,
-            p: *mut *const ffi::BIGNUM,
-            q: *mut *const ffi::BIGNUM,
-            g: *mut *const ffi::BIGNUM)
-        {
-            if !p.is_null() {
-                *p = (*d).p;
-            }
-            if !q.is_null() {
-                *q = (*d).q;
-            }
-            if !g.is_null() {
-                *g = (*d).g;
-            }
-        }
-
-        #[allow(bad_style)]
-        unsafe fn DSA_get0_key(
-            d: *mut ffi::DSA,
-            pub_key: *mut *const ffi::BIGNUM,
-            priv_key: *mut *const ffi::BIGNUM)
-        {
-            if !pub_key.is_null() {
-                *pub_key = (*d).pub_key;
-            }
-            if !priv_key.is_null() {
-                *priv_key = (*d).priv_key;
-            }
-        }
-
-        #[allow(bad_style)]
-        unsafe fn DSA_set0_key(
-            d: *mut ffi::DSA,
-            pub_key: *mut ffi::BIGNUM,
-            priv_key: *mut ffi::BIGNUM) -> c_int
-        {
-            (*d).pub_key = pub_key;
-            (*d).priv_key = priv_key;
-            1
-        }
-
-        #[allow(bad_style)]
-        unsafe fn DSA_set0_pqg(
-            d: *mut ffi::DSA,
-            p: *mut ffi::BIGNUM,
-            q: *mut ffi::BIGNUM,
-            g: *mut ffi::BIGNUM) -> c_int
-        {
-            (*d).p = p;
-            (*d).q = q;
-            (*d).g = g;
-            1
-        }
-    }
-}
+use ffi::{DSA_get0_key, DSA_get0_pqg, DSA_set0_key, DSA_set0_pqg};
 
 foreign_type_and_impl_send_sync! {
     type CType = ffi::DSA_SIG;
@@ -493,51 +432,17 @@ impl DsaSigRef {
     }
 }
 
-cfg_if! {
-    if #[cfg(any(ossl110, libressl273, boringssl, awslc))] {
-        use ffi::{DSA_SIG_set0, DSA_SIG_get0};
-    } else {
-        #[allow(bad_style)]
-        unsafe fn DSA_SIG_set0(
-            sig: *mut ffi::DSA_SIG,
-            r: *mut ffi::BIGNUM,
-            s: *mut ffi::BIGNUM,
-        ) -> c_int {
-            if r.is_null() || s.is_null() {
-                return 0;
-            }
-            ffi::BN_clear_free((*sig).r);
-            ffi::BN_clear_free((*sig).s);
-            (*sig).r = r;
-            (*sig).s = s;
-            1
-        }
-
-        #[allow(bad_style)]
-        unsafe fn DSA_SIG_get0(
-            sig: *const ffi::DSA_SIG,
-            pr: *mut *const ffi::BIGNUM,
-            ps: *mut *const ffi::BIGNUM)
-        {
-            if !pr.is_null() {
-                (*pr) = (*sig).r;
-            }
-            if !ps.is_null() {
-                (*ps) = (*sig).s;
-            }
-        }
-    }
-}
+use ffi::{DSA_SIG_get0, DSA_SIG_set0};
 
 #[cfg(test)]
 mod test {
     use super::*;
     use crate::bn::BigNumContext;
-    #[cfg(not(boringssl))]
+    #[cfg(not(any(boringssl, awslc_fips)))]
     use crate::hash::MessageDigest;
-    #[cfg(not(boringssl))]
+    #[cfg(not(any(boringssl, awslc_fips)))]
     use crate::pkey::PKey;
-    #[cfg(not(boringssl))]
+    #[cfg(not(any(boringssl, awslc_fips)))]
     use crate::sign::{Signer, Verifier};
 
     #[test]
@@ -607,7 +512,7 @@ mod test {
     }
 
     #[test]
-    #[cfg(not(boringssl))]
+    #[cfg(not(any(boringssl, awslc_fips)))]
     fn test_signature() {
         const TEST_DATA: &[u8] = &[0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
         let dsa_ref = Dsa::generate(1024).unwrap();
@@ -648,7 +553,7 @@ mod test {
     }
 
     #[test]
-    #[cfg(not(boringssl))]
+    #[cfg(not(any(boringssl, awslc_fips)))]
     fn test_signature_der() {
         use std::convert::TryInto;
 

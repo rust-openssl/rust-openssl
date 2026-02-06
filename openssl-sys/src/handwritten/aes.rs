@@ -1,6 +1,7 @@
 use super::super::*;
 use libc::*;
 
+#[cfg(not(osslconf = "OPENSSL_NO_DEPRECATED_3_0"))]
 #[repr(C)]
 pub struct AES_KEY {
     // There is some business with AES_LONG which is there to ensure the values here are 32 bits
@@ -8,6 +9,7 @@ pub struct AES_KEY {
     rounds: c_int,
 }
 
+#[cfg(not(osslconf = "OPENSSL_NO_DEPRECATED_3_0"))]
 extern "C" {
     pub fn AES_set_encrypt_key(userKey: *const c_uchar, bits: c_int, key: *mut AES_KEY) -> c_int;
     pub fn AES_set_decrypt_key(userKey: *const c_uchar, bits: c_int, key: *mut AES_KEY) -> c_int;

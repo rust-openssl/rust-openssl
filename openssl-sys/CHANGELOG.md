@@ -2,6 +2,50 @@
 
 ## [Unreleased]
 
+## [v0.9.111] - 2025-11-07
+
+### Added
+
+* Added bindings to `EVP_MAC` APIs.
+* Added bindings to `ASN1_GENERALIZEDTIME_new` and `ASN1_GENERALIZEDTIME_set_string`.
+
+## [v0.9.110] - 2025-10-14
+
+### Added
+
+* Added support for LibreSSL 4.2.0.
+* Added bindings to many OpenSSL APIs.
+
+### Changed
+
+* Bumped bindgen to 0.72.0.
+* Bumped MSRV to 1.70.
+
+### Fixed
+
+* Fixed missing `__off_t` on NetBSD 10.
+* Fixed building with `OPENSSL_NO_COMP`.
+* Fixed building with `OPENSSL_NO_SRTP`.
+* Fixed finding OpenSSL on AIX.
+
+### Removed
+
+* Removed support for OpenSSL <1.0.2.
+* Removed support for LibreSSL <3.5.
+
+## [v0.9.109] - 2025-05-28
+
+### Fixed
+
+* Fixed building with `vcpkg`, a statically linked OpenSSL, and rust 1.87.0.
+* Fixed building on the latest BoringSSL.
+
+## [v0.9.108] - 2025-04-30
+
+### Added
+
+* Added support for LibreSSL 4.1.x.
+
 ## [v0.9.107] - 2025-04-04
 
 ### Added
@@ -642,69 +686,73 @@ Fixed builds against OpenSSL built with `no-cast`.
 * Added `X509_verify` and `X509_REQ_verify`.
 * Added `EVP_MD_type` and `EVP_GROUP_get_curve_name`.
 
-[Unreleased]: https://github.com/sfackler/rust-openssl/compare/openssl-sys-v0.9.107..master
-[v0.9.107]: https://github.com/sfackler/rust-openssl/compare/openssl-sys-v0.9.106...openssl-sys-v0.9.107
-[v0.9.106]: https://github.com/sfackler/rust-openssl/compare/openssl-sys-v0.9.105...openssl-sys-v0.9.106
-[v0.9.105]: https://github.com/sfackler/rust-openssl/compare/openssl-sys-v0.9.104...openssl-sys-v0.9.105
-[v0.9.104]: https://github.com/sfackler/rust-openssl/compare/openssl-sys-v0.9.103...openssl-sys-v0.9.104
-[v0.9.103]: https://github.com/sfackler/rust-openssl/compare/openssl-sys-v0.9.102...openssl-sys-v0.9.103
-[v0.9.102]: https://github.com/sfackler/rust-openssl/compare/openssl-sys-v0.9.101...openssl-sys-v0.9.102
-[v0.9.101]: https://github.com/sfackler/rust-openssl/compare/openssl-sys-v0.9.100...openssl-sys-v0.9.101
-[v0.9.100]: https://github.com/sfackler/rust-openssl/compare/openssl-sys-v0.9.99...openssl-sys-v0.9.100
-[v0.9.99]: https://github.com/sfackler/rust-openssl/compare/openssl-sys-v0.9.98...openssl-sys-v0.9.99
-[v0.9.98]: https://github.com/sfackler/rust-openssl/compare/openssl-sys-v0.9.97...openssl-sys-v0.9.98
-[v0.9.97]: https://github.com/sfackler/rust-openssl/compare/openssl-sys-v0.9.96...openssl-sys-v0.9.97
-[v0.9.96]: https://github.com/sfackler/rust-openssl/compare/openssl-sys-v0.9.95...openssl-sys-v0.9.96
-[v0.9.95]: https://github.com/sfackler/rust-openssl/compare/openssl-sys-v0.9.94...openssl-sys-v0.9.95
-[v0.9.94]: https://github.com/sfackler/rust-openssl/compare/openssl-sys-v0.9.93...openssl-sys-v0.9.94
-[v0.9.93]: https://github.com/sfackler/rust-openssl/compare/openssl-sys-v0.9.92...openssl-sys-v0.9.93
-[v0.9.92]: https://github.com/sfackler/rust-openssl/compare/openssl-sys-v0.9.91...openssl-sys-v0.9.92
-[v0.9.91]: https://github.com/sfackler/rust-openssl/compare/openssl-sys-v0.9.90...openssl-sys-v0.9.91
-[v0.9.90]: https://github.com/sfackler/rust-openssl/compare/openssl-sys-v0.9.89...openssl-sys-v0.9.90
-[v0.9.89]: https://github.com/sfackler/rust-openssl/compare/openssl-sys-v0.9.88...openssl-sys-v0.9.89
-[v0.9.88]: https://github.com/sfackler/rust-openssl/compare/openssl-sys-v0.9.87...openssl-sys-v0.9.88
-[v0.9.87]: https://github.com/sfackler/rust-openssl/compare/openssl-sys-v0.9.86...openssl-sys-v0.9.87
-[v0.9.86]: https://github.com/sfackler/rust-openssl/compare/openssl-sys-v0.9.85...openssl-sys-v0.9.86
-[v0.9.85]: https://github.com/sfackler/rust-openssl/compare/openssl-sys-v0.9.84...openssl-sys-v0.9.85
-[v0.9.84]: https://github.com/sfackler/rust-openssl/compare/openssl-sys-v0.9.83...openssl-sys-v0.9.84
-[v0.9.83]: https://github.com/sfackler/rust-openssl/compare/openssl-sys-v0.9.82...openssl-sys-v0.9.83
-[v0.9.82]: https://github.com/sfackler/rust-openssl/compare/openssl-sys-v0.9.81...openssl-sys-v0.9.82
-[v0.9.81]: https://github.com/sfackler/rust-openssl/compare/openssl-sys-v0.9.80...openssl-sys-v0.9.81
-[v0.9.80]: https://github.com/sfackler/rust-openssl/compare/openssl-sys-v0.9.79...openssl-sys-v0.9.80
-[v0.9.79]: https://github.com/sfackler/rust-openssl/compare/openssl-sys-v0.9.78...openssl-sys-v0.9.79
-[v0.9.78]: https://github.com/sfackler/rust-openssl/compare/openssl-sys-v0.9.77...openssl-sys-v0.9.78
-[v0.9.77]: https://github.com/sfackler/rust-openssl/compare/openssl-sys-v0.9.76...openssl-sys-v0.9.77
-[v0.9.76]: https://github.com/sfackler/rust-openssl/compare/openssl-sys-v0.9.75...openssl-sys-v0.9.76
-[v0.9.75]: https://github.com/sfackler/rust-openssl/compare/openssl-sys-v0.9.74...openssl-sys-v0.9.75
-[v0.9.74]: https://github.com/sfackler/rust-openssl/compare/openssl-sys-v0.9.73...openssl-sys-v0.9.74
-[v0.9.73]: https://github.com/sfackler/rust-openssl/compare/openssl-sys-v0.9.72...openssl-sys-v0.9.73
-[v0.9.72]: https://github.com/sfackler/rust-openssl/compare/openssl-sys-v0.9.71...openssl-sys-v0.9.72
-[v0.9.71]: https://github.com/sfackler/rust-openssl/compare/openssl-sys-v0.9.70...openssl-sys-v0.9.71
-[v0.9.70]: https://github.com/sfackler/rust-openssl/compare/openssl-sys-v0.9.69...openssl-sys-v0.9.70
-[v0.9.69]: https://github.com/sfackler/rust-openssl/compare/openssl-sys-v0.9.68...openssl-sys-v0.9.69
-[v0.9.68]: https://github.com/sfackler/rust-openssl/compare/openssl-sys-v0.9.67...openssl-sys-v0.9.68
-[v0.9.67]: https://github.com/sfackler/rust-openssl/compare/openssl-sys-v0.9.66...openssl-sys-v0.9.67
-[v0.9.66]: https://github.com/sfackler/rust-openssl/compare/openssl-sys-v0.9.65...openssl-sys-v0.9.66
-[v0.9.65]: https://github.com/sfackler/rust-openssl/compare/openssl-sys-v0.9.64...openssl-sys-v0.9.65
-[v0.9.64]: https://github.com/sfackler/rust-openssl/compare/openssl-sys-v0.9.63...openssl-sys-v0.9.64
-[v0.9.63]: https://github.com/sfackler/rust-openssl/compare/openssl-sys-v0.9.62...openssl-sys-v0.9.63
-[v0.9.62]: https://github.com/sfackler/rust-openssl/compare/openssl-sys-v0.9.61...openssl-sys-v0.9.62
-[v0.9.61]: https://github.com/sfackler/rust-openssl/compare/openssl-sys-v0.9.60...openssl-sys-v0.9.61
-[v0.9.60]: https://github.com/sfackler/rust-openssl/compare/openssl-sys-v0.9.59...openssl-sys-v0.9.60
-[v0.9.59]: https://github.com/sfackler/rust-openssl/compare/openssl-sys-v0.9.58...openssl-sys-v0.9.59
-[v0.9.58]: https://github.com/sfackler/rust-openssl/compare/openssl-sys-v0.9.57...openssl-sys-v0.9.58
-[v0.9.57]: https://github.com/sfackler/rust-openssl/compare/openssl-sys-v0.9.56...openssl-sys-v0.9.57
-[v0.9.56]: https://github.com/sfackler/rust-openssl/compare/openssl-sys-v0.9.55...openssl-sys-v0.9.56
-[v0.9.55]: https://github.com/sfackler/rust-openssl/compare/openssl-sys-v0.9.54...openssl-sys-v0.9.55
-[v0.9.54]: https://github.com/sfackler/rust-openssl/compare/openssl-sys-v0.9.53...openssl-sys-v0.9.54
-[v0.9.53]: https://github.com/sfackler/rust-openssl/compare/openssl-sys-v0.9.52...openssl-sys-v0.9.53
-[v0.9.52]: https://github.com/sfackler/rust-openssl/compare/openssl-sys-v0.9.51...openssl-sys-v0.9.52
-[v0.9.51]: https://github.com/sfackler/rust-openssl/compare/openssl-sys-v0.9.50...openssl-sys-v0.9.51
-[v0.9.50]: https://github.com/sfackler/rust-openssl/compare/openssl-sys-v0.9.49...openssl-sys-v0.9.50
-[v0.9.49]: https://github.com/sfackler/rust-openssl/compare/openssl-sys-v0.9.48...openssl-sys-v0.9.49
-[v0.9.48]: https://github.com/sfackler/rust-openssl/compare/openssl-sys-v0.9.47...openssl-sys-v0.9.48
-[v0.9.47]: https://github.com/sfackler/rust-openssl/compare/openssl-sys-v0.9.46...openssl-sys-v0.9.47
-[v0.9.46]: https://github.com/sfackler/rust-openssl/compare/openssl-sys-v0.9.45...openssl-sys-v0.9.46
-[v0.9.45]: https://github.com/sfackler/rust-openssl/compare/openssl-sys-v0.9.44...openssl-sys-v0.9.45
-[v0.9.44]: https://github.com/sfackler/rust-openssl/compare/openssl-sys-v0.9.43...openssl-sys-v0.9.44
-[v0.9.43]: https://github.com/sfackler/rust-openssl/compare/openssl-sys-v0.9.42...openssl-sys-v0.9.43
+[Unreleased]: https://github.com/rust-openssl/rust-openssl/compare/openssl-sys-v0.9.111..master
+[v0.9.111]: https://github.com/rust-openssl/rust-openssl/compare/openssl-sys-v0.9.110...openssl-sys-v0.9.111
+[v0.9.110]: https://github.com/rust-openssl/rust-openssl/compare/openssl-sys-v0.9.109...openssl-sys-v0.9.110
+[v0.9.109]: https://github.com/rust-openssl/rust-openssl/compare/openssl-sys-v0.9.108...openssl-sys-v0.9.109
+[v0.9.108]: https://github.com/rust-openssl/rust-openssl/compare/openssl-sys-v0.9.107...openssl-sys-v0.9.108
+[v0.9.107]: https://github.com/rust-openssl/rust-openssl/compare/openssl-sys-v0.9.106...openssl-sys-v0.9.107
+[v0.9.106]: https://github.com/rust-openssl/rust-openssl/compare/openssl-sys-v0.9.105...openssl-sys-v0.9.106
+[v0.9.105]: https://github.com/rust-openssl/rust-openssl/compare/openssl-sys-v0.9.104...openssl-sys-v0.9.105
+[v0.9.104]: https://github.com/rust-openssl/rust-openssl/compare/openssl-sys-v0.9.103...openssl-sys-v0.9.104
+[v0.9.103]: https://github.com/rust-openssl/rust-openssl/compare/openssl-sys-v0.9.102...openssl-sys-v0.9.103
+[v0.9.102]: https://github.com/rust-openssl/rust-openssl/compare/openssl-sys-v0.9.101...openssl-sys-v0.9.102
+[v0.9.101]: https://github.com/rust-openssl/rust-openssl/compare/openssl-sys-v0.9.100...openssl-sys-v0.9.101
+[v0.9.100]: https://github.com/rust-openssl/rust-openssl/compare/openssl-sys-v0.9.99...openssl-sys-v0.9.100
+[v0.9.99]: https://github.com/rust-openssl/rust-openssl/compare/openssl-sys-v0.9.98...openssl-sys-v0.9.99
+[v0.9.98]: https://github.com/rust-openssl/rust-openssl/compare/openssl-sys-v0.9.97...openssl-sys-v0.9.98
+[v0.9.97]: https://github.com/rust-openssl/rust-openssl/compare/openssl-sys-v0.9.96...openssl-sys-v0.9.97
+[v0.9.96]: https://github.com/rust-openssl/rust-openssl/compare/openssl-sys-v0.9.95...openssl-sys-v0.9.96
+[v0.9.95]: https://github.com/rust-openssl/rust-openssl/compare/openssl-sys-v0.9.94...openssl-sys-v0.9.95
+[v0.9.94]: https://github.com/rust-openssl/rust-openssl/compare/openssl-sys-v0.9.93...openssl-sys-v0.9.94
+[v0.9.93]: https://github.com/rust-openssl/rust-openssl/compare/openssl-sys-v0.9.92...openssl-sys-v0.9.93
+[v0.9.92]: https://github.com/rust-openssl/rust-openssl/compare/openssl-sys-v0.9.91...openssl-sys-v0.9.92
+[v0.9.91]: https://github.com/rust-openssl/rust-openssl/compare/openssl-sys-v0.9.90...openssl-sys-v0.9.91
+[v0.9.90]: https://github.com/rust-openssl/rust-openssl/compare/openssl-sys-v0.9.89...openssl-sys-v0.9.90
+[v0.9.89]: https://github.com/rust-openssl/rust-openssl/compare/openssl-sys-v0.9.88...openssl-sys-v0.9.89
+[v0.9.88]: https://github.com/rust-openssl/rust-openssl/compare/openssl-sys-v0.9.87...openssl-sys-v0.9.88
+[v0.9.87]: https://github.com/rust-openssl/rust-openssl/compare/openssl-sys-v0.9.86...openssl-sys-v0.9.87
+[v0.9.86]: https://github.com/rust-openssl/rust-openssl/compare/openssl-sys-v0.9.85...openssl-sys-v0.9.86
+[v0.9.85]: https://github.com/rust-openssl/rust-openssl/compare/openssl-sys-v0.9.84...openssl-sys-v0.9.85
+[v0.9.84]: https://github.com/rust-openssl/rust-openssl/compare/openssl-sys-v0.9.83...openssl-sys-v0.9.84
+[v0.9.83]: https://github.com/rust-openssl/rust-openssl/compare/openssl-sys-v0.9.82...openssl-sys-v0.9.83
+[v0.9.82]: https://github.com/rust-openssl/rust-openssl/compare/openssl-sys-v0.9.81...openssl-sys-v0.9.82
+[v0.9.81]: https://github.com/rust-openssl/rust-openssl/compare/openssl-sys-v0.9.80...openssl-sys-v0.9.81
+[v0.9.80]: https://github.com/rust-openssl/rust-openssl/compare/openssl-sys-v0.9.79...openssl-sys-v0.9.80
+[v0.9.79]: https://github.com/rust-openssl/rust-openssl/compare/openssl-sys-v0.9.78...openssl-sys-v0.9.79
+[v0.9.78]: https://github.com/rust-openssl/rust-openssl/compare/openssl-sys-v0.9.77...openssl-sys-v0.9.78
+[v0.9.77]: https://github.com/rust-openssl/rust-openssl/compare/openssl-sys-v0.9.76...openssl-sys-v0.9.77
+[v0.9.76]: https://github.com/rust-openssl/rust-openssl/compare/openssl-sys-v0.9.75...openssl-sys-v0.9.76
+[v0.9.75]: https://github.com/rust-openssl/rust-openssl/compare/openssl-sys-v0.9.74...openssl-sys-v0.9.75
+[v0.9.74]: https://github.com/rust-openssl/rust-openssl/compare/openssl-sys-v0.9.73...openssl-sys-v0.9.74
+[v0.9.73]: https://github.com/rust-openssl/rust-openssl/compare/openssl-sys-v0.9.72...openssl-sys-v0.9.73
+[v0.9.72]: https://github.com/rust-openssl/rust-openssl/compare/openssl-sys-v0.9.71...openssl-sys-v0.9.72
+[v0.9.71]: https://github.com/rust-openssl/rust-openssl/compare/openssl-sys-v0.9.70...openssl-sys-v0.9.71
+[v0.9.70]: https://github.com/rust-openssl/rust-openssl/compare/openssl-sys-v0.9.69...openssl-sys-v0.9.70
+[v0.9.69]: https://github.com/rust-openssl/rust-openssl/compare/openssl-sys-v0.9.68...openssl-sys-v0.9.69
+[v0.9.68]: https://github.com/rust-openssl/rust-openssl/compare/openssl-sys-v0.9.67...openssl-sys-v0.9.68
+[v0.9.67]: https://github.com/rust-openssl/rust-openssl/compare/openssl-sys-v0.9.66...openssl-sys-v0.9.67
+[v0.9.66]: https://github.com/rust-openssl/rust-openssl/compare/openssl-sys-v0.9.65...openssl-sys-v0.9.66
+[v0.9.65]: https://github.com/rust-openssl/rust-openssl/compare/openssl-sys-v0.9.64...openssl-sys-v0.9.65
+[v0.9.64]: https://github.com/rust-openssl/rust-openssl/compare/openssl-sys-v0.9.63...openssl-sys-v0.9.64
+[v0.9.63]: https://github.com/rust-openssl/rust-openssl/compare/openssl-sys-v0.9.62...openssl-sys-v0.9.63
+[v0.9.62]: https://github.com/rust-openssl/rust-openssl/compare/openssl-sys-v0.9.61...openssl-sys-v0.9.62
+[v0.9.61]: https://github.com/rust-openssl/rust-openssl/compare/openssl-sys-v0.9.60...openssl-sys-v0.9.61
+[v0.9.60]: https://github.com/rust-openssl/rust-openssl/compare/openssl-sys-v0.9.59...openssl-sys-v0.9.60
+[v0.9.59]: https://github.com/rust-openssl/rust-openssl/compare/openssl-sys-v0.9.58...openssl-sys-v0.9.59
+[v0.9.58]: https://github.com/rust-openssl/rust-openssl/compare/openssl-sys-v0.9.57...openssl-sys-v0.9.58
+[v0.9.57]: https://github.com/rust-openssl/rust-openssl/compare/openssl-sys-v0.9.56...openssl-sys-v0.9.57
+[v0.9.56]: https://github.com/rust-openssl/rust-openssl/compare/openssl-sys-v0.9.55...openssl-sys-v0.9.56
+[v0.9.55]: https://github.com/rust-openssl/rust-openssl/compare/openssl-sys-v0.9.54...openssl-sys-v0.9.55
+[v0.9.54]: https://github.com/rust-openssl/rust-openssl/compare/openssl-sys-v0.9.53...openssl-sys-v0.9.54
+[v0.9.53]: https://github.com/rust-openssl/rust-openssl/compare/openssl-sys-v0.9.52...openssl-sys-v0.9.53
+[v0.9.52]: https://github.com/rust-openssl/rust-openssl/compare/openssl-sys-v0.9.51...openssl-sys-v0.9.52
+[v0.9.51]: https://github.com/rust-openssl/rust-openssl/compare/openssl-sys-v0.9.50...openssl-sys-v0.9.51
+[v0.9.50]: https://github.com/rust-openssl/rust-openssl/compare/openssl-sys-v0.9.49...openssl-sys-v0.9.50
+[v0.9.49]: https://github.com/rust-openssl/rust-openssl/compare/openssl-sys-v0.9.48...openssl-sys-v0.9.49
+[v0.9.48]: https://github.com/rust-openssl/rust-openssl/compare/openssl-sys-v0.9.47...openssl-sys-v0.9.48
+[v0.9.47]: https://github.com/rust-openssl/rust-openssl/compare/openssl-sys-v0.9.46...openssl-sys-v0.9.47
+[v0.9.46]: https://github.com/rust-openssl/rust-openssl/compare/openssl-sys-v0.9.45...openssl-sys-v0.9.46
+[v0.9.45]: https://github.com/rust-openssl/rust-openssl/compare/openssl-sys-v0.9.44...openssl-sys-v0.9.45
+[v0.9.44]: https://github.com/rust-openssl/rust-openssl/compare/openssl-sys-v0.9.43...openssl-sys-v0.9.44
+[v0.9.43]: https://github.com/rust-openssl/rust-openssl/compare/openssl-sys-v0.9.42...openssl-sys-v0.9.43

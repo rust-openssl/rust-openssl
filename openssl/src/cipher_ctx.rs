@@ -55,7 +55,7 @@ use crate::error::ErrorStack;
 #[cfg(not(any(boringssl, awslc)))]
 use crate::pkey::{HasPrivate, HasPublic, PKey, PKeyRef};
 use crate::{cvt, cvt_p};
-#[cfg(ossl102)]
+#[cfg(ossl110)]
 use bitflags::bitflags;
 use cfg_if::cfg_if;
 use foreign_types::{ForeignType, ForeignTypeRef};
@@ -82,7 +82,7 @@ foreign_type_and_impl_send_sync! {
     pub struct CipherCtxRef;
 }
 
-#[cfg(ossl102)]
+#[cfg(ossl110)]
 bitflags! {
     /// Flags for `EVP_CIPHER_CTX`.
     pub struct CipherCtxFlags : c_int {
@@ -526,9 +526,9 @@ impl CipherCtxRef {
 
     /// Set ctx flags.
     ///
-    /// This function is currently used to enable AES key wrap feature supported by OpenSSL 1.0.2 or newer.
+    /// This function is currently used to enable AES key wrap feature supported by OpenSSL 1.1.0 or newer.
     #[corresponds(EVP_CIPHER_CTX_set_flags)]
-    #[cfg(ossl102)]
+    #[cfg(ossl110)]
     pub fn set_flags(&mut self, flags: CipherCtxFlags) {
         unsafe {
             ffi::EVP_CIPHER_CTX_set_flags(self.as_ptr(), flags.bits());
@@ -1111,7 +1111,7 @@ mod test {
             .unwrap();
     }
 
-    #[cfg(ossl102)]
+    #[cfg(ossl110)]
     fn cipher_wrap_test(cipher: &CipherRef, pt: &str, ct: &str, key: &str, iv: Option<&str>) {
         let pt = hex::decode(pt).unwrap();
         let key = hex::decode(key).unwrap();
@@ -1144,7 +1144,7 @@ mod test {
     }
 
     #[test]
-    #[cfg(ossl102)]
+    #[cfg(ossl110)]
     fn test_aes128_wrap() {
         let pt = "00112233445566778899aabbccddeeff";
         let ct = "7940ff694448b5bb5139c959a4896832e55d69aa04daa27e";
@@ -1155,7 +1155,7 @@ mod test {
     }
 
     #[test]
-    #[cfg(ossl102)]
+    #[cfg(ossl110)]
     fn test_aes128_wrap_default_iv() {
         let pt = "00112233445566778899aabbccddeeff";
         let ct = "38f1215f0212526f8a70b51955b9fbdc9fe3041d9832306e";
@@ -1186,7 +1186,7 @@ mod test {
     }
 
     #[test]
-    #[cfg(ossl102)]
+    #[cfg(ossl110)]
     fn test_aes192_wrap() {
         let pt = "9f6dee187d35302116aecbfd059657efd9f7589c4b5e7f5b";
         let ct = "83b89142dfeeb4871e078bfb81134d33e23fedc19b03a1cf689973d3831b6813";
@@ -1197,7 +1197,7 @@ mod test {
     }
 
     #[test]
-    #[cfg(ossl102)]
+    #[cfg(ossl110)]
     fn test_aes192_wrap_default_iv() {
         let pt = "9f6dee187d35302116aecbfd059657efd9f7589c4b5e7f5b";
         let ct = "c02c2cf11505d3e4851030d5534cbf5a1d7eca7ba8839adbf239756daf1b43e6";
@@ -1228,7 +1228,7 @@ mod test {
     }
 
     #[test]
-    #[cfg(ossl102)]
+    #[cfg(ossl110)]
     fn test_aes256_wrap() {
         let pt = "6bc1bee22e409f96e93d7e117393172aae2d8a571e03ac9c9eb76fac45af8e51";
         let ct = "cc05da2a7f56f7dd0c144231f90bce58648fa20a8278f5a6b7d13bba6aa57a33229d4333866b7fd6";
@@ -1239,7 +1239,7 @@ mod test {
     }
 
     #[test]
-    #[cfg(ossl102)]
+    #[cfg(ossl110)]
     fn test_aes256_wrap_default_iv() {
         let pt = "6bc1bee22e409f96e93d7e117393172aae2d8a571e03ac9c9eb76fac45af8e51";
         let ct = "0b24f068b50e52bc6987868411c36e1b03900866ed12af81eb87cef70a8d1911731c1d7abf789d88";

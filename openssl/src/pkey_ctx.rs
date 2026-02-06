@@ -64,14 +64,17 @@ let cmac_key = ctx.keygen().unwrap();
 //! let valid = ctx.verify(text, &signature).unwrap();
 //! assert!(valid);
 //! ```
+use crate::bn::BigNumRef;
 #[cfg(not(any(boringssl, awslc)))]
 use crate::cipher::CipherRef;
 use crate::error::ErrorStack;
 use crate::md::MdRef;
-use crate::pkey::{HasPrivate, HasPublic, Id, PKey, PKeyRef, Private};
+use crate::nid::Nid;
+use crate::pkey::{HasPrivate, HasPublic, Id, PKey, PKeyRef, Params, Private};
 use crate::rsa::Padding;
 use crate::sign::RsaPssSaltlen;
 use crate::{cvt, cvt_p};
+use cfg_if::cfg_if;
 use foreign_types::{ForeignType, ForeignTypeRef};
 #[cfg(not(any(boringssl, awslc)))]
 use libc::c_int;
@@ -420,6 +423,17 @@ impl<T> PkeyCtxRef<T> {
         Ok(())
     }
 
+    /// Prepares the context for key parameter generation.
+    #[corresponds(EVP_PKEY_paramgen_init)]
+    #[inline]
+    pub fn paramgen_init(&mut self) -> Result<(), ErrorStack> {
+        unsafe {
+            cvt(ffi::EVP_PKEY_paramgen_init(self.as_ptr()))?;
+        }
+
+        Ok(())
+    }
+
     /// Sets which algorithm was used to compute the digest used in a
     /// signature. With RSA signatures this causes the signature to be wrapped
     /// in a `DigestInfo` structure. This is almost always what you want with
@@ -433,6 +447,72 @@ impl<T> PkeyCtxRef<T> {
                 md.as_ptr(),
             ))?;
         }
+        Ok(())
+    }
+
+    /// Sets the DH paramgen prime length.
+    ///
+    /// This is only useful for DH keys.
+    #[corresponds(EVP_PKEY_CTX_set_dh_paramgen_prime_len)]
+    #[cfg(not(boringssl))]
+    #[inline]
+    pub fn set_dh_paramgen_prime_len(&mut self, bits: u32) -> Result<(), ErrorStack> {
+        unsafe {
+            cvt(ffi::EVP_PKEY_CTX_set_dh_paramgen_prime_len(
+                self.as_ptr(),
+                bits as i32,
+            ))?;
+        }
+
+        Ok(())
+    }
+
+    /// Sets the DH paramgen generator.
+    ///
+    /// This is only useful for DH keys.
+    #[corresponds(EVP_PKEY_CTX_set_dh_paramgen_generator)]
+    #[cfg(not(boringssl))]
+    #[inline]
+    pub fn set_dh_paramgen_generator(&mut self, bits: u32) -> Result<(), ErrorStack> {
+        unsafe {
+            cvt(ffi::EVP_PKEY_CTX_set_dh_paramgen_generator(
+                self.as_ptr(),
+                bits as i32,
+            ))?;
+        }
+
+        Ok(())
+    }
+
+    /// Sets the DSA paramgen bits.
+    ///
+    /// This is only useful for DSA keys.
+    #[corresponds(EVP_PKEY_CTX_set_dsa_paramgen_bits)]
+    #[inline]
+    pub fn set_dsa_paramgen_bits(&mut self, bits: u32) -> Result<(), ErrorStack> {
+        unsafe {
+            cvt(ffi::EVP_PKEY_CTX_set_dsa_paramgen_bits(
+                self.as_ptr(),
+                bits as i32,
+            ))?;
+        }
+
+        Ok(())
+    }
+
+    /// Sets the EC paramgen curve NID.
+    ///
+    /// This is only useful for EC keys.
+    #[corresponds(EVP_PKEY_CTX_set_ec_paramgen_curve_nid)]
+    #[inline]
+    pub fn set_ec_paramgen_curve_nid(&mut self, nid: Nid) -> Result<(), ErrorStack> {
+        unsafe {
+            cvt(ffi::EVP_PKEY_CTX_set_ec_paramgen_curve_nid(
+                self.as_ptr(),
+                nid.as_raw(),
+            ))?;
+        }
+
         Ok(())
     }
 
@@ -461,6 +541,48 @@ impl<T> PkeyCtxRef<T> {
                 self.as_ptr(),
                 padding.as_raw(),
             ))?;
+        }
+
+        Ok(())
+    }
+
+    /// Sets the RSA keygen bits.
+    ///
+    /// This is only useful for RSA keys.
+    #[corresponds(EVP_PKEY_CTX_set_rsa_keygen_bits)]
+    #[inline]
+    pub fn set_rsa_keygen_bits(&mut self, bits: u32) -> Result<(), ErrorStack> {
+        unsafe {
+            cvt(ffi::EVP_PKEY_CTX_set_rsa_keygen_bits(
+                self.as_ptr(),
+                bits as i32,
+            ))?;
+        }
+
+        Ok(())
+    }
+
+    /// Sets the RSA keygen public exponent.
+    ///
+    /// This is only useful for RSA keys.
+    #[corresponds(EVP_PKEY_CTX_set1_rsa_keygen_pubexp)]
+    #[inline]
+    pub fn set_rsa_keygen_pubexp(&mut self, pubexp: &BigNumRef) -> Result<(), ErrorStack> {
+        unsafe {
+            cfg_if! {
+                if #[cfg(ossl300)] {
+                    cvt(ffi::EVP_PKEY_CTX_set1_rsa_keygen_pubexp(
+                        self.as_ptr(),
+                        pubexp.as_ptr(),
+                    ))?;
+                } else {
+                    cvt(ffi::EVP_PKEY_CTX_set_rsa_keygen_pubexp(
+                        self.as_ptr(),
+                        // Dupe the BN because the EVP_PKEY_CTX takes ownership of it and will free it.
+                        cvt_p(ffi::BN_dup(pubexp.as_ptr()))?,
+                    ))?;
+                }
+            }
         }
 
         Ok(())
@@ -501,7 +623,6 @@ impl<T> PkeyCtxRef<T> {
     ///
     /// This is only useful for RSA keys.
     #[corresponds(EVP_PKEY_CTX_set_rsa_oaep_md)]
-    #[cfg(any(ossl102, libressl310, boringssl, awslc))]
     #[inline]
     pub fn set_rsa_oaep_md(&mut self, md: &MdRef) -> Result<(), ErrorStack> {
         unsafe {
@@ -518,7 +639,6 @@ impl<T> PkeyCtxRef<T> {
     ///
     /// This is only useful for RSA keys.
     #[corresponds(EVP_PKEY_CTX_set0_rsa_oaep_label)]
-    #[cfg(any(ossl102, libressl310, boringssl, awslc))]
     pub fn set_rsa_oaep_label(&mut self, label: &[u8]) -> Result<(), ErrorStack> {
         use crate::LenType;
         let len = LenType::try_from(label.len()).unwrap();
@@ -734,6 +854,17 @@ impl<T> PkeyCtxRef<T> {
         }
     }
 
+    /// Generates a new set of key parameters.
+    #[corresponds(EVP_PKEY_paramgen)]
+    #[inline]
+    pub fn paramgen(&mut self) -> Result<PKey<Params>, ErrorStack> {
+        unsafe {
+            let mut key = ptr::null_mut();
+            cvt(ffi::EVP_PKEY_paramgen(self.as_ptr(), &mut key))?;
+            Ok(PKey::from_ptr(key))
+        }
+    }
+
     /// Sets the nonce type for a private key context.
     ///
     /// The nonce for DSA and ECDSA can be either random (the default) or deterministic (as defined by RFC 6979).
@@ -785,6 +916,7 @@ impl<T> PkeyCtxRef<T> {
 #[cfg(test)]
 mod test {
     use super::*;
+    use crate::bn::BigNum;
     #[cfg(not(any(boringssl, awslc)))]
     use crate::cipher::Cipher;
     use crate::ec::{EcGroup, EcKey};
@@ -794,6 +926,8 @@ mod test {
     use crate::pkey::PKey;
     use crate::rsa::Rsa;
     use crate::sign::Verifier;
+    #[cfg(not(boringssl))]
+    use cfg_if::cfg_if;
 
     #[test]
     fn rsa() {
@@ -819,7 +953,6 @@ mod test {
     }
 
     #[test]
-    #[cfg(any(ossl102, libressl310, boringssl, awslc))]
     fn rsa_oaep() {
         let key = include_bytes!("../test/rsa.pem");
         let rsa = Rsa::private_key_from_pem(key).unwrap();
@@ -918,6 +1051,63 @@ mod test {
         ctx.set_keygen_mac_key(&hex::decode("9294727a3638bb1c13f48ef8158bfc9d").unwrap())
             .unwrap();
         ctx.keygen().unwrap();
+    }
+
+    #[test]
+    #[cfg(not(boringssl))]
+    fn dh_paramgen() {
+        let mut ctx = PkeyCtx::new_id(Id::DH).unwrap();
+        ctx.paramgen_init().unwrap();
+        ctx.set_dh_paramgen_prime_len(512).unwrap();
+        ctx.set_dh_paramgen_generator(2).unwrap();
+        let params = ctx.paramgen().unwrap();
+
+        assert_eq!(params.size(), 64);
+    }
+
+    #[test]
+    #[cfg(not(boringssl))]
+    fn dsa_paramgen() {
+        let mut ctx = PkeyCtx::new_id(Id::DSA).unwrap();
+        ctx.paramgen_init().unwrap();
+        ctx.set_dsa_paramgen_bits(2048).unwrap();
+        let params = ctx.paramgen().unwrap();
+
+        let size = {
+            cfg_if! {
+                if #[cfg(awslc)] {
+                    72
+                } else if #[cfg(libressl)] {
+                    48
+                } else {
+                    64
+                }
+            }
+        };
+        assert_eq!(params.size(), size);
+    }
+
+    #[test]
+    fn ec_keygen() {
+        let mut ctx = PkeyCtx::new_id(Id::EC).unwrap();
+        ctx.paramgen_init().unwrap();
+        ctx.set_ec_paramgen_curve_nid(Nid::X9_62_PRIME256V1)
+            .unwrap();
+        let params = ctx.paramgen().unwrap();
+
+        assert_eq!(params.size(), 72);
+    }
+
+    #[test]
+    fn rsa_keygen() {
+        let pubexp = BigNum::from_u32(65537).unwrap();
+        let mut ctx = PkeyCtx::new_id(Id::RSA).unwrap();
+        ctx.keygen_init().unwrap();
+        ctx.set_rsa_keygen_pubexp(&pubexp).unwrap();
+        ctx.set_rsa_keygen_bits(2048).unwrap();
+        let key = ctx.keygen().unwrap();
+
+        assert_eq!(key.bits(), 2048);
     }
 
     #[test]
@@ -1051,7 +1241,7 @@ mod test {
         // result_buf contains the digest
         assert_eq!(result_buf[..length], digest);
 
-        // Attempt recovery of teh entire DigestInfo
+        // Attempt recovery of the entire DigestInfo
         let mut ctx = PkeyCtx::new(&key).unwrap();
         ctx.verify_recover_init().unwrap();
         ctx.set_rsa_padding(Padding::PKCS1).unwrap();
@@ -1094,12 +1284,12 @@ mxJ7imIrEg9nIQ==
         let key1 = EcKey::private_key_from_pem(private_key_pem.as_bytes()).unwrap();
         let key1 = PKey::from_ec_key(key1).unwrap();
         let input = "sample";
-        let expected_output = hex::decode("3044022061340C88C3AAEBEB4F6D667F672CA9759A6CCAA9FA8811313039EE4A35471D3202206D7F147DAC089441BB2E2FE8F7A3FA264B9C475098FDCF6E00D7C996E1B8B7EB").unwrap();
+        let expected_output = hex::decode("3046022100EFD48B2AACB6A8FD1140DD9CD45E81D69D2C877B56AAF991C34D0EA84EAF3716022100F7CB1C942D657C41D436C7A1B6E29F65F3E900DBB9AFF4064DC4AB2F843ACDA8").unwrap();
 
-        let hashed_input = hash(MessageDigest::sha1(), input.as_bytes()).unwrap();
+        let hashed_input = hash(MessageDigest::sha256(), input.as_bytes()).unwrap();
         let mut ctx = PkeyCtx::new(&key1).unwrap();
         ctx.sign_init().unwrap();
-        ctx.set_signature_md(Md::sha1()).unwrap();
+        ctx.set_signature_md(Md::sha256()).unwrap();
         ctx.set_nonce_type(NonceType::DETERMINISTIC_K).unwrap();
 
         let mut output = vec![];

@@ -23,16 +23,13 @@ extern "C" {
     pub fn BN_clear_free(bn: *mut BIGNUM);
     pub fn BN_bin2bn(s: *const u8, size: c_int, ret: *mut BIGNUM) -> *mut BIGNUM;
     pub fn BN_bn2bin(a: *const BIGNUM, to: *mut u8) -> c_int;
-    #[cfg(any(ossl110, libressl340))]
     pub fn BN_bn2binpad(a: *const BIGNUM, to: *mut u8, tolen: c_int) -> c_int;
     pub fn BN_sub(r: *mut BIGNUM, a: *const BIGNUM, b: *const BIGNUM) -> c_int;
     pub fn BN_add(r: *mut BIGNUM, a: *const BIGNUM, b: *const BIGNUM) -> c_int;
     pub fn BN_mul(r: *mut BIGNUM, a: *const BIGNUM, b: *const BIGNUM, ctx: *mut BN_CTX) -> c_int;
     pub fn BN_sqr(r: *mut BIGNUM, a: *const BIGNUM, ctx: *mut BN_CTX) -> c_int;
     pub fn BN_set_negative(bn: *mut BIGNUM, n: c_int);
-    #[cfg(any(ossl110, libressl350))]
     pub fn BN_is_negative(b: *const BIGNUM) -> c_int;
-    #[cfg(any(ossl110, libressl350))]
     pub fn BN_is_odd(b: *const BIGNUM) -> c_int;
 
     pub fn BN_div(
@@ -149,28 +146,13 @@ extern "C" {
     ) -> c_int;
 }
 
-cfg_if! {
-    if #[cfg(any(ossl110, libressl350))] {
-        extern "C" {
-            pub fn BN_get_rfc2409_prime_768(bn: *mut BIGNUM) -> *mut BIGNUM;
-            pub fn BN_get_rfc2409_prime_1024(bn: *mut BIGNUM) -> *mut BIGNUM;
-            pub fn BN_get_rfc3526_prime_1536(bn: *mut BIGNUM) -> *mut BIGNUM;
-            pub fn BN_get_rfc3526_prime_2048(bn: *mut BIGNUM) -> *mut BIGNUM;
-            pub fn BN_get_rfc3526_prime_3072(bn: *mut BIGNUM) -> *mut BIGNUM;
-            pub fn BN_get_rfc3526_prime_4096(bn: *mut BIGNUM) -> *mut BIGNUM;
-            pub fn BN_get_rfc3526_prime_6144(bn: *mut BIGNUM) -> *mut BIGNUM;
-            pub fn BN_get_rfc3526_prime_8192(bn: *mut BIGNUM) -> *mut BIGNUM;
-        }
-    } else {
-        extern "C" {
-            pub fn get_rfc2409_prime_768(bn: *mut BIGNUM) -> *mut BIGNUM;
-            pub fn get_rfc2409_prime_1024(bn: *mut BIGNUM) -> *mut BIGNUM;
-            pub fn get_rfc3526_prime_1536(bn: *mut BIGNUM) -> *mut BIGNUM;
-            pub fn get_rfc3526_prime_2048(bn: *mut BIGNUM) -> *mut BIGNUM;
-            pub fn get_rfc3526_prime_3072(bn: *mut BIGNUM) -> *mut BIGNUM;
-            pub fn get_rfc3526_prime_4096(bn: *mut BIGNUM) -> *mut BIGNUM;
-            pub fn get_rfc3526_prime_6144(bn: *mut BIGNUM) -> *mut BIGNUM;
-            pub fn get_rfc3526_prime_8192(bn: *mut BIGNUM) -> *mut BIGNUM;
-        }
-    }
+extern "C" {
+    pub fn BN_get_rfc2409_prime_768(bn: *mut BIGNUM) -> *mut BIGNUM;
+    pub fn BN_get_rfc2409_prime_1024(bn: *mut BIGNUM) -> *mut BIGNUM;
+    pub fn BN_get_rfc3526_prime_1536(bn: *mut BIGNUM) -> *mut BIGNUM;
+    pub fn BN_get_rfc3526_prime_2048(bn: *mut BIGNUM) -> *mut BIGNUM;
+    pub fn BN_get_rfc3526_prime_3072(bn: *mut BIGNUM) -> *mut BIGNUM;
+    pub fn BN_get_rfc3526_prime_4096(bn: *mut BIGNUM) -> *mut BIGNUM;
+    pub fn BN_get_rfc3526_prime_6144(bn: *mut BIGNUM) -> *mut BIGNUM;
+    pub fn BN_get_rfc3526_prime_8192(bn: *mut BIGNUM) -> *mut BIGNUM;
 }

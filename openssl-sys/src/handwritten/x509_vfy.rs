@@ -1,7 +1,7 @@
 use super::super::*;
 use libc::*;
 
-#[cfg(any(libressl, all(ossl102, not(ossl110))))]
+#[cfg(all(libressl, not(libressl430)))]
 pub enum X509_VERIFY_PARAM_ID {}
 
 extern "C" {
@@ -73,60 +73,41 @@ const_ptr_api! {
 extern "C" {
     pub fn X509_STORE_CTX_set_error(ctx: *mut X509_STORE_CTX, error: c_int);
 }
-cfg_if! {
-    if #[cfg(any(ossl110, libressl350))] {
-        const_ptr_api! {
-            extern "C" {
-                pub fn X509_STORE_CTX_get0_chain(ctx: #[const_ptr_if(ossl300)] X509_STORE_CTX) -> *mut stack_st_X509;
-            }
-        }
-    } else {
-        extern "C" {
-            pub fn X509_STORE_CTX_get_chain(ctx: *mut X509_STORE_CTX) -> *mut stack_st_X509;
-        }
+const_ptr_api! {
+    extern "C" {
+        pub fn X509_STORE_CTX_get0_chain(ctx: #[const_ptr_if(ossl300)] X509_STORE_CTX) -> *mut stack_st_X509;
     }
 }
 
 extern "C" {
-    #[cfg(any(ossl102, libressl261))]
     pub fn X509_VERIFY_PARAM_new() -> *mut X509_VERIFY_PARAM;
-    #[cfg(any(ossl102, libressl261))]
     pub fn X509_VERIFY_PARAM_free(param: *mut X509_VERIFY_PARAM);
 
-    #[cfg(any(ossl102, libressl261))]
     pub fn X509_VERIFY_PARAM_set_flags(param: *mut X509_VERIFY_PARAM, flags: c_ulong) -> c_int;
-    #[cfg(any(ossl102, libressl261))]
     pub fn X509_VERIFY_PARAM_clear_flags(param: *mut X509_VERIFY_PARAM, flags: c_ulong) -> c_int;
 
-    #[cfg(any(ossl102, libressl261))]
     pub fn X509_VERIFY_PARAM_set_time(param: *mut X509_VERIFY_PARAM, t: time_t);
 
-    #[cfg(any(ossl102, libressl261))]
     pub fn X509_VERIFY_PARAM_set_depth(param: *mut X509_VERIFY_PARAM, depth: c_int);
 }
 const_ptr_api! {
     extern "C" {
-        #[cfg(any(ossl102, libressl261))]
         pub fn X509_VERIFY_PARAM_get_flags(param: #[const_ptr_if(ossl300)] X509_VERIFY_PARAM) -> c_ulong;
     }
 }
 
 extern "C" {
-    #[cfg(any(ossl102, libressl261))]
     pub fn X509_VERIFY_PARAM_set1_host(
         param: *mut X509_VERIFY_PARAM,
         name: *const c_char,
         namelen: size_t,
     ) -> c_int;
-    #[cfg(any(ossl102, libressl261))]
     pub fn X509_VERIFY_PARAM_set_hostflags(param: *mut X509_VERIFY_PARAM, flags: c_uint);
-    #[cfg(any(ossl102, libressl261))]
     pub fn X509_VERIFY_PARAM_set1_email(
         param: *mut X509_VERIFY_PARAM,
         email: *const c_char,
         emaillen: size_t,
     ) -> c_int;
-    #[cfg(any(ossl102, libressl261))]
     pub fn X509_VERIFY_PARAM_set1_ip(
         param: *mut X509_VERIFY_PARAM,
         ip: *const c_uchar,
@@ -136,6 +117,5 @@ extern "C" {
     pub fn X509_VERIFY_PARAM_set_auth_level(param: *mut X509_VERIFY_PARAM, lvl: c_int);
     #[cfg(ossl110)]
     pub fn X509_VERIFY_PARAM_get_auth_level(param: *const X509_VERIFY_PARAM) -> c_int;
-    #[cfg(ossl102)]
     pub fn X509_VERIFY_PARAM_set_purpose(param: *mut X509_VERIFY_PARAM, purpose: c_int) -> c_int;
 }

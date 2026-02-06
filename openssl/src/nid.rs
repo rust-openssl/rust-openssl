@@ -3,6 +3,7 @@ use libc::{c_char, c_int};
 
 use std::ffi::CStr;
 use std::ffi::CString;
+use std::fmt;
 use std::str;
 
 use crate::cvt_p;
@@ -44,8 +45,8 @@ pub struct SignatureAlgorithms {
 /// The following documentation provides context about `Nid`s and their usage
 /// in OpenSSL.
 ///
-/// - [Obj_nid2obj](https://www.openssl.org/docs/manmaster/crypto/OBJ_create.html)
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+/// - [Obj_nid2obj](https://docs.openssl.org/master/man3/OBJ_create/)
+#[derive(Copy, Clone, PartialEq, Eq, Hash)]
 pub struct Nid(c_int);
 
 #[allow(non_snake_case)]
@@ -221,6 +222,14 @@ impl Nid {
     pub const BRAINPOOL_P384R1: Nid = Nid(ffi::NID_brainpoolP384r1);
     #[cfg(any(ossl110, libressl))]
     pub const BRAINPOOL_P512R1: Nid = Nid(ffi::NID_brainpoolP512r1);
+    #[cfg(any(ossl110, libressl))]
+    pub const BRAINPOOL_P256T1: Nid = Nid(ffi::NID_brainpoolP256t1);
+    #[cfg(any(ossl110, libressl))]
+    pub const BRAINPOOL_P320T1: Nid = Nid(ffi::NID_brainpoolP320t1);
+    #[cfg(any(ossl110, libressl))]
+    pub const BRAINPOOL_P384T1: Nid = Nid(ffi::NID_brainpoolP384t1);
+    #[cfg(any(ossl110, libressl))]
+    pub const BRAINPOOL_P512T1: Nid = Nid(ffi::NID_brainpoolP512t1);
     pub const WAP_WSG_IDM_ECID_WTLS1: Nid = Nid(ffi::NID_wap_wsg_idm_ecid_wtls1);
     pub const WAP_WSG_IDM_ECID_WTLS3: Nid = Nid(ffi::NID_wap_wsg_idm_ecid_wtls3);
     pub const WAP_WSG_IDM_ECID_WTLS4: Nid = Nid(ffi::NID_wap_wsg_idm_ecid_wtls4);
@@ -746,6 +755,12 @@ impl Nid {
     pub const AES_256_CTR: Nid = Nid(ffi::NID_aes_256_ctr);
     pub const AES_128_XTS: Nid = Nid(ffi::NID_aes_128_xts);
     pub const AES_256_XTS: Nid = Nid(ffi::NID_aes_256_xts);
+    #[cfg(ossl110)]
+    pub const AES_128_OCB: Nid = Nid(ffi::NID_aes_128_ocb);
+    #[cfg(ossl110)]
+    pub const AES_192_OCB: Nid = Nid(ffi::NID_aes_192_ocb);
+    #[cfg(ossl110)]
+    pub const AES_256_OCB: Nid = Nid(ffi::NID_aes_256_ocb);
     pub const DES_CFB1: Nid = Nid(ffi::NID_des_cfb1);
     pub const DES_CFB8: Nid = Nid(ffi::NID_des_cfb8);
     pub const DES_EDE3_CFB1: Nid = Nid(ffi::NID_des_ede3_cfb1);
@@ -1076,7 +1091,7 @@ impl Nid {
     pub const AES_256_CBC_HMAC_SHA1: Nid = Nid(ffi::NID_aes_256_cbc_hmac_sha1);
     #[cfg(ossl111)]
     pub const SM2: Nid = Nid(ffi::NID_sm2);
-    #[cfg(any(ossl111, libressl291))]
+    #[cfg(any(ossl111, libressl))]
     pub const SM3: Nid = Nid(ffi::NID_sm3);
     #[cfg(any(ossl111, libressl380, awslc))]
     pub const SHA3_224: Nid = Nid(ffi::NID_sha3_224);
@@ -1090,8 +1105,21 @@ impl Nid {
     pub const SHAKE128: Nid = Nid(ffi::NID_shake128);
     #[cfg(any(ossl111, awslc))]
     pub const SHAKE256: Nid = Nid(ffi::NID_shake256);
-    #[cfg(any(ossl110, libressl271, awslc))]
+    #[cfg(any(ossl110, libressl, awslc))]
     pub const CHACHA20_POLY1305: Nid = Nid(ffi::NID_chacha20_poly1305);
+}
+
+impl fmt::Debug for Nid {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
+        if let Ok(short_name) = self.short_name() {
+            f.debug_struct("Nid")
+                .field("nid", &self.0)
+                .field("short_name", &short_name)
+                .finish()
+        } else {
+            f.debug_struct("Nid").field("nid", &self.0).finish()
+        }
+    }
 }
 
 #[cfg(test)]
@@ -1177,5 +1205,18 @@ mod test {
                 "invalid_oid should not return a valid value"
             );
         }
+    }
+
+    #[test]
+    fn test_debug() {
+        assert_eq!(
+            format!("{:?}", Nid::SECP521R1),
+            "Nid { nid: 716, short_name: \"secp521r1\" }"
+        );
+
+        assert_eq!(
+            format!("{:?}", Nid::from_raw(123456789)),
+            "Nid { nid: 123456789 }"
+        );
     }
 }

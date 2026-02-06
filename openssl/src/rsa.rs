@@ -23,7 +23,6 @@
 //! let mut buf = vec![0; rsa.size() as usize];
 //! let encrypted_len = rsa.public_encrypt(data, &mut buf, Padding::PKCS1).unwrap();
 //! ```
-use cfg_if::cfg_if;
 use foreign_types::{ForeignType, ForeignTypeRef};
 use libc::c_int;
 use std::fmt;
@@ -376,8 +375,8 @@ impl Rsa<Public> {
     ///
     /// This corresponds to [`RSA_new`] and uses [`RSA_set0_key`].
     ///
-    /// [`RSA_new`]: https://www.openssl.org/docs/manmaster/crypto/RSA_new.html
-    /// [`RSA_set0_key`]: https://www.openssl.org/docs/manmaster/crypto/RSA_set0_key.html
+    /// [`RSA_new`]: https://docs.openssl.org/master/man3/RSA_new/
+    /// [`RSA_set0_key`]: https://docs.openssl.org/master/man3/RSA_set0_key/
     pub fn from_public_components(n: BigNum, e: BigNum) -> Result<Rsa<Public>, ErrorStack> {
         unsafe {
             let rsa = cvt_p(ffi::RSA_new())?;
@@ -436,8 +435,8 @@ impl RsaPrivateKeyBuilder {
     ///
     /// This corresponds to [`RSA_new`] and uses [`RSA_set0_key`].
     ///
-    /// [`RSA_new`]: https://www.openssl.org/docs/manmaster/crypto/RSA_new.html
-    /// [`RSA_set0_key`]: https://www.openssl.org/docs/manmaster/crypto/RSA_set0_key.html
+    /// [`RSA_new`]: https://docs.openssl.org/master/man3/RSA_new/
+    /// [`RSA_set0_key`]: https://docs.openssl.org/master/man3/RSA_set0_key/
     pub fn new(n: BigNum, e: BigNum, d: BigNum) -> Result<RsaPrivateKeyBuilder, ErrorStack> {
         unsafe {
             let rsa = cvt_p(ffi::RSA_new())?;
@@ -584,101 +583,10 @@ impl<T> fmt::Debug for Rsa<T> {
     }
 }
 
-cfg_if! {
-    if #[cfg(any(ossl110, libressl273, boringssl, awslc))] {
-        use ffi::{
-            RSA_get0_key, RSA_get0_factors, RSA_get0_crt_params, RSA_set0_key, RSA_set0_factors,
-            RSA_set0_crt_params,
-        };
-    } else {
-        #[allow(bad_style)]
-        unsafe fn RSA_get0_key(
-            r: *const ffi::RSA,
-            n: *mut *const ffi::BIGNUM,
-            e: *mut *const ffi::BIGNUM,
-            d: *mut *const ffi::BIGNUM,
-        ) {
-            if !n.is_null() {
-                *n = (*r).n;
-            }
-            if !e.is_null() {
-                *e = (*r).e;
-            }
-            if !d.is_null() {
-                *d = (*r).d;
-            }
-        }
-
-        #[allow(bad_style)]
-        unsafe fn RSA_get0_factors(
-            r: *const ffi::RSA,
-            p: *mut *const ffi::BIGNUM,
-            q: *mut *const ffi::BIGNUM,
-        ) {
-            if !p.is_null() {
-                *p = (*r).p;
-            }
-            if !q.is_null() {
-                *q = (*r).q;
-            }
-        }
-
-        #[allow(bad_style)]
-        unsafe fn RSA_get0_crt_params(
-            r: *const ffi::RSA,
-            dmp1: *mut *const ffi::BIGNUM,
-            dmq1: *mut *const ffi::BIGNUM,
-            iqmp: *mut *const ffi::BIGNUM,
-        ) {
-            if !dmp1.is_null() {
-                *dmp1 = (*r).dmp1;
-            }
-            if !dmq1.is_null() {
-                *dmq1 = (*r).dmq1;
-            }
-            if !iqmp.is_null() {
-                *iqmp = (*r).iqmp;
-            }
-        }
-
-        #[allow(bad_style)]
-        unsafe fn RSA_set0_key(
-            r: *mut ffi::RSA,
-            n: *mut ffi::BIGNUM,
-            e: *mut ffi::BIGNUM,
-            d: *mut ffi::BIGNUM,
-        ) -> c_int {
-            (*r).n = n;
-            (*r).e = e;
-            (*r).d = d;
-            1
-        }
-
-        #[allow(bad_style)]
-        unsafe fn RSA_set0_factors(
-            r: *mut ffi::RSA,
-            p: *mut ffi::BIGNUM,
-            q: *mut ffi::BIGNUM,
-        ) -> c_int {
-            (*r).p = p;
-            (*r).q = q;
-            1
-        }
-
-        #[allow(bad_style)]
-        unsafe fn RSA_set0_crt_params(
-            r: *mut ffi::RSA,
-            dmp1: *mut ffi::BIGNUM,
-            dmq1: *mut ffi::BIGNUM,
-            iqmp: *mut ffi::BIGNUM,
-        ) -> c_int {
-            (*r).dmp1 = dmp1;
-            (*r).dmq1 = dmq1;
-            (*r).iqmp = iqmp;
-            1
-        }
-    }
-}
+use ffi::{
+    RSA_get0_crt_params, RSA_get0_factors, RSA_get0_key, RSA_set0_crt_params, RSA_set0_factors,
+    RSA_set0_key,
+};
 
 #[cfg(test)]
 mod test {
