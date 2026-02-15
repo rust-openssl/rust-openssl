@@ -701,6 +701,12 @@ impl EcPointRef {
     }
 }
 
+impl fmt::Debug for EcPointRef {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
+        f.debug_struct("EcPoint").finish_non_exhaustive()
+    }
+}
+
 impl EcPoint {
     /// Creates a new point on the specified curve.
     #[corresponds(EC_POINT_new)]
@@ -747,6 +753,12 @@ impl EcPoint {
             ))?;
         }
         Ok(point)
+    }
+}
+
+impl fmt::Debug for EcPoint {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
+        self.as_ref().fmt(f)
     }
 }
 
@@ -1457,5 +1469,14 @@ mod test {
             format!("{:?}", group),
             "EcGroup { p: \"01FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF\", a: \"01FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFC\", b: \"51953EB9618E1C9A1F929A21A0B68540EEA2DA725B99B315F3B8B489918EF109E156193951EC7E937B1652C0BD3BB1BF073573DF883D2C34F1EF451FD46B503F00\" }"
         );
+    }
+
+    #[test]
+    fn test_debug_point() {
+        let group = EcGroup::from_curve_name(Nid::SECP521R1).unwrap();
+
+        let g = group.generator();
+
+        assert_eq!(format!("{:?}", g), "EcPoint { .. }");
     }
 }
