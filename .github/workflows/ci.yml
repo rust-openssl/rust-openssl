@@ -75,6 +75,7 @@ jobs:
       - run: sed -i '/"systest",/d' Cargo.toml
       - run: cargo generate-lockfile
       - run: |
+          cargo update -p syn --precise 2.0.114
           cargo update -p once_cell --precise 1.20.3
           cargo update -p wasip2 --precise 1.0.1+wasi-0.2.4
       - uses: actions/cache@v5
