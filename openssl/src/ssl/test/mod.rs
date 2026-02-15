@@ -562,6 +562,72 @@ fn test_alpn_server_unilateral() {
 }
 
 #[test]
+fn test_io_retry() {
+    #[derive(Debug)]
+    struct RetryStream {
+        inner: TcpStream,
+        first_read: bool,
+        first_write: bool,
+        first_flush: bool,
+    }
+
+    impl Read for RetryStream {
+        fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+            if mem::replace(&mut self.first_read, false) {
+                Err(io::Error::new(io::ErrorKind::WouldBlock, "first read"))
+            } else {
+                self.inner.read(buf)
+            }
+        }
+    }
+
+    impl Write for RetryStream {
+        fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+            if mem::replace(&mut self.first_write, false) {
+                Err(io::Error::new(io::ErrorKind::WouldBlock, "first write"))
+            } else {
+                self.inner.write(buf)
+            }
+        }
+
+        fn flush(&mut self) -> io::Result<()> {
+            if mem::replace(&mut self.first_flush, false) {
+                Err(io::Error::new(io::ErrorKind::WouldBlock, "first flush"))
+            } else {
+                self.inner.flush()
+            }
+        }
+    }
+
+    let server = Server::builder().build();
+
+    let stream = RetryStream {
+        inner: server.connect_tcp(),
+        first_read: true,
+        first_write: true,
+        // Set it to `true` to test the flush retry logic.
+        // OpenSSL has a bug where it doesn't retry on the flush.
+        // Related PR: https://github.com/openssl/openssl/pull/20919
+        // TODO: Set it to `true` once the OpenSSL bug is fixed.
+        first_flush: false,
+    };
+
+    let ctx = SslContext::builder(SslMethod::tls()).unwrap();
+    let mut s = match Ssl::new(&ctx.build()).unwrap().connect(stream) {
+        Ok(mut s) => return s.read_exact(&mut [0]).unwrap(),
+        Err(HandshakeError::WouldBlock(s)) => s,
+        Err(_) => panic!("should not fail on setup"),
+    };
+    loop {
+        match s.handshake() {
+            Ok(mut s) => return s.read_exact(&mut [0]).unwrap(),
+            Err(HandshakeError::WouldBlock(mid_s)) => s = mid_s,
+            Err(_) => panic!("should not fail on handshake"),
+        }
+    }
+}
+
+#[test]
 #[should_panic(expected = "blammo")]
 fn write_panic() {
     struct ExplodingStream(TcpStream);
