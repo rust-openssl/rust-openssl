@@ -185,12 +185,16 @@ pub mod pkcs5;
 pub mod pkcs7;
 pub mod pkey;
 pub mod pkey_ctx;
+#[cfg(ossl350)]
+pub mod pkey_ml_dsa;
 #[cfg(ossl300)]
 pub mod provider;
 pub mod rand;
 pub mod rsa;
 pub mod sha;
 pub mod sign;
+#[cfg(ossl300)]
+pub mod signature;
 pub mod srtp;
 pub mod ssl;
 pub mod stack;
