@@ -799,15 +799,10 @@ impl Clone for X509 {
 
 impl fmt::Debug for X509 {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let serial = match &self.serial_number().to_bn() {
-            Ok(bn) => match bn.to_hex_str() {
-                Ok(hex) => hex.to_string(),
-                Err(_) => "".to_string(),
-            },
-            Err(_) => "".to_string(),
-        };
         let mut debug_struct = formatter.debug_struct("X509");
-        debug_struct.field("serial_number", &serial);
+        if let Ok(serial) = self.serial_number().to_bn() {
+            debug_struct.field("serial_number", &format!("{:X}", serial));
+        }
         debug_struct.field("signature_algorithm", &self.signature_algorithm().object());
         debug_struct.field("issuer", &self.issuer_name());
         debug_struct.field("subject", &self.subject_name());
