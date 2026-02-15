@@ -127,14 +127,11 @@ impl Error {
                     let data = if flags & ffi::ERR_TXT_STRING != 0 {
                         let bytes = CStr::from_ptr(data as *const _).to_bytes();
                         let data = str::from_utf8(bytes).unwrap();
-                        #[cfg(not(any(boringssl, awslc)))]
                         let data = if flags & ffi::ERR_TXT_MALLOCED != 0 {
                             Cow::Owned(data.to_string())
                         } else {
                             Cow::Borrowed(data)
                         };
-                        #[cfg(any(boringssl, awslc))]
-                        let data = Cow::Borrowed(data);
                         Some(data)
                     } else {
                         None
