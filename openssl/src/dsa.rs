@@ -444,6 +444,8 @@ mod test {
     use crate::pkey::PKey;
     #[cfg(not(any(boringssl, awslc_fips)))]
     use crate::sign::{Signer, Verifier};
+    use crate::symm::Cipher;
+    use std::str::from_utf8;
 
     #[test]
     pub fn test_generate() {
@@ -598,5 +600,64 @@ mod test {
         .unwrap();
         let s = format!("{:?}", sig);
         assert_eq!(s, "DsaSig { r: 774484690634577222213819810519929266740561094381, s: 910998676210681457251421818099943952372231273347 }");
+    }
+
+    #[test]
+    fn test_private_key_to_pem() {
+        let key = Dsa::generate(512).unwrap();
+        let pem = key.private_key_to_pem().unwrap();
+        let pem_str = from_utf8(&pem).unwrap();
+        assert!(
+            pem_str.contains("-----BEGIN DSA PRIVATE KEY-----"),
+            "{pem_str}"
+        );
+    }
+
+    #[test]
+    fn test_private_key_to_pem_password() {
+        let key = Dsa::generate(512).unwrap();
+        let pem = key
+            .private_key_to_pem_passphrase(Cipher::aes_128_cbc(), b"foobar")
+            .unwrap();
+        let pem_str = from_utf8(&pem).unwrap();
+        assert!(
+            pem_str.contains("-----BEGIN DSA PRIVATE KEY-----"),
+            "{pem_str}"
+        );
+        assert!(pem_str.contains("ENCRYPTED"), "{pem_str}");
+        assert!(pem_str.contains("AES-128-CBC"), "{pem_str}");
+    }
+
+    #[test]
+    fn test_private_key_to_der() {
+        let key = Dsa::generate(512).unwrap();
+        key.private_key_to_der().unwrap();
+    }
+
+    #[test]
+    fn test_public_key_from_pem() {
+        Dsa::public_key_from_pem(include_bytes!("../test/dsa.pub.pem")).unwrap();
+    }
+
+    #[test]
+    fn test_public_key_from_der() {
+        Dsa::public_key_from_der(include_bytes!("../test/dsa.pub.der")).unwrap();
+    }
+
+    #[test]
+    fn test_public_key_to_pem() {
+        let key = Dsa::public_key_from_der(include_bytes!("../test/dsa.pub.der")).unwrap();
+        let pem = key.public_key_to_pem().unwrap();
+        assert_eq!(
+            from_utf8(&pem).unwrap(),
+            include_str!("../test/dsa.pub.pem").replace("\r\n", "\n")
+        );
+    }
+
+    #[test]
+    fn test_public_key_to_der() {
+        let key = Dsa::public_key_from_pem(include_bytes!("../test/dsa.pub.pem")).unwrap();
+        let der = key.public_key_to_der().unwrap();
+        assert_eq!(der, include_bytes!("../test/dsa.pub.der"));
     }
 }
