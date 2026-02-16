@@ -658,3 +658,15 @@ const_ptr_api! {
         pub fn X509_ATTRIBUTE_dup(x: #[const_ptr_if(ossl300)] X509_ATTRIBUTE) -> *mut X509_ATTRIBUTE;
     }
 }
+const_ptr_api! {
+    extern "C" {
+        pub fn X509_check_private_key(
+            cert: #[const_ptr_if(any(ossl110, libressl280, boringssl, awslc))] X509,
+            pkey: #[const_ptr_if(any(ossl110, libressl280, boringssl, awslc))] EVP_PKEY
+        ) -> c_int;
+        pub fn X509_REQ_check_private_key(
+            req: #[const_ptr_if(any(ossl320, boringssl, awslc))] X509_REQ,
+            pkey: #[const_ptr_if(any(boringssl, awslc))] EVP_PKEY
+        ) -> c_int;
+    }
+}
