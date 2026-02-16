@@ -68,6 +68,8 @@ use crate::bn::BigNumRef;
 #[cfg(not(any(boringssl, awslc)))]
 use crate::cipher::CipherRef;
 use crate::error::ErrorStack;
+#[cfg(ossl300)]
+use crate::lib_ctx::LibCtxRef;
 use crate::md::MdRef;
 use crate::nid::Nid;
 use crate::pkey::{HasPrivate, HasPublic, Id, PKey, PKeyRef, Params, Private};
@@ -84,6 +86,8 @@ use openssl_macros::corresponds;
 use std::convert::TryFrom;
 #[cfg(ossl320)]
 use std::ffi::CStr;
+#[cfg(ossl300)]
+use std::ffi::CString;
 use std::ptr;
 
 /// HKDF modes of operation.
@@ -159,6 +163,26 @@ impl PkeyCtx<()> {
             Ok(PkeyCtx::from_ptr(ptr))
         }
     }
+
+    /// Creates a new pkey context from the algorithm name.
+    #[corresponds(EVP_PKEY_CTX_new_from_name)]
+    #[cfg(ossl300)]
+    pub fn new_from_name(
+        libctx: Option<&LibCtxRef>,
+        name: &str,
+        propquery: Option<&str>,
+    ) -> Result<Self, ErrorStack> {
+        unsafe {
+            let propquery = propquery.map(|s| CString::new(s).unwrap());
+            let name = CString::new(name).unwrap();
+            let ptr = cvt_p(ffi::EVP_PKEY_CTX_new_from_name(
+                libctx.map_or(ptr::null_mut(), ForeignTypeRef::as_ptr),
+                name.as_ptr(),
+                propquery.map_or(ptr::null_mut(), |s| s.as_ptr()),
+            ))?;
+            Ok(PkeyCtx::from_ptr(ptr))
+        }
+    }
 }
 
 impl<T> PkeyCtxRef<T>
@@ -176,12 +200,138 @@ where
         Ok(())
     }
 
+    /// Prepares the context for encapsulateion using the public key.
+    #[cfg(ossl300)]
+    #[corresponds(EVP_PKEY_encapsulate_init)]
+    #[inline]
+    pub fn encapsulate_init(&mut self) -> Result<(), ErrorStack> {
+        unsafe {
+            cvt(ffi::EVP_PKEY_encapsulate_init(self.as_ptr(), ptr::null()))?;
+        }
+
+        Ok(())
+    }
+
+    /// Performs a public key encapsulation operation.
+    #[cfg(ossl300)]
+    #[corresponds(EVP_PKEY_encapsulate)]
+    pub fn encapsulate(
+        &mut self,
+        wrappedkey: Option<&mut [u8]>,
+        genkey: Option<&mut [u8]>,
+    ) -> Result<(usize, usize), ErrorStack> {
+        let mut wrappedkey_len = wrappedkey.as_ref().map_or(0, |b| b.len());
+        let mut genkey_len = genkey.as_ref().map_or(0, |b| b.len());
+        unsafe {
+            cvt(ffi::EVP_PKEY_encapsulate(
+                self.as_ptr(),
+                wrappedkey.map_or(ptr::null_mut(), |b| b.as_mut_ptr()),
+                &mut wrappedkey_len,
+                genkey.map_or(ptr::null_mut(), |b| b.as_mut_ptr()),
+                &mut genkey_len,
+            ))?;
+        }
+
+        Ok((wrappedkey_len, genkey_len))
+    }
+
+    /// Like [`Self::encapsulate`] but appends ciphertext and key to a [`Vec`].
+    #[cfg(ossl300)]
+    pub fn encapsulate_to_vec(
+        &mut self,
+        wrappedkey: &mut Vec<u8>,
+        genkey: &mut Vec<u8>,
+    ) -> Result<(usize, usize), ErrorStack> {
+        let wrappedkey_base = wrappedkey.len();
+        let genkey_base = genkey.len();
+        // Get maximum output buffer size for wrappedkey and genkey
+        let (wrappedkey_len, genkey_len) = self.encapsulate(None, None)?;
+
+        wrappedkey.resize(wrappedkey_base + wrappedkey_len, 0);
+        genkey.resize(genkey_base + genkey_len, 0);
+
+        let (wrappedkey_len, genkey_len) = self.encapsulate(
+            Some(&mut wrappedkey[wrappedkey_base..]),
+            Some(&mut genkey[genkey_base..]),
+        )?;
+
+        wrappedkey.truncate(wrappedkey_base + wrappedkey_len);
+        genkey.truncate(genkey_base + genkey_len);
+
+        Ok((wrappedkey_len, genkey_len))
+    }
+
+    /// Prepares the context for decapsulation using the private key.
+    #[cfg(ossl300)]
+    #[corresponds(EVP_PKEY_decapsulate_init)]
+    #[inline]
+    pub fn decapsulate_init(&mut self) -> Result<(), ErrorStack> {
+        unsafe {
+            cvt(ffi::EVP_PKEY_decapsulate_init(self.as_ptr(), ptr::null()))?;
+        }
+
+        Ok(())
+    }
+
+    /// Performs a decapsulation operation using the private key.
+    #[cfg(ossl300)]
+    #[corresponds(EVP_PKEY_decapsulate)]
+    pub fn decapsulate(&mut self, from: &[u8], to: Option<&mut [u8]>) -> Result<usize, ErrorStack> {
+        let mut written = to.as_ref().map_or(0, |b| b.len());
+        unsafe {
+            cvt(ffi::EVP_PKEY_decapsulate(
+                self.as_ptr(),
+                to.map_or(ptr::null_mut(), |b| b.as_mut_ptr()),
+                &mut written,
+                from.as_ptr(),
+                from.len(),
+            ))?;
+        }
+
+        Ok(written)
+    }
+
+    /// Like [`Self::decapsulate`] but appends plaintext to a [`Vec`].
+    #[cfg(ossl300)]
+    pub fn decapsulate_to_vec(
+        &mut self,
+        from: &[u8],
+        out: &mut Vec<u8>,
+    ) -> Result<usize, ErrorStack> {
+        let base = out.len();
+        let len = self.decapsulate(from, None)?;
+        out.resize(base + len, 0);
+        let len = self.decapsulate(from, Some(&mut out[base..]))?;
+        out.truncate(base + len);
+        Ok(len)
+    }
+
     /// Prepares the context for signature verification using the public key.
     #[corresponds(EVP_PKEY_verify_init)]
     #[inline]
     pub fn verify_init(&mut self) -> Result<(), ErrorStack> {
         unsafe {
             cvt(ffi::EVP_PKEY_verify_init(self.as_ptr()))?;
+        }
+
+        Ok(())
+    }
+
+    /// Prepares the context for signature verification over a message
+    /// using the public key.
+    #[cfg(ossl340)]
+    #[corresponds(EVP_PKEY_verify_message_init)]
+    #[inline]
+    pub fn verify_message_init(
+        &mut self,
+        algo: &mut crate::signature::Signature,
+    ) -> Result<(), ErrorStack> {
+        unsafe {
+            cvt(ffi::EVP_PKEY_verify_message_init(
+                self.as_ptr(),
+                algo.as_ptr(),
+                ptr::null(),
+            ))?;
         }
 
         Ok(())
@@ -314,6 +464,47 @@ where
     pub fn sign_init(&mut self) -> Result<(), ErrorStack> {
         unsafe {
             cvt(ffi::EVP_PKEY_sign_init(self.as_ptr()))?;
+        }
+
+        Ok(())
+    }
+
+    /// Prepares the context for signing a message using the private key.
+    #[cfg(ossl340)]
+    #[corresponds(EVP_PKEY_sign_message_init)]
+    #[inline]
+    pub fn sign_message_init(
+        &mut self,
+        algo: &mut crate::signature::Signature,
+    ) -> Result<(), ErrorStack> {
+        unsafe {
+            cvt(ffi::EVP_PKEY_sign_message_init(
+                self.as_ptr(),
+                algo.as_ptr(),
+                ptr::null(),
+            ))?;
+        }
+
+        Ok(())
+    }
+
+    /// Prepares the context for signing a message using the private key with params.
+    /// Used internally for testing.
+    #[cfg(ossl350)]
+    #[corresponds(EVP_PKEY_sign_message_init)]
+    #[inline]
+    #[cfg(test)]
+    pub(crate) fn sign_message_init_with_params(
+        &mut self,
+        algo: &mut crate::signature::Signature,
+        params: crate::ossl_param::OsslParamArray,
+    ) -> Result<(), ErrorStack> {
+        unsafe {
+            cvt(ffi::EVP_PKEY_sign_message_init(
+                self.as_ptr(),
+                algo.as_ptr(),
+                params.as_ptr(),
+            ))?;
         }
 
         Ok(())
@@ -887,6 +1078,19 @@ impl<T> PkeyCtxRef<T> {
         Ok(())
     }
 
+    /// Performs the generation operation and returns the resulting
+    /// key parameters or key.
+    #[corresponds(EVP_PKEY_generate)]
+    #[cfg(ossl300)]
+    #[inline]
+    pub fn generate(&mut self) -> Result<PKey<Private>, ErrorStack> {
+        unsafe {
+            let mut key = ptr::null_mut();
+            cvt(ffi::EVP_PKEY_generate(self.as_ptr(), &mut key))?;
+            Ok(PKey::from_ptr(key))
+        }
+    }
+
     /// Gets the nonce type for a private key context.
     ///
     /// The nonce for DSA and ECDSA can be either random (the default) or deterministic (as defined by RFC 6979).
@@ -910,6 +1114,14 @@ impl<T> PkeyCtxRef<T> {
             ))?;
         }
         Ok(NonceType(nonce_type))
+    }
+
+    /// Initializes a conversion from `OsslParam` to `PKey` on given `PkeyCtx`.
+    #[corresponds(EVP_PKEY_fromdata_init)]
+    #[cfg(ossl300)]
+    pub fn fromdata_init(&mut self) -> Result<(), ErrorStack> {
+        unsafe { cvt(ffi::EVP_PKEY_fromdata_init(self.as_ptr()))? };
+        Ok(())
     }
 }
 
