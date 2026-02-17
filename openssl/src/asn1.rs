@@ -27,11 +27,14 @@
 use foreign_types::{ForeignType, ForeignTypeRef};
 use libc::{c_char, c_int, c_long, time_t};
 use std::cmp::Ordering;
+use std::convert::TryFrom;
 use std::convert::TryInto;
 use std::ffi::CString;
 use std::fmt;
+use std::mem;
 use std::ptr;
 use std::str;
+use std::str::FromStr;
 
 use crate::bio::MemBio;
 use crate::bn::{BigNum, BigNumRef};
@@ -422,6 +425,43 @@ impl<'a> PartialOrd<&'a Asn1TimeRef> for Asn1Time {
 }
 
 foreign_type_and_impl_send_sync! {
+    type CType = ffi::ASN1_TYPE;
+    fn drop = ffi::ASN1_TYPE_free;
+    /// Primary ASN.1 type object used by OpenSSL
+    ///
+    /// This combines the type of the contained data together with the data.
+    /// E.g. is stores an Asn1String together with the type information IA5String
+    pub struct Asn1TypeWithValue;
+    /// A reference to an [`Asn1TypeWithValue`].
+    pub struct Asn1TypeWithValueRef;
+}
+
+impl Asn1TypeWithValue {
+    /// Converts the Asn1Type to DER encoding
+    pub fn as_der(&self) -> Result<Vec<u8>, ErrorStack> {
+        unsafe {
+            let len = cvt(ffi::i2d_ASN1_TYPE(self.0, ptr::null_mut()))?;
+            let mut buf = vec![0; len as usize];
+            crate::cvt(ffi::i2d_ASN1_TYPE(self.0, &mut buf.as_mut_ptr()))?;
+            Ok(buf)
+        }
+    }
+}
+
+impl TryFrom<Asn1String> for Asn1TypeWithValue {
+    type Error = ErrorStack;
+
+    fn try_from(value: Asn1String) -> Result<Self, Self::Error> {
+        unsafe {
+            let asn1type = cvt_p(ffi::ASN1_TYPE_new())?;
+            ffi::ASN1_TYPE_set(asn1type, ffi::V_ASN1_IA5STRING, value.0.cast());
+            mem::forget(value);
+            Ok(Asn1TypeWithValue::from_ptr(asn1type))
+        }
+    }
+}
+
+foreign_type_and_impl_send_sync! {
     type CType = ffi::ASN1_STRING;
     fn drop = ffi::ASN1_STRING_free;
     /// Primary ASN.1 type used by OpenSSL
@@ -434,6 +474,19 @@ foreign_type_and_impl_send_sync! {
     pub struct Asn1String;
     /// A reference to an [`Asn1String`].
     pub struct Asn1StringRef;
+}
+
+impl FromStr for Asn1String {
+    type Err = ErrorStack;
+
+    /// Converts a `&str` to an `Asn1String`.
+    fn from_str(data: &str) -> Result<Self, ErrorStack> {
+        unsafe {
+            let s = cvt_p(ffi::ASN1_STRING_type_new(Asn1Type::IA5STRING.as_raw()))?;
+            ffi::ASN1_STRING_set(s, data.as_ptr().cast(), data.len().try_into().unwrap());
+            Ok(Self::from_ptr(s))
+        }
+    }
 }
 
 impl Asn1StringRef {
@@ -908,5 +961,18 @@ mod tests {
         let octet_string = Asn1OctetString::new_from_bytes(b"hello world").unwrap();
         assert_eq!(octet_string.as_slice(), b"hello world");
         assert_eq!(octet_string.len(), 11);
+    }
+
+    #[test]
+    fn ans1_string_from_str_to_asn1type_der() {
+        let orig_string = "test";
+        let asn1string = Asn1String::from_str(orig_string).unwrap();
+        let asn1type: Asn1TypeWithValue = asn1string.try_into().unwrap();
+        let der = asn1type.as_der().unwrap();
+
+        // this is the hex representation of "test" encoded as a ia5string
+        let expected = [0x16, 0x04, 0x74, 0x65, 0x73, 0x74];
+
+        assert_eq!(der, expected);
     }
 }
