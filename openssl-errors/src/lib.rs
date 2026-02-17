@@ -160,6 +160,15 @@ unsafe fn put_error_inner(
                 func,
             );
             openssl_sys::ERR_set_error(library, reason, ptr::null());
+        } else if #[cfg(awslc)] {
+            // AWS-LC declares ERR_put_error with `line: c_uint`.
+            openssl_sys::ERR_put_error(
+                library,
+                func,
+                reason,
+                file.as_ptr() as *const c_char,
+                line,
+            );
         } else {
             openssl_sys::ERR_put_error(
                 library,

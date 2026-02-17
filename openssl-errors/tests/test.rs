@@ -1,3 +1,4 @@
+#[cfg(not(awslc))]
 use cfg_if::cfg_if;
 use openssl::error::Error;
 
@@ -15,7 +16,13 @@ openssl_errors::openssl_errors! {
     }
 }
 
+// AWS-LC does not support ERR_load_strings, so custom error string registration
+// is a no-op. The tests below verify string content and are skipped on AWS-LC.
+// The `awslc_put_error_smoke` test at the bottom covers the basic put_error!
+// functionality on AWS-LC.
+
 #[test]
+#[cfg(not(awslc))]
 fn basic() {
     openssl_errors::put_error!(Test::FOO, Test::NO_MILK);
 
@@ -40,6 +47,7 @@ fn basic() {
 }
 
 #[test]
+#[cfg(not(awslc))]
 fn static_data() {
     openssl_errors::put_error!(Test::BAR, Test::NO_BACON, "foobar {{}}");
 
@@ -57,6 +65,7 @@ fn static_data() {
 }
 
 #[test]
+#[cfg(not(awslc))]
 fn dynamic_data() {
     openssl_errors::put_error!(Test::BAR, Test::NO_MILK, "hello {}", "world");
 
@@ -74,6 +83,7 @@ fn dynamic_data() {
 }
 
 #[test]
+#[cfg(not(awslc))]
 fn deferred_error_render() {
     openssl_errors::put_error!(Test::BAR, Test::NO_MILK);
 
@@ -89,6 +99,37 @@ fn deferred_error_render() {
         error.file().replace('\\', "/"),
         "openssl-errors/tests/test.rs"
     );
+
+    // clear out the stack for other tests on the same thread
+    while Error::get().is_some() {}
+}
+
+/// Smoke test for AWS-LC: custom error strings are not available, but
+/// put_error! should still push an error onto the stack with the correct
+/// file, line, and optional data fields.
+#[test]
+#[cfg(awslc)]
+fn awslc_put_error_smoke() {
+    // Basic put_error without data
+    openssl_errors::put_error!(Test::FOO, Test::NO_MILK);
+
+    let error = Error::get().unwrap();
+    assert_eq!(
+        error.file().replace('\\', "/"),
+        "openssl-errors/tests/test.rs"
+    );
+    assert!(error.line() > 0);
+
+    // put_error with dynamic data
+    openssl_errors::put_error!(Test::BAR, Test::NO_BACON, "hello {}", "world");
+
+    let error = Error::get().unwrap();
+    assert_eq!(
+        error.file().replace('\\', "/"),
+        "openssl-errors/tests/test.rs"
+    );
+    assert!(error.line() > 0);
+    assert_eq!(error.data(), Some("hello world"));
 
     // clear out the stack for other tests on the same thread
     while Error::get().is_some() {}
