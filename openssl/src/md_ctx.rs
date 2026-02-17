@@ -549,4 +549,22 @@ mod test {
         // Validate result of digest of "World"
         assert_eq!(reset_result, world_expected);
     }
+
+    #[test]
+    fn from_message_digest() {
+        let messagedigest = crate::hash::MessageDigest::from_name("sha256").unwrap();
+        let md = Md::from(messagedigest);
+        let mut ctx = MdCtx::new().unwrap();
+        ctx.digest_init(&md).unwrap();
+        ctx.digest_update(b"test").unwrap();
+        let mut digest = [0; 32];
+        ctx.digest_final(digest.as_mut_slice()).unwrap();
+        // It is safe to call EVP_MD_free on const EVP_MDs from MessageDigest, but
+        // let's test it anyway before we use the original const EVP_MD in a hasher
+        drop(md);
+        let mut h = crate::hash::Hasher::new(messagedigest).unwrap();
+        h.update(b"test").unwrap();
+        let output = h.finish().unwrap();
+        assert_eq!(digest, *output);
+    }
 }
