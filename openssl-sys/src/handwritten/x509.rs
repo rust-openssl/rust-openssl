@@ -60,8 +60,20 @@ extern "C" {
         buf: *mut c_uchar,
         len: *mut c_uint,
     ) -> c_int;
+    pub fn X509_pubkey_digest(
+        x: *const X509,
+        digest: *const EVP_MD,
+        buf: *mut c_uchar,
+        len: *mut c_uint,
+    ) -> c_int;
 
     pub fn X509_REQ_sign(x: *mut X509_REQ, pkey: *mut EVP_PKEY, md: *const EVP_MD) -> c_int;
+    pub fn X509_REQ_digest(
+        x: *const X509_REQ,
+        digest: *const EVP_MD,
+        md: *mut c_uchar,
+        len: *mut c_uint,
+    ) -> c_int;
 }
 
 const_ptr_api! {
@@ -192,6 +204,13 @@ extern "C" {
     pub fn X509_NAME_new() -> *mut X509_NAME;
     pub fn X509_NAME_cmp(x: *const X509_NAME, y: *const X509_NAME) -> c_int;
     pub fn X509_NAME_free(x: *mut X509_NAME);
+
+    pub fn X509_NAME_digest(
+        data: *const X509_NAME,
+        type_: *const EVP_MD,
+        md: *mut c_uchar,
+        len: *mut c_uint,
+    ) -> c_int;
 
     pub fn X509_new() -> *mut X509;
     pub fn X509_free(x: *mut X509);

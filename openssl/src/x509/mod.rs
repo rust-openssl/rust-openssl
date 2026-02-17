@@ -531,25 +531,24 @@ impl X509Ref {
         }
     }
 
-    /// Returns a digest of the DER representation of the certificate.
-    #[corresponds(X509_digest)]
-    pub fn digest(&self, hash_type: MessageDigest) -> Result<DigestBytes, ErrorStack> {
-        unsafe {
-            let mut digest = DigestBytes {
-                buf: [0; ffi::EVP_MAX_MD_SIZE as usize],
-                len: ffi::EVP_MAX_MD_SIZE as usize,
-            };
-            let mut len = ffi::EVP_MAX_MD_SIZE as c_uint;
-            cvt(ffi::X509_digest(
-                self.as_ptr(),
-                hash_type.as_ptr(),
-                digest.buf.as_mut_ptr() as *mut _,
-                &mut len,
-            ))?;
-            digest.len = len as usize;
+    digest! {
+        /// Returns a digest of the DER representation of the certificate.
+        ///
+        /// This corresponds to [`X509_digest`].
+        ///
+        /// [`X509_digest`]: https://www.openssl.org/docs/manmaster/man3/X509_digest.html
+        digest,
+        ffi::X509_digest
+    }
 
-            Ok(digest)
-        }
+    digest! {
+        /// Returns a digest of the DER representation of the public key in the specified X509 data object.
+        ///
+        /// This corresponds to [`X509_pubkey_digest`].
+        ///
+        /// [`X509_pubkey_digest`]: https://www.openssl.org/docs/manmaster/man3/X509_pubkey_digest.html
+        pubkey_digest,
+        ffi::X509_pubkey_digest
     }
 
     #[deprecated(since = "0.10.9", note = "renamed to digest")]
@@ -1263,6 +1262,16 @@ impl X509NameRef {
         to_der,
         ffi::i2d_X509_NAME
     }
+
+    digest! {
+        /// Returns a digest of the DER representation of this 'X509Name'.
+        ///
+        /// This corresponds to [`X509_NAME_digest`].
+        ///
+        /// [`X509_NAME_digest`]: https://www.openssl.org/docs/manmaster/man3/X509_NAME_digest.html
+        digest,
+        ffi::X509_NAME_digest
+    }
 }
 
 impl fmt::Debug for X509NameRef {
@@ -1521,6 +1530,16 @@ impl X509ReqRef {
         #[corresponds(X509_Req_print)]
         to_text,
         ffi::X509_REQ_print
+    }
+
+    digest! {
+        /// Returns a digest of the DER representation of this 'X509Req'.
+        ///
+        /// This corresponds to [`X509_REQ_digest`].
+        ///
+        /// [`X509_REQ_digest`]: https://www.openssl.org/docs/manmaster/man3/X509_REQ_digest.html
+        digest,
+        ffi::X509_REQ_digest
     }
 
     /// Returns the numerical value of the version field of the certificate request.
@@ -1810,6 +1829,16 @@ impl X509CrlRef {
         #[corresponds(i2d_X509_CRL)]
         to_der,
         ffi::i2d_X509_CRL
+    }
+
+    digest! {
+        /// Returns a digest of the DER representation of this 'X509Crl'.
+        ///
+        /// This corresponds to [`X509_CRL_digest`].
+        ///
+        /// [`X509_CRL_digest`]: https://www.openssl.org/docs/manmaster/man3/X509_CRL_digest.html
+        digest,
+        ffi::X509_CRL_digest
     }
 
     /// Get the stack of revocation entries

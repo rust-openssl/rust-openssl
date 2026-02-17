@@ -95,6 +95,18 @@ fn test_subject_read_cn() {
 }
 
 #[test]
+fn test_subject_digest() {
+    let cert = include_bytes!("../../test/cert.pem");
+    let cert = X509::from_pem(cert).unwrap();
+    let subject = cert.subject_name();
+    let digest = subject.digest(MessageDigest::sha1()).unwrap();
+    assert_eq!(
+        hex::encode(digest),
+        "9665d6f11a76d066813bffd6031856f076684e05"
+    )
+}
+
+#[test]
 fn test_nid_values() {
     let cert = include_bytes!("../../test/nid_test_cert.pem");
     let cert = X509::from_pem(cert).unwrap();
