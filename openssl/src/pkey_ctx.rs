@@ -816,6 +816,67 @@ impl<T> PkeyCtxRef<T> {
         Ok(())
     }
 
+    /// Sets the digest used for TLS1 PRF derivation.
+    ///
+    /// Requires OpenSSL 1.1.0 or newer.
+    #[corresponds(EVP_PKEY_CTX_set_tls1_prf_md)]
+    #[cfg(ossl110)]
+    #[inline]
+    pub fn set_tls1_prf_md(&mut self, digest: &MdRef) -> Result<(), ErrorStack> {
+        unsafe {
+            cvt(ffi::EVP_PKEY_CTX_set_tls1_prf_md(
+                self.as_ptr(),
+                digest.as_ptr(),
+            ))?;
+        }
+
+        Ok(())
+    }
+
+    /// Sets the secret value for TLS PRF derivation.
+    ///
+    /// Any existing secret value is replaced and any seed is reset.
+    ///
+    /// Requires OpenSSL 1.1.0 or newer.
+    #[corresponds(EVP_PKEY_CTX_set1_tls1_prf_secret)]
+    #[cfg(ossl110)]
+    #[inline]
+    pub fn set_tls1_prf_secret(&mut self, secret: &[u8]) -> Result<(), ErrorStack> {
+        let len = c_int::try_from(secret.len()).unwrap();
+
+        unsafe {
+            cvt(ffi::EVP_PKEY_CTX_set1_tls1_prf_secret(
+                self.as_ptr(),
+                secret.as_ptr(),
+                len,
+            ))?;
+        }
+
+        Ok(())
+    }
+
+    /// Adds a seed for TLS PRF derivation.
+    ///
+    /// If a seed is already set, the new seed is appended to the existing seed.
+    ///
+    /// Requires OpenSSL 1.1.0 or newer.
+    #[corresponds(EVP_PKEY_CTX_add1_tls1_prf_seed)]
+    #[cfg(ossl110)]
+    #[inline]
+    pub fn add_tls1_prf_seed(&mut self, seed: &[u8]) -> Result<(), ErrorStack> {
+        let len = c_int::try_from(seed.len()).unwrap();
+
+        unsafe {
+            cvt(ffi::EVP_PKEY_CTX_add1_tls1_prf_seed(
+                self.as_ptr(),
+                seed.as_ptr(),
+                len,
+            ))?;
+        }
+
+        Ok(())
+    }
+
     /// Derives a shared secret between two keys.
     ///
     /// If `buf` is set to `None`, an upper bound on the number of bytes required for the buffer will be returned.
@@ -1296,5 +1357,51 @@ mxJ7imIrEg9nIQ==
         ctx.sign_to_vec(&hashed_input, &mut output).unwrap();
         assert_eq!(output, expected_output);
         assert!(ErrorStack::get().errors().is_empty());
+    }
+
+    #[test]
+    #[cfg(ossl111)]
+    fn tls1_prf_sha256() {
+        // SHA256 PRF test vectors from https://mailarchive.ietf.org/arch/msg/tls/fzVCzk-z3FShgGJ6DOXqM1ydxms/
+        let mut ctx = PkeyCtx::new_id(Id::TLS1_PRF).unwrap();
+        ctx.derive_init().unwrap();
+        ctx.set_tls1_prf_md(Md::sha256()).unwrap();
+        ctx.set_tls1_prf_secret(&hex::decode("9bbe436ba940f017b17652849a71db35").unwrap())
+            .unwrap();
+        ctx.add_tls1_prf_seed(&hex::decode("74657374206c6162656c").unwrap())
+            .unwrap();
+        ctx.add_tls1_prf_seed(&hex::decode("a0ba9f936cda311827a6f796ffd5198c").unwrap())
+            .unwrap();
+        let mut out = [0u8; 100];
+        ctx.derive(Some(&mut out)).unwrap();
+
+        assert_eq!(
+            &out[..],
+            hex::decode("e3f229ba727be17b8d122620557cd453c2aab21d07c3d495329b52d4e61edb5a6b301791e90d35c9c9a46b4e14baf9af0fa022f7077def17abfd3797c0564bab4fbc91666e9def9b97fce34f796789baa48082d122ee42c5a72e5a5110fff70187347b66")
+                .unwrap()
+        );
+    }
+
+    #[test]
+    #[cfg(ossl111)]
+    fn tls1_prf_sha384() {
+        // SHA384 PRF test vectors from https://mailarchive.ietf.org/arch/msg/tls/fzVCzk-z3FShgGJ6DOXqM1ydxms/
+        let mut ctx = PkeyCtx::new_id(Id::TLS1_PRF).unwrap();
+        ctx.derive_init().unwrap();
+        ctx.set_tls1_prf_md(Md::sha384()).unwrap();
+        ctx.set_tls1_prf_secret(&hex::decode("b80b733d6ceefcdc71566ea48e5567df").unwrap())
+            .unwrap();
+        ctx.add_tls1_prf_seed(&hex::decode("74657374206c6162656c").unwrap())
+            .unwrap();
+        ctx.add_tls1_prf_seed(&hex::decode("cd665cf6a8447dd6ff8b27555edb7465").unwrap())
+            .unwrap();
+        let mut out = [0u8; 148];
+        ctx.derive(Some(&mut out)).unwrap();
+
+        assert_eq!(
+            &out[..],
+            hex::decode("7b0c18e9ced410ed1804f2cfa34a336a1c14dffb4900bb5fd7942107e81c83cde9ca0faa60be9fe34f82b1233c9146a0e534cb400fed2700884f9dc236f80edd8bfa961144c9e8d792eca722a7b32fc3d416d473ebc2c5fd4abfdad05d9184259b5bf8cd4d90fa0d31e2dec479e4f1a26066f2eea9a69236a3e52655c9e9aee691c8f3a26854308d5eaa3be85e0990703d73e56f")
+                .unwrap()
+        );
     }
 }

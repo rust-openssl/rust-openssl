@@ -95,6 +95,9 @@ impl Id {
     #[cfg(any(ossl110, boringssl, libressl360, awslc))]
     pub const HKDF: Id = Id(ffi::EVP_PKEY_HKDF);
 
+    #[cfg(ossl110)]
+    pub const TLS1_PRF: Id = Id(ffi::EVP_PKEY_TLS1_PRF);
+
     #[cfg(any(ossl111, boringssl, libressl370, awslc))]
     pub const ED25519: Id = Id(ffi::EVP_PKEY_ED25519);
     #[cfg(ossl111)]
