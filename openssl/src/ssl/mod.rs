@@ -3943,6 +3943,11 @@ impl<S> SslStream<S> {
     pub fn ssl(&self) -> &SslRef {
         &self.ssl
     }
+
+    /// Returns a mutable reference to the `Ssl` object associated with this stream.
+    pub fn ssl_mut(&mut self) -> &mut SslRef {
+        &mut self.ssl
+    }
 }
 
 impl<S: Read + Write> Read for SslStream<S> {
