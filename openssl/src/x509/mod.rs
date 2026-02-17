@@ -30,6 +30,8 @@ use crate::conf::ConfRef;
 use crate::error::ErrorStack;
 use crate::ex_data::Index;
 use crate::hash::{DigestBytes, MessageDigest};
+#[cfg(ossl300)]
+use crate::lib_ctx::LibCtxRef;
 use crate::nid::Nid;
 use crate::pkey::{HasPrivate, HasPublic, PKey, PKeyRef, Public};
 use crate::ssl::SslRef;
@@ -1215,6 +1217,51 @@ impl Stackable for X509Name {
 }
 
 impl X509NameRef {
+    /// Returns the hash of the X509 name
+    #[cfg(ossl300)]
+    #[corresponds(X509_NAME_hash_ex)]
+    pub fn hash_ex(&self, ctx: Option<LibCtxRef>, propq: Option<&str>) -> Result<u32, ErrorStack> {
+        let ctx_ref = ctx.map_or(ptr::null_mut(), |ctx| ctx.as_ptr());
+
+        let cstr;
+        let propq = if let Some(propq) = propq {
+            cstr = CString::new(propq).unwrap();
+            cstr.as_ptr()
+        } else {
+            ptr::null()
+        };
+
+        let mut ok: c_int = 0;
+        let hash;
+
+        #[allow(clippy::unnecessary_cast)]
+        unsafe {
+            hash = ffi::X509_NAME_hash_ex(self.as_ptr(), ctx_ref, propq, &mut ok) as u32;
+        }
+
+        if ok != 1 {
+            return Err(ErrorStack::get());
+        }
+
+        Ok(hash)
+    }
+
+    /// Returns the hash of the X509 name
+    #[cfg(ossl300)]
+    #[corresponds(X509_NAME_hash)]
+    pub fn hash(&self) -> u32 {
+        self.hash_ex(None, None).unwrap_or(0)
+    }
+
+    #[cfg(not(ossl300))]
+    #[corresponds(X509_NAME_hash)]
+    pub fn hash(&self) -> u32 {
+        #[allow(clippy::unnecessary_cast)]
+        unsafe {
+            ffi::X509_NAME_hash(self.as_ptr()) as u32
+        }
+    }
+
     /// Returns the name entries by the nid.
     pub fn entries_by_nid(&self, nid: Nid) -> X509NameEntries<'_> {
         X509NameEntries {
