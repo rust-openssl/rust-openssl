@@ -80,6 +80,10 @@ const INCLUDES: &str = "
 #if OPENSSL_VERSION_NUMBER >= 0x30200000
 #include <openssl/thread.h>
 #endif
+
+#if OPENSSL_VERSION_NUMBER >= 0x30200000
+#include <openssl/hpke.h>
+#endif
 ";
 
 #[cfg(feature = "bindgen")]

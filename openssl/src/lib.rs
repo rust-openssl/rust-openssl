@@ -168,6 +168,8 @@ pub mod ex_data;
 #[cfg(not(any(libressl, ossl300)))]
 pub mod fips;
 pub mod hash;
+#[cfg(ossl320)]
+pub mod hpke;
 pub mod kdf;
 #[cfg(ossl300)]
 pub mod lib_ctx;
