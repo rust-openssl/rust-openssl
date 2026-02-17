@@ -274,6 +274,7 @@ fn main() {
         && (env::var("CARGO_CFG_TARGET_OS").unwrap() == "linux"
             || env::var("CARGO_CFG_TARGET_OS").unwrap() == "android")
         && env::var("CARGO_CFG_TARGET_POINTER_WIDTH").unwrap() == "32"
+        && !env::var("TARGET").unwrap().ends_with("-linux-ohos")
     {
         println!("cargo:rustc-link-lib=atomic");
     }
