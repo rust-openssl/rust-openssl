@@ -262,6 +262,47 @@ pub fn unwrap_key(
     }
 }
 
+/// The standard AES block
+type AesBlock = [u8; ffi::AES_BLOCK_SIZE as usize];
+
+/// Encrypts an aes-128/192/256 block from `in` to `out`.
+/// * `key`: The key to encrypt the input data block. Must be an encrypting key.
+/// * `out`: The buffer to write the ciphertext to
+/// * `in_`: The input plaintext
+///
+/// WARNING: This is more than likely not the function you're looking for, this is
+/// plain AES without a block mode. You're most likely looking for AES-GCM, etc.,
+/// which is in `openssl::symm`.
+#[corresponds(AES_encrypt)]
+pub fn aes_encrypt(key: &AesKey, out: &mut AesBlock, in_: &AesBlock) {
+    unsafe {
+        ffi::AES_encrypt(
+            in_.as_ptr() as *const _,
+            out.as_ptr() as *mut _,
+            &key.0 as *const _,
+        );
+    }
+}
+
+/// Decrypts an AES-128/192/256 block from `in` to `out`.
+/// * `key`: The key to decrypt the input data block. Must be a decrypting key.
+/// * `out`: The buffer to write the plaintext to
+/// * `in_`: The input ciphertext
+///
+/// WARNING: This is more than likely not the function you're looking for, this is
+/// plain AES without a block mode. You're most likely looking for AES-GCM, etc.,
+/// which is in `openssl::symm`.
+#[corresponds(AES_decrypt)]
+pub fn aes_decrypt(key: &AesKey, out: &mut AesBlock, in_: &AesBlock) {
+    unsafe {
+        ffi::AES_decrypt(
+            in_.as_ptr() as *const _,
+            out.as_ptr() as *mut _,
+            &key.0 as *const _,
+        );
+    }
+}
+
 #[cfg(test)]
 mod test {
     use hex::FromHex;
@@ -319,5 +360,16 @@ mod test {
             16
         );
         assert_eq!(&unwrapped[..], &key_data[..]);
+    }
+
+    #[test]
+    fn test_aes_encrypt_decrypt() {
+        let key = b"000102030405060708090A0B0C0D0E0F";
+        let block = b"0011223344556677";
+        let mut c_buf = AesBlock::default();
+        let mut p_buf = AesBlock::default();
+        aes_encrypt(&AesKey::new_encrypt(key).unwrap(), &mut c_buf, block);
+        aes_decrypt(&AesKey::new_decrypt(key).unwrap(), &mut p_buf, &c_buf);
+        assert_eq!(&p_buf, block);
     }
 }
