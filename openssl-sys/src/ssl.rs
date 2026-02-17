@@ -216,9 +216,27 @@ pub const SSL_MODE_SEND_CLIENTHELLO_TIME: c_long = 0x20;
 pub const SSL_MODE_SEND_SERVERHELLO_TIME: c_long = 0x40;
 #[cfg(ossl110)]
 pub const SSL_MODE_SEND_FALLBACK_SCSV: c_long = 0x80;
+#[cfg(ossl110)]
+pub const SSL_MODE_ASYNC: c_long = 0x100;
 
 pub unsafe fn SSL_CTX_set_mode(ctx: *mut SSL_CTX, op: c_long) -> c_long {
     SSL_CTX_ctrl(ctx, SSL_CTRL_MODE, op, ptr::null_mut())
+}
+pub unsafe fn SSL_CTX_clear_mode(ctx: *mut SSL_CTX, op: c_long) -> c_long {
+    SSL_CTX_ctrl(ctx, SSL_CTRL_CLEAR_MODE, op, ptr::null_mut())
+}
+pub unsafe fn SSL_CTX_get_mode(ctx: *mut SSL_CTX) -> c_long {
+    SSL_CTX_ctrl(ctx, SSL_CTRL_MODE, 0, ptr::null_mut())
+}
+
+pub unsafe fn SSL_set_mode(ssl: *mut SSL, op: c_long) -> c_long {
+    SSL_ctrl(ssl, SSL_CTRL_MODE, op, ptr::null_mut())
+}
+pub unsafe fn SSL_clear_mode(ssl: *mut SSL, op: c_long) -> c_long {
+    SSL_ctrl(ssl, SSL_CTRL_CLEAR_MODE, op, ptr::null_mut())
+}
+pub unsafe fn SSL_get_mode(ssl: *mut SSL) -> c_long {
+    SSL_ctrl(ssl, SSL_CTRL_MODE, 0, ptr::null_mut())
 }
 
 #[cfg(ossl111)]
@@ -315,6 +333,7 @@ pub const SSL_CTRL_GET_TLSEXT_STATUS_REQ_OCSP_RESP: c_int = 70;
 pub const SSL_CTRL_SET_TLSEXT_STATUS_REQ_OCSP_RESP: c_int = 71;
 #[cfg(libressl)]
 pub const SSL_CTRL_CLEAR_OPTIONS: c_int = 77;
+pub const SSL_CTRL_CLEAR_MODE: c_int = 78;
 pub const SSL_CTRL_GET_EXTRA_CHAIN_CERTS: c_int = 82;
 #[cfg(ossl110)]
 pub const SSL_CTRL_CHAIN_CERT: c_int = 89;
