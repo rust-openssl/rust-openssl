@@ -1430,6 +1430,25 @@ impl X509ReqBuilder {
         }
     }
 
+    /// Adds attribute defined by Asn1Object and type of value to certificate request
+    pub fn add_attribute(
+        &mut self,
+        attrname: &Asn1Object,
+        attrtype: Asn1Type,
+        value: &[u8],
+    ) -> Result<(), ErrorStack> {
+        unsafe {
+            cvt(ffi::X509_REQ_add1_attr_by_OBJ(
+                self.0.as_ptr(),
+                attrname.as_ptr(),
+                attrtype.as_raw(),
+                value.as_ptr(),
+                value.len().try_into().expect("value's len outside range"),
+            ))
+            .map(|_| ())
+        }
+    }
+
     /// Sign the request using a private key.
     #[corresponds(X509_REQ_sign)]
     pub fn sign<T>(&mut self, key: &PKeyRef<T>, hash: MessageDigest) -> Result<(), ErrorStack>
@@ -1565,6 +1584,18 @@ impl X509ReqRef {
         unsafe {
             let extensions = cvt_p(ffi::X509_REQ_get_extensions(self.as_ptr()))?;
             Ok(Stack::from_ptr(extensions))
+        }
+    }
+
+    /// Check if X509 Attribute is prensent in X509Req.
+    #[corresponds(X509_REQ_get_attr_by_OBJ)]
+    pub fn attribute_is_present(&self, obj: &Asn1Object) -> Result<i32, ErrorStack> {
+        unsafe {
+            cvt(ffi::X509_REQ_get_attr_by_OBJ(
+                self.as_ptr(),
+                obj.as_ptr(),
+                0 as c_int,
+            ))
         }
     }
 }

@@ -1,6 +1,6 @@
 use std::cmp::Ordering;
 
-use crate::asn1::{Asn1Object, Asn1OctetString, Asn1Time};
+use crate::asn1::{Asn1Object, Asn1OctetString, Asn1Time, Asn1Type};
 use crate::bn::{BigNum, MsbOption};
 use crate::hash::MessageDigest;
 use crate::nid::Nid;
@@ -23,8 +23,10 @@ use crate::x509::X509PurposeRef;
 #[cfg(ossl110)]
 use crate::x509::{CrlReason, X509Builder};
 use crate::x509::{
-    CrlStatus, X509Crl, X509Extension, X509Name, X509Req, X509StoreContext, X509VerifyResult, X509,
+    CrlStatus, X509Crl, X509Extension, X509Name, X509NameBuilder, X509Req, X509StoreContext,
+    X509VerifyResult, X509,
 };
+
 #[cfg(ossl110)]
 use foreign_types::ForeignType;
 use hex::{self, FromHex};
@@ -450,12 +452,29 @@ fn x509_req_builder() {
     extensions.push(subject_alternative_name).unwrap();
     builder.add_extensions(&extensions).unwrap();
 
+    let cp_obj = Asn1Object::from_str("challengePassword").unwrap();
+    let csn_obj = Asn1Object::from_str("2.16.840.1.113733.1.1.5").unwrap(); // OID('changeSubjectName')
+    let masa_obj = Asn1Object::from_str("1.3.6.1.5.5.7.7.21").unwrap(); // OID('brski-masa-url'')
+    let mut dn = X509NameBuilder::new().unwrap();
+    dn.append_entry_by_text("CN", "foobar.com").unwrap();
+    let csn_val = dn.build().to_der().unwrap();
+
+    builder
+        .add_attribute(&cp_obj, Asn1Type::PRINTABLESTRING, b"password")
+        .unwrap();
+    builder
+        .add_attribute(&csn_obj, Asn1Type::SEQUENCE, csn_val.as_slice())
+        .unwrap();
+
     builder.sign(&pkey, MessageDigest::sha256()).unwrap();
 
     let req = builder.build();
     assert!(req.public_key().unwrap().public_eq(&pkey));
     assert_eq!(req.extensions().unwrap().len(), extensions.len());
     assert!(req.verify(&pkey).unwrap());
+    assert!(req.attribute_is_present(&cp_obj).is_ok());
+    assert!(req.attribute_is_present(&csn_obj).is_ok());
+    assert!(req.attribute_is_present(&masa_obj).is_err());
 }
 
 #[test]
