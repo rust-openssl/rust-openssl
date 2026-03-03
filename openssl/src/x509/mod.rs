@@ -47,6 +47,35 @@ pub mod store;
 #[cfg(test)]
 mod tests;
 
+#[cfg(any(ossl110, boringssl))]
+bitflags::bitflags! {
+    /// KeyUsage bitset
+    ///
+    /// Refer to KeyUsage extension for details and meaning of every flag
+    #[derive(Copy, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[repr(transparent)]
+    pub struct X509KeyUsage: u32 {
+        #[allow(clippy::unnecessary_cast)]
+        const DIGITAL_SIGNATURE = ffi::X509v3_KU_DIGITAL_SIGNATURE as u32;
+        #[allow(clippy::unnecessary_cast)]
+        const NON_REPUDIATION = ffi::X509v3_KU_NON_REPUDIATION as u32;
+        #[allow(clippy::unnecessary_cast)]
+        const KEY_ENCIPHERMENT = ffi::X509v3_KU_KEY_ENCIPHERMENT as u32;
+        #[allow(clippy::unnecessary_cast)]
+        const DATA_ENCIPHERMENT = ffi::X509v3_KU_DATA_ENCIPHERMENT as u32;
+        #[allow(clippy::unnecessary_cast)]
+        const KEY_AGREEMENT = ffi::X509v3_KU_KEY_AGREEMENT as u32;
+        #[allow(clippy::unnecessary_cast)]
+        const KEY_CERT_SIGN = ffi::X509v3_KU_KEY_CERT_SIGN as u32;
+        #[allow(clippy::unnecessary_cast)]
+        const CRL_SIGN = ffi::X509v3_KU_CRL_SIGN as u32;
+        #[allow(clippy::unnecessary_cast)]
+        const ENCIPHER_ONLY = ffi::X509v3_KU_ENCIPHER_ONLY as u32;
+        #[allow(clippy::unnecessary_cast)]
+        const DECIPHER_ONLY = ffi::X509v3_KU_DECIPHER_ONLY as u32;
+    }
+}
+
 /// A type of X509 extension.
 ///
 /// # Safety
@@ -661,6 +690,19 @@ impl X509Ref {
             } else {
                 Some(util::from_raw_parts(ptr, len as usize))
             }
+        }
+    }
+
+    #[cfg(any(ossl110, boringssl))]
+    /// Retrieves set of basic key usage flags within certificate
+    #[corresponds(X509_get_key_usage)]
+    pub fn key_usage(&self) -> X509KeyUsage {
+        let res = unsafe { ffi::X509_get_key_usage(self.as_ptr()) };
+        //u32::MAX indicates key usage is not set
+        if res == u32::MAX {
+            X509KeyUsage::empty()
+        } else {
+            X509KeyUsage::from_bits_retain(res)
         }
     }
 
