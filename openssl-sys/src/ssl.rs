@@ -281,6 +281,10 @@ pub const SSL_ERROR_SSL: c_int = 1;
 pub const SSL_ERROR_SYSCALL: c_int = 5;
 pub const SSL_ERROR_WANT_ACCEPT: c_int = 8;
 pub const SSL_ERROR_WANT_CONNECT: c_int = 7;
+#[cfg(ossl110)]
+pub const SSL_ERROR_WANT_ASYNC: c_int = 9;
+#[cfg(ossl110)]
+pub const SSL_ERROR_WANT_ASYNC_JOB: c_int = 10;
 pub const SSL_ERROR_WANT_READ: c_int = 2;
 pub const SSL_ERROR_WANT_WRITE: c_int = 3;
 pub const SSL_ERROR_WANT_X509_LOOKUP: c_int = 4;
