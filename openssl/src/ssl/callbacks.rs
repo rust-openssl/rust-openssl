@@ -484,7 +484,7 @@ pub struct CustomExtAddState<T>(Option<T>);
 #[cfg(ossl111)]
 pub extern "C" fn raw_custom_ext_add<F, T>(
     ssl: *mut ffi::SSL,
-    _: c_uint,
+    ext_type: c_uint,
     context: c_uint,
     out: *mut *const c_uchar,
     outlen: *mut size_t,
@@ -502,9 +502,11 @@ where
 {
     unsafe {
         let ssl = SslRef::from_ptr_mut(ssl);
+        let cb_key =
+            SslContext::get_custom_ext_cb_key(ext_type as u16, super::CustomExtCbType::Add);
         let callback = ssl
             .ssl_context()
-            .ex_data(SslContext::cached_ex_index::<F>())
+            .ex_data(SslContext::cached_custom_ext_ex_index(cb_key))
             .expect("BUG: custom ext add callback missing") as *const F;
         let ectx = ExtensionContext::from_bits_truncate(context);
         let cert = if ectx.contains(ExtensionContext::TLS1_3_CERTIFICATE) {
@@ -562,7 +564,7 @@ pub extern "C" fn raw_custom_ext_free<T>(
 #[cfg(ossl111)]
 pub extern "C" fn raw_custom_ext_parse<F>(
     ssl: *mut ffi::SSL,
-    _: c_uint,
+    ext_type: c_uint,
     context: c_uint,
     input: *const c_uchar,
     inlen: size_t,
@@ -579,9 +581,11 @@ where
 {
     unsafe {
         let ssl = SslRef::from_ptr_mut(ssl);
+        let cb_key =
+            SslContext::get_custom_ext_cb_key(ext_type as u16, super::CustomExtCbType::Parse);
         let callback = ssl
             .ssl_context()
-            .ex_data(SslContext::cached_ex_index::<F>())
+            .ex_data(SslContext::cached_custom_ext_ex_index(cb_key))
             .expect("BUG: custom ext parse callback missing") as *const F;
         let ectx = ExtensionContext::from_bits_truncate(context);
         #[allow(clippy::unnecessary_cast)]
