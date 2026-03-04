@@ -116,6 +116,7 @@ fn try_pregenerated_awslc_bindings(include_dirs: &[PathBuf]) -> bool {
                 bindings_path.display()
             );
             println!("cargo:rerun-if-changed={}", bindings_path.display());
+            println!("cargo:rustc-cfg=awslc_pregenerated");
             fs::copy(&bindings_path, out_dir.join("bindgen.rs"))
                 .expect("Failed to copy pre-generated AWS-LC Rust bindings");
             return true;

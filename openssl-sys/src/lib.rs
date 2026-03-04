@@ -45,7 +45,7 @@ mod aws_lc {
     #[cfg(not(any(feature = "aws-lc", feature = "aws-lc-fips")))]
     include!(concat!(env!("OUT_DIR"), "/bindgen.rs"));
 
-    use libc::{c_char, c_int, c_long, c_ulong, c_void};
+    use libc::{c_char, c_long, c_void};
 
     pub fn init() {
         unsafe { CRYPTO_library_init() }
@@ -58,46 +58,31 @@ mod aws_lc {
     }
 
     // ERR_GET_{LIB,REASON,FUNC} are macros/static inlines in AWS-LC and
-    // therefore not emitted by bindgen. We provide pure-Rust implementations
-    // matching the logic in aws-lc-sys. When aws-lc-sys is used via the
-    // glob import above, these shadow its versions (signatures are identical).
+    // therefore not emitted by bindgen when using pregenerated bindings.
+    // We provide pure-Rust implementations matching the logic in aws-lc-sys.
+    //
+    // When aws-lc-sys is used (feature = "aws-lc" or "aws-lc-fips"), these
+    // shadow the identical versions from the glob import.
+    //
+    // When normal bindgen runs (wrap_static_fns), these functions are already
+    // in the generated output, so we must not redefine them.
+    #[cfg(any(feature = "aws-lc", feature = "aws-lc-fips", awslc_pregenerated))]
     #[allow(non_snake_case, clippy::cast_possible_wrap)]
     pub fn ERR_GET_LIB(packed_error: ::libc::c_uint) -> ::libc::c_int {
         ((packed_error >> 24) & 0xFF) as ::libc::c_int
     }
 
+    #[cfg(any(feature = "aws-lc", feature = "aws-lc-fips", awslc_pregenerated))]
     #[allow(non_snake_case, clippy::cast_possible_wrap)]
     pub fn ERR_GET_REASON(packed_error: ::libc::c_uint) -> ::libc::c_int {
         (packed_error & 0xFFF) as ::libc::c_int
     }
 
+    #[cfg(any(feature = "aws-lc", feature = "aws-lc-fips", awslc_pregenerated))]
     #[allow(non_snake_case)]
     pub fn ERR_GET_FUNC(_packed_error: ::libc::c_uint) -> ::libc::c_int {
         0
     }
-
-    // ERR_STRING_DATA is not part of the AWS-LC API, but is needed by
-    // openssl-errors. We define a compatible struct here.
-    #[repr(C)]
-    pub struct ERR_STRING_DATA {
-        pub error: c_ulong,
-        pub string: *const c_char,
-    }
-
-    // ERR_PACK is a C preprocessor macro in AWS-LC:
-    //   ((lib & 0xff) << 24) | (reason & 0xfff)
-    // We keep the 3-argument signature for OpenSSL API compatibility;
-    // the `func` parameter is ignored (same as OpenSSL 3.x).
-    #[allow(non_snake_case)]
-    pub const fn ERR_PACK(lib: c_int, _func: c_int, reason: c_int) -> c_ulong {
-        (((lib as c_ulong) & 0xff) << 24) | ((reason as c_ulong) & 0xfff)
-    }
-
-    // ERR_load_strings does not exist in AWS-LC. Provide a no-op stub so
-    // that code which registers custom error strings (e.g. openssl-errors)
-    // compiles. The custom strings simply won't be available at runtime.
-    #[allow(non_snake_case)]
-    pub unsafe fn ERR_load_strings(_lib: c_int, _str: *mut ERR_STRING_DATA) {}
 }
 #[cfg(awslc)]
 pub use aws_lc::*;

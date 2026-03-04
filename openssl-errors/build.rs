@@ -4,15 +4,6 @@ use std::env;
 
 fn main() {
     println!("cargo:rustc-check-cfg=cfg(ossl300)");
-    println!("cargo:rustc-check-cfg=cfg(awslc)");
-
-    if env::var("DEP_OPENSSL_AWSLC").is_ok() {
-        println!("cargo:rustc-cfg=awslc");
-    }
-
-    if env::var("DEP_OPENSSL_AWSLC_FIPS").is_ok() {
-        println!("cargo:rustc-cfg=awslc");
-    }
 
     if let Ok(version) = env::var("DEP_OPENSSL_VERSION_NUMBER") {
         let version = u64::from_str_radix(&version, 16).unwrap();
