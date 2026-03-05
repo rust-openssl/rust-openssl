@@ -58,27 +58,25 @@ mod aws_lc {
     }
 
     // ERR_GET_{LIB,REASON,FUNC} are macros/static inlines in AWS-LC and
-    // therefore not emitted by bindgen when using pregenerated bindings.
-    // We provide pure-Rust implementations matching the logic in aws-lc-sys.
+    // therefore not emitted by pregenerated bindings. We provide pure-Rust
+    // implementations matching the logic in aws-lc-sys.
     //
     // When aws-lc-sys is used (feature = "aws-lc" or "aws-lc-fips"), these
-    // shadow the identical versions from the glob import.
-    //
-    // When normal bindgen runs (wrap_static_fns), these functions are already
-    // in the generated output, so we must not redefine them.
-    #[cfg(any(feature = "aws-lc", feature = "aws-lc-fips", awslc_pregenerated))]
+    // come from the glob import instead. When normal bindgen runs
+    // (wrap_static_fns), they're in the generated output.
+    #[cfg(awslc_pregenerated)]
     #[allow(non_snake_case, clippy::cast_possible_wrap)]
     pub fn ERR_GET_LIB(packed_error: ::libc::c_uint) -> ::libc::c_int {
         ((packed_error >> 24) & 0xFF) as ::libc::c_int
     }
 
-    #[cfg(any(feature = "aws-lc", feature = "aws-lc-fips", awslc_pregenerated))]
+    #[cfg(awslc_pregenerated)]
     #[allow(non_snake_case, clippy::cast_possible_wrap)]
     pub fn ERR_GET_REASON(packed_error: ::libc::c_uint) -> ::libc::c_int {
         (packed_error & 0xFFF) as ::libc::c_int
     }
 
-    #[cfg(any(feature = "aws-lc", feature = "aws-lc-fips", awslc_pregenerated))]
+    #[cfg(awslc_pregenerated)]
     #[allow(non_snake_case)]
     pub fn ERR_GET_FUNC(_packed_error: ::libc::c_uint) -> ::libc::c_int {
         0
