@@ -28,6 +28,17 @@ cfg_if! {
             pub fn EVP_KDF_derive(ctx: *mut EVP_KDF_CTX, key: *mut u8, keylen: size_t, params: *const OSSL_PARAM) -> c_int;
             pub fn EVP_KDF_fetch(ctx: *mut OSSL_LIB_CTX, algorithm: *const c_char, properties: *const c_char) -> *mut EVP_KDF;
             pub fn EVP_KDF_free(kdf: *mut EVP_KDF);
+            pub fn EVP_PKEY_CTX_set_tls1_prf_md(ctx: *mut EVP_PKEY_CTX, md: *const EVP_MD) -> c_int;
+            pub fn EVP_PKEY_CTX_set1_tls1_prf_secret(
+                ctx: *mut EVP_PKEY_CTX,
+                secret: *const u8,
+                secretlen: c_int,
+            ) -> c_int;
+            pub fn EVP_PKEY_CTX_add1_tls1_prf_seed(
+                ctx: *mut EVP_PKEY_CTX,
+                seed: *const u8,
+                seedlen: c_int,
+            ) -> c_int;
         }
 
     }
