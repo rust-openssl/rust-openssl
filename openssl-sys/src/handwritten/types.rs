@@ -198,3 +198,15 @@ pub type OSSL_PASSPHRASE_CALLBACK = Option<
 pub enum EVP_MAC {}
 #[cfg(ossl300)]
 pub enum EVP_MAC_CTX {}
+
+#[cfg(ossl320)]
+pub enum OSSL_HPKE_CTX {}
+
+#[cfg(ossl320)]
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct OSSL_HPKE_SUITE {
+    pub kem_id: u16,
+    pub kdf_id: u16,
+    pub aead_id: u16,
+}
