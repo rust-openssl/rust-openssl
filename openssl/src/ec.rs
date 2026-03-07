@@ -883,6 +883,20 @@ impl EcKey<Params> {
     }
 }
 
+impl fmt::Debug for EcKey<Params> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
+        self.as_ref().fmt(f)
+    }
+}
+
+impl fmt::Debug for EcKeyRef<Params> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
+        f.debug_struct("EcKey<Params>")
+            .field("group", self.group())
+            .finish()
+    }
+}
+
 impl EcKey<Public> {
     /// Constructs an `EcKey` from the specified group with the associated [`EcPoint`]: `public_key`.
     ///
@@ -972,6 +986,39 @@ impl EcKey<Public> {
         public_key_from_der,
         EcKey<Public>,
         ffi::d2i_EC_PUBKEY
+    }
+}
+
+impl fmt::Debug for EcKey<Public> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
+        self.as_ref().fmt(f)
+    }
+}
+
+impl fmt::Debug for EcKeyRef<Public> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
+        // let chains are only allowed in Rust 2024 or later
+        if let Ok(mut x) = BigNum::new() {
+            if let Ok(mut y) = BigNum::new() {
+                if let Ok(mut ctx) = BigNumContext::new() {
+                    if self
+                        .public_key()
+                        .affine_coordinates_gfp(self.group(), &mut x, &mut y, &mut ctx)
+                        .is_ok()
+                    {
+                        // switch to .field_with() after debug_closure_helpers stabilizes
+                        return f
+                            .debug_struct("EcKey<Public>")
+                            .field("group", self.group())
+                            .field("x", &format!("{:X}", x))
+                            .field("y", &format!("{:X}", y))
+                            .finish();
+                    }
+                }
+            }
+        }
+
+        f.debug_struct("EcKey<Public>").finish()
     }
 }
 
@@ -1079,15 +1126,42 @@ impl EcKey<Private> {
     }
 }
 
-impl<T> Clone for EcKey<T> {
-    fn clone(&self) -> EcKey<T> {
-        (**self).to_owned()
+impl fmt::Debug for EcKey<Private> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
+        self.as_ref().fmt(f)
     }
 }
 
-impl<T> fmt::Debug for EcKey<T> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "EcKey")
+impl fmt::Debug for EcKeyRef<Private> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
+        // let chains are only allowed in Rust 2024 or later
+        if let Ok(mut x) = BigNum::new() {
+            if let Ok(mut y) = BigNum::new() {
+                if let Ok(mut ctx) = BigNumContext::new() {
+                    if self
+                        .public_key()
+                        .affine_coordinates_gfp(self.group(), &mut x, &mut y, &mut ctx)
+                        .is_ok()
+                    {
+                        // switch to .field_with() after debug_closure_helpers stabilizes
+                        return f
+                            .debug_struct("EcKey<Private>")
+                            .field("group", self.group())
+                            .field("x", &format!("{:X}", x))
+                            .field("y", &format!("{:X}", y))
+                            .finish_non_exhaustive();
+                    }
+                }
+            }
+        }
+
+        f.debug_struct("EcKey<Private>").finish()
+    }
+}
+
+impl<T> Clone for EcKey<T> {
+    fn clone(&self) -> EcKey<T> {
+        (**self).to_owned()
     }
 }
 
@@ -1456,6 +1530,36 @@ mod test {
         assert_eq!(
             format!("{:?}", group),
             "EcGroup { p: \"01FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF\", a: \"01FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFC\", b: \"51953EB9618E1C9A1F929A21A0B68540EEA2DA725B99B315F3B8B489918EF109E156193951EC7E937B1652C0BD3BB1BF073573DF883D2C34F1EF451FD46B503F00\" }"
+        );
+    }
+
+    #[test]
+    fn test_debug_params_key() {
+        let key = EcKey::from_curve_name(Nid::SECP521R1).unwrap();
+
+        assert_eq!(
+            format!("{:?}", key),
+            "EcKey<Params> { group: EcGroup { curve_name: \"secp521r1\" } }"
+        );
+    }
+
+    #[test]
+    fn test_debug_public_private_key() {
+        let key_bytes = include_bytes!("../test/ec.pem");
+
+        let private_key = EcKey::private_key_from_pem(&key_bytes[..]).unwrap();
+
+        let public_key =
+            EcKey::from_public_key(private_key.group(), private_key.public_key()).unwrap();
+
+        assert_eq!(
+            format!("{:?}", public_key),
+            "EcKey<Public> { group: EcGroup { curve_name: \"secp521r1\" }, x: \"A578CDD519850464382DA8713AEB364277E1999B599EA7712B4D0140E6CBFCF7648677B25DC7CACE3C9A7275913E88E7D545CC6A2C06F585A22E38162FCF4E001E\", y: \"015166A9CCB395B21A1F80478E36586A92DD9D1542920C417174D5FF8E7BCCEAA600929B17B614B1B11560EA20E003F2A18150350A7ADA9D63E4C4FE40823D74007F\" }"
+        );
+
+        assert_eq!(
+            format!("{:?}", private_key),
+            "EcKey<Private> { group: EcGroup { curve_name: \"secp521r1\" }, x: \"A578CDD519850464382DA8713AEB364277E1999B599EA7712B4D0140E6CBFCF7648677B25DC7CACE3C9A7275913E88E7D545CC6A2C06F585A22E38162FCF4E001E\", y: \"015166A9CCB395B21A1F80478E36586A92DD9D1542920C417174D5FF8E7BCCEAA600929B17B614B1B11560EA20E003F2A18150350A7ADA9D63E4C4FE40823D74007F\", .. }"
         );
     }
 }
