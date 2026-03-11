@@ -21,7 +21,6 @@ mod run_bindgen;
 enum Version {
     Openssl3xx,
     Openssl11x,
-    Openssl10x,
     Libressl,
     Boringssl,
     AwsLc,
@@ -161,6 +160,7 @@ fn main() {
     println!("cargo:rustc-check-cfg=cfg(libressl400)");
     println!("cargo:rustc-check-cfg=cfg(libressl410)");
     println!("cargo:rustc-check-cfg=cfg(libressl420)");
+    println!("cargo:rustc-check-cfg=cfg(libressl430)");
 
     println!("cargo:rustc-check-cfg=cfg(ossl101)");
     println!("cargo:rustc-check-cfg=cfg(ossl102)");
@@ -225,7 +225,6 @@ fn main() {
             }
         }
         None => match version {
-            Version::Openssl10x if target.contains("windows") => vec!["ssleay32", "libeay32"],
             Version::Openssl3xx | Version::Openssl11x if target.contains("windows-msvc") => {
                 vec!["libssl", "libcrypto"]
             }
@@ -304,18 +303,9 @@ fn postprocess(include_dirs: &[PathBuf]) -> Version {
 /// version string of OpenSSL.
 #[allow(clippy::unusual_byte_groupings)]
 fn validate_headers(include_dirs: &[PathBuf]) -> Version {
-    // This `*-sys` crate only works with OpenSSL 1.0.2, 1.1.0, 1.1.1 and 3.0.0.
+    // This `*-sys` crate only works with OpenSSL 1.1.0, 1.1.1 and 3.x.
     // To correctly expose the right API from this crate, take a look at
     // `opensslv.h` to see what version OpenSSL claims to be.
-    //
-    // OpenSSL has a number of build-time configuration options which affect
-    // various structs and such. Since OpenSSL 1.1.0 this isn't really a problem
-    // as the library is much more FFI-friendly, but 1.0.{1,2} suffer this problem.
-    //
-    // To handle all this conditional compilation we slurp up the configuration
-    // file of OpenSSL, `opensslconf.h`, and then dump out everything it defines
-    // as our own #[cfg] directives. That way the `ossl10x.rs` bindings can
-    // account for compile differences and such.
     println!("cargo:rerun-if-changed=build/expando.c");
     let mut gcc = cc::Build::new();
     gcc.includes(include_dirs);
@@ -459,9 +449,6 @@ See rust-openssl documentation for more information:
         } else if openssl_version >= 0x1_01_00_00_0 {
             println!("cargo:version=110");
             Version::Openssl11x
-        } else if openssl_version >= 0x1_00_02_00_0 {
-            println!("cargo:version=102");
-            Version::Openssl10x
         } else {
             version_error()
         }
@@ -472,7 +459,7 @@ fn version_error() -> ! {
     panic!(
         "
 
-This crate is only compatible with OpenSSL (version 1.0.2 through 1.1.1, or 3), or LibreSSL 3.5
+This crate is only compatible with OpenSSL (version 1.1.0, 1.1.1, or 3.x), or LibreSSL 3.5.0
 through 4.2.x, but a different version of OpenSSL was found. The build is now aborting
 due to this version mismatch.
 

@@ -1,7 +1,7 @@
 use super::super::*;
 use libc::*;
 
-#[cfg(any(libressl, all(ossl102, not(ossl110))))]
+#[cfg(all(libressl, not(libressl430)))]
 pub enum X509_VERIFY_PARAM_ID {}
 
 extern "C" {
@@ -74,17 +74,9 @@ const_ptr_api! {
 extern "C" {
     pub fn X509_STORE_CTX_set_error(ctx: *mut X509_STORE_CTX, error: c_int);
 }
-cfg_if! {
-    if #[cfg(any(ossl110, libressl))] {
-        const_ptr_api! {
-            extern "C" {
-                pub fn X509_STORE_CTX_get0_chain(ctx: #[const_ptr_if(ossl300)] X509_STORE_CTX) -> *mut stack_st_X509;
-            }
-        }
-    } else {
-        extern "C" {
-            pub fn X509_STORE_CTX_get_chain(ctx: *mut X509_STORE_CTX) -> *mut stack_st_X509;
-        }
+const_ptr_api! {
+    extern "C" {
+        pub fn X509_STORE_CTX_get0_chain(ctx: #[const_ptr_if(ossl300)] X509_STORE_CTX) -> *mut stack_st_X509;
     }
 }
 

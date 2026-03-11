@@ -21,7 +21,7 @@ use std::fmt::Write;
 use crate::asn1::Asn1Object;
 use crate::error::ErrorStack;
 use crate::nid::Nid;
-use crate::x509::{GeneralName, Stack, X509Extension, X509v3Context};
+use crate::x509::{GeneralName, Stack, X509Extension, X509Name, X509v3Context};
 use foreign_types::ForeignType;
 
 /// An extension which indicates whether a certificate is a CA certificate.
@@ -435,6 +435,7 @@ enum RustGeneralName {
     Ip(String),
     Rid(String),
     OtherName(Asn1Object, Vec<u8>),
+    DirName(X509Name),
 }
 
 /// An extension that allows additional identities to be bound to the subject
@@ -497,12 +498,16 @@ impl SubjectAlternativeName {
 
     /// Sets the `dirName` flag.
     ///
-    /// Not currently actually supported, always panics.
-    #[deprecated = "dir_name is deprecated and always panics. Please file a bug if you have a use case for this."]
+    /// Not currently actually supported, always panics. Please use dir_name2
+    #[deprecated = "dir_name is deprecated and always panics. Please use dir_name2."]
     pub fn dir_name(&mut self, _dir_name: &str) -> &mut SubjectAlternativeName {
-        unimplemented!(
-            "This has not yet been adapted for the new internals. File a bug if you need this."
-        );
+        unimplemented!("This has not yet been adapted for the new internals. Use dir_name2.");
+    }
+
+    /// Sets the `dirName` flag.
+    pub fn dir_name2(&mut self, dir_name: X509Name) -> &mut SubjectAlternativeName {
+        self.items.push(RustGeneralName::DirName(dir_name));
+        self
     }
 
     /// Sets the `otherName` flag.
@@ -539,6 +544,7 @@ impl SubjectAlternativeName {
                 RustGeneralName::OtherName(oid, content) => {
                     GeneralName::new_other_name(oid.clone(), content)?
                 }
+                RustGeneralName::DirName(name) => GeneralName::new_dir_name(name.as_ref())?,
             };
             stack.push(gn)?;
         }

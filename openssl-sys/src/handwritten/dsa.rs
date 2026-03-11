@@ -7,17 +7,7 @@ extern "C" {
     pub fn EVP_PKEY_CTX_set_dsa_paramgen_bits(ctx: *mut EVP_PKEY_CTX, nbits: c_int) -> c_int;
 }
 
-cfg_if! {
-    if #[cfg(any(ossl110, libressl))] {
-        pub enum DSA_SIG {}
-    } else {
-      #[repr(C)]
-      pub struct DSA_SIG {
-          pub r: *mut BIGNUM,
-          pub s: *mut BIGNUM,
-      }
-    }
-}
+pub enum DSA_SIG {}
 
 #[cfg(not(osslconf = "OPENSSL_NO_DEPRECATED_3_0"))]
 extern "C" {
@@ -60,18 +50,14 @@ extern "C" {
     pub fn i2d_DSAPublicKey(a: *const DSA, pp: *mut *mut c_uchar) -> c_int;
     pub fn i2d_DSAPrivateKey(a: *const DSA, pp: *mut *mut c_uchar) -> c_int;
 
-    #[cfg(any(ossl110, libressl))]
     pub fn DSA_get0_pqg(
         d: *const DSA,
         p: *mut *const BIGNUM,
         q: *mut *const BIGNUM,
         q: *mut *const BIGNUM,
     );
-    #[cfg(any(ossl110, libressl))]
     pub fn DSA_set0_pqg(d: *mut DSA, p: *mut BIGNUM, q: *mut BIGNUM, q: *mut BIGNUM) -> c_int;
-    #[cfg(any(ossl110, libressl))]
     pub fn DSA_get0_key(d: *const DSA, pub_key: *mut *const BIGNUM, priv_key: *mut *const BIGNUM);
-    #[cfg(any(ossl110, libressl))]
     pub fn DSA_set0_key(d: *mut DSA, pub_key: *mut BIGNUM, priv_key: *mut BIGNUM) -> c_int;
 }
 
@@ -86,9 +72,6 @@ extern "C" {
     pub fn DSA_SIG_new() -> *mut DSA_SIG;
     pub fn DSA_SIG_free(sig: *mut DSA_SIG);
 
-    #[cfg(any(ossl110, libressl))]
     pub fn DSA_SIG_get0(sig: *const DSA_SIG, pr: *mut *const BIGNUM, ps: *mut *const BIGNUM);
-
-    #[cfg(any(ossl110, libressl))]
     pub fn DSA_SIG_set0(sig: *mut DSA_SIG, pr: *mut BIGNUM, ps: *mut BIGNUM) -> c_int;
 }

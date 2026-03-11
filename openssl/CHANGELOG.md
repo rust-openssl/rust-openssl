@@ -2,6 +2,22 @@
 
 ## [Unreleased]
 
+## [v0.10.75] - 2025-11-07
+
+### Added
+
+* Added support for `set_rsa_oaep_label` on AWS-LC/BoringSSL.
+* Added `Asn1GeneralizedTime::from_str`.
+* Added `OcspStatus::next_update` method.
+
+### Fixed
+
+* Fixed unsound OCSP `find_status` handling of optional next_update field. If an OCSP response does not have a `nextUpdate`, `OcspStatus::next_update` will store a sentinel value. Use `OcspStatus::next_update()` instead.
+
+### Deprecated
+
+* Deprecated `OcspStatus::next_update` field in favor of the `next_update()` method.
+
 ## [v0.10.74] - 2025-10-14
 
 ### Added
@@ -1006,7 +1022,8 @@
 
 Look at the [release tags] for information about older releases.
 
-[Unreleased]: https://github.com/rust-openssl/rust-openssl/compare/openssl-v0.10.74...master
+[Unreleased]: https://github.com/rust-openssl/rust-openssl/compare/openssl-v0.10.75...master
+[v0.10.75]: https://github.com/rust-openssl/rust-openssl/compare/openssl-v0.10.74...openssl-v0.10.75
 [v0.10.74]: https://github.com/rust-openssl/rust-openssl/compare/openssl-v0.10.73...openssl-v0.10.74
 [v0.10.73]: https://github.com/rust-openssl/rust-openssl/compare/openssl-v0.10.72...openssl-v0.10.73
 [v0.10.72]: https://github.com/rust-openssl/rust-openssl/compare/openssl-v0.10.71...openssl-v0.10.72

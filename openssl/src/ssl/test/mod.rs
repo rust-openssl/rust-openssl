@@ -22,7 +22,7 @@ use crate::ocsp::{OcspResponse, OcspResponseStatus};
 use crate::pkey::{Id, PKey};
 use crate::srtp::SrtpProfileId;
 use crate::ssl::test::server::Server;
-#[cfg(any(ossl110, ossl111, libressl))]
+#[cfg(any(ossl110, libressl))]
 use crate::ssl::SslVersion;
 use crate::ssl::{self, NameType, SslConnectorBuilder};
 #[cfg(ossl111)]
@@ -32,9 +32,9 @@ use crate::ssl::{
     SslAcceptorBuilder, SslConnector, SslContext, SslContextBuilder, SslFiletype, SslMethod,
     SslOptions, SslSessionCacheMode, SslStream, SslVerifyMode, StatusType,
 };
-#[cfg(ossl102)]
+#[cfg(ossl110)]
 use crate::x509::store::X509StoreBuilder;
-#[cfg(ossl102)]
+#[cfg(ossl110)]
 use crate::x509::verify::X509CheckFlags;
 use crate::x509::{X509Name, X509StoreContext, X509VerifyResult, X509};
 
@@ -67,7 +67,7 @@ fn verify_trusted() {
 }
 
 #[test]
-#[cfg(ossl102)]
+#[cfg(ossl110)]
 fn verify_trusted_with_set_cert() {
     let server = Server::builder().build();
 
@@ -701,7 +701,7 @@ fn add_extra_chain_cert() {
 }
 
 #[test]
-#[cfg(ossl102)]
+#[cfg(ossl110)]
 fn verify_valid_hostname() {
     let server = Server::builder().build();
 
@@ -719,7 +719,7 @@ fn verify_valid_hostname() {
 }
 
 #[test]
-#[cfg(ossl102)]
+#[cfg(ossl110)]
 fn verify_invalid_hostname() {
     let mut server = Server::builder();
     server.should_error();
@@ -989,30 +989,6 @@ fn tmp_dh_callback() {
 }
 
 #[test]
-#[cfg(all(ossl102, not(ossl110)))]
-#[allow(deprecated)]
-fn tmp_ecdh_callback() {
-    use crate::ec::EcKey;
-    use crate::nid::Nid;
-
-    static CALLED_BACK: AtomicBool = AtomicBool::new(false);
-
-    let mut server = Server::builder();
-    server.ctx().set_tmp_ecdh_callback(|_, _, _| {
-        CALLED_BACK.store(true, Ordering::SeqCst);
-        EcKey::from_curve_name(Nid::X9_62_PRIME256V1)
-    });
-
-    let server = server.build();
-
-    let mut client = server.client();
-    client.ctx().set_cipher_list("ECDH").unwrap();
-    client.connect();
-
-    assert!(CALLED_BACK.load(Ordering::SeqCst));
-}
-
-#[test]
 #[cfg_attr(any(boringssl, awslc), ignore)]
 fn tmp_dh_callback_ssl() {
     static CALLED_BACK: AtomicBool = AtomicBool::new(false);
@@ -1033,32 +1009,6 @@ fn tmp_dh_callback_ssl() {
     #[cfg(any(ossl111, libressl))]
     client.ctx().set_options(super::SslOptions::NO_TLSV1_3);
     client.ctx().set_cipher_list("EDH").unwrap();
-    client.connect();
-
-    assert!(CALLED_BACK.load(Ordering::SeqCst));
-}
-
-#[test]
-#[cfg(all(ossl102, not(ossl110)))]
-#[allow(deprecated)]
-fn tmp_ecdh_callback_ssl() {
-    use crate::ec::EcKey;
-    use crate::nid::Nid;
-
-    static CALLED_BACK: AtomicBool = AtomicBool::new(false);
-
-    let mut server = Server::builder();
-    server.ssl_cb(|ssl| {
-        ssl.set_tmp_ecdh_callback(|_, _, _| {
-            CALLED_BACK.store(true, Ordering::SeqCst);
-            EcKey::from_curve_name(Nid::X9_62_PRIME256V1)
-        });
-    });
-
-    let server = server.build();
-
-    let mut client = server.client();
-    client.ctx().set_cipher_list("ECDH").unwrap();
     client.connect();
 
     assert!(CALLED_BACK.load(Ordering::SeqCst));
@@ -1546,7 +1496,7 @@ fn session_cache_size() {
 }
 
 #[test]
-#[cfg(ossl102)]
+#[cfg(ossl110)]
 fn add_chain_cert() {
     let ctx = SslContext::builder(SslMethod::tls()).unwrap().build();
     let cert = X509::from_pem(CERT).unwrap();

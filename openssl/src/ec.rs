@@ -21,7 +21,7 @@ use libc::c_int;
 use std::fmt;
 use std::ptr;
 
-use crate::bn::{BigNum, BigNumContextRef, BigNumRef};
+use crate::bn::{BigNum, BigNumContext, BigNumContextRef, BigNumRef};
 use crate::error::ErrorStack;
 use crate::nid::Nid;
 use crate::pkey::{HasParams, HasPrivate, HasPublic, Params, Private, Public};
@@ -165,6 +165,12 @@ impl EcGroup {
     }
 }
 
+impl fmt::Debug for EcGroup {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
+        self.as_ref().fmt(f)
+    }
+}
+
 impl EcGroupRef {
     /// Places the components of a curve over a prime field in the provided `BigNum`s.
     /// The components make up the formula `y^2 mod p = x^3 + ax + b mod p`.
@@ -240,7 +246,6 @@ impl EcGroupRef {
 
     /// Returns the number of bits in the group order.
     #[corresponds(EC_GROUP_order_bits)]
-    #[cfg(any(ossl110, libressl, awslc, boringssl))]
     pub fn order_bits(&self) -> u32 {
         unsafe { ffi::EC_GROUP_order_bits(self.as_ptr()) as u32 }
     }
@@ -316,6 +321,46 @@ impl EcGroupRef {
             Some(Nid::from_raw(nid))
         } else {
             None
+        }
+    }
+}
+
+impl fmt::Debug for EcGroupRef {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
+        if let Some(curve_name) = self.curve_name() {
+            if let Ok(name) = curve_name.short_name() {
+                f.debug_struct("EcGroup")
+                    .field("curve_name", &name)
+                    .finish()
+            } else {
+                f.debug_struct("EcGroup")
+                    .field("curve", &curve_name)
+                    .finish()
+            }
+        } else {
+            // let chains are only allowed in Rust 2024 or later
+            if let Ok(mut p) = BigNum::new() {
+                if let Ok(mut a) = BigNum::new() {
+                    if let Ok(mut b) = BigNum::new() {
+                        if let Ok(mut ctx) = BigNumContext::new() {
+                            if self
+                                .components_gfp(&mut p, &mut a, &mut b, &mut ctx)
+                                .is_ok()
+                            {
+                                // switch to .field_with() after debug_closure_helpers stabilizes
+                                return f
+                                    .debug_struct("EcGroup")
+                                    .field("p", &format!("{:X}", p))
+                                    .field("a", &format!("{:X}", a))
+                                    .field("b", &format!("{:X}", b))
+                                    .finish();
+                            }
+                        }
+                    }
+                }
+            }
+
+            f.debug_struct("EcGroup").finish()
         }
     }
 }
@@ -1376,10 +1421,41 @@ mod test {
     }
 
     #[test]
-    #[cfg(any(boringssl, ossl111, libressl, awslc))]
+    #[cfg(any(ossl111, boringssl, libressl, awslc))]
     fn asn1_flag() {
         let group = EcGroup::from_curve_name(Nid::X9_62_PRIME256V1).unwrap();
         let flag = group.asn1_flag();
         assert_eq!(flag, Asn1Flag::NAMED_CURVE);
+    }
+
+    #[test]
+    fn test_debug_standard_group() {
+        let group = EcGroup::from_curve_name(Nid::SECP521R1).unwrap();
+
+        assert_eq!(
+            format!("{:?}", group),
+            "EcGroup { curve_name: \"secp521r1\" }"
+        );
+    }
+
+    #[test]
+    fn test_debug_custom_group() {
+        let mut p = BigNum::new().unwrap();
+        let mut a = BigNum::new().unwrap();
+        let mut b = BigNum::new().unwrap();
+        let mut ctx = BigNumContext::new().unwrap();
+
+        EcGroup::from_curve_name(Nid::SECP521R1)
+            .unwrap()
+            .components_gfp(&mut p, &mut a, &mut b, &mut ctx)
+            .unwrap();
+
+        // reconstruct the group from its components
+        let group = EcGroup::from_components(p, a, b, &mut ctx).unwrap();
+
+        assert_eq!(
+            format!("{:?}", group),
+            "EcGroup { p: \"01FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF\", a: \"01FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFC\", b: \"51953EB9618E1C9A1F929A21A0B68540EEA2DA725B99B315F3B8B489918EF109E156193951EC7E937B1652C0BD3BB1BF073573DF883D2C34F1EF451FD46B503F00\" }"
+        );
     }
 }

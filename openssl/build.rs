@@ -125,10 +125,7 @@ fn main() {
         let version = u64::from_str_radix(&version, 16).unwrap();
         println!("cargo:rustc-cfg=ossl101");
         println!("cargo:rustc-cfg=ossl102");
-
-        if version >= 0x1_01_00_00_0 {
-            println!("cargo:rustc-cfg=ossl110");
-        }
+        println!("cargo:rustc-cfg=ossl110");
         if version >= 0x1_01_00_07_0 {
             println!("cargo:rustc-cfg=ossl110g");
         }
