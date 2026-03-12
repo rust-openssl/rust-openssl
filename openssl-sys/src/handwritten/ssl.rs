@@ -230,6 +230,9 @@ extern "C" {
     );
     pub fn SSL_get_psk_identity_hint(ssl: *const SSL) -> *const c_char;
     pub fn SSL_get_psk_identity(ssl: *const SSL) -> *const c_char;
+
+    pub fn SSL_CTX_use_psk_identity_hint(ctx: *mut SSL_CTX, hint: *const c_char) -> c_int;
+    pub fn SSL_use_psk_identity_hint(ssl: *mut SSL, hint: *const c_char) -> c_int;
 }
 
 extern "C" {
