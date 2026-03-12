@@ -794,6 +794,9 @@ fn test_verify_crl() {
     store_bldr.add_cert(ca).unwrap();
     store_bldr.add_crl(&crl).unwrap();
     store_bldr.set_flags(X509VerifyFlags::CRL_CHECK).unwrap();
+    let mut verify_params = X509VerifyParam::new().unwrap();
+    verify_params.set_time(1_577_836_800 as time_t);
+    store_bldr.set_param(&verify_params).unwrap();
     let store = store_bldr.build();
     let mut context = X509StoreContext::new().unwrap();
     assert_eq!(
