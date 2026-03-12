@@ -2,6 +2,27 @@
 
 ## [Unreleased]
 
+## [v0.10.76] - 2026-03-11
+
+### Added
+
+* Added brainpool curve NID constants.
+* Added `SubjectAlternativeName::dir_name2` for constructing directoryName SAN entries.
+* Added HKDF and generic KDF support.
+* Added `UpperHex` implementation for `BigNum` and `BigNumRef`.
+* Added `add_utf8_string` and `add_int` to `OsslParamBuilder`.
+* Added `Debug` implementation for `EcGroup`, `EcGroupRef`, `EcdsaSig` and `EcdsaSigRef`.
+* Enhanced `Debug` implementation for `Nid`.
+* Constified `PKey::from_raw`.
+* Exposed `from_str_x509()` for LibreSSL >= 3.6.0.
+
+### Fixed
+
+* Fixed use-after-free of error strings on BoringSSL/aws-lc.
+* Fixed cipher comparison (`is_ccm`, `is_ocb`) to use NID instead of unreliable pointer comparison. Added NID constants for `AES_*_OCB`.
+* Fixed invalid value parsing of OCSP revocation reason.
+* Fixed `BIO_METHOD` path for AWS-LC to use BoringSSL codepath.
+
 ## [v0.10.75] - 2025-11-07
 
 ### Added
@@ -1022,7 +1043,8 @@
 
 Look at the [release tags] for information about older releases.
 
-[Unreleased]: https://github.com/rust-openssl/rust-openssl/compare/openssl-v0.10.75...master
+[Unreleased]: https://github.com/rust-openssl/rust-openssl/compare/openssl-v0.10.76...master
+[v0.10.76]: https://github.com/rust-openssl/rust-openssl/compare/openssl-v0.10.75...openssl-v0.10.76
 [v0.10.75]: https://github.com/rust-openssl/rust-openssl/compare/openssl-v0.10.74...openssl-v0.10.75
 [v0.10.74]: https://github.com/rust-openssl/rust-openssl/compare/openssl-v0.10.73...openssl-v0.10.74
 [v0.10.73]: https://github.com/rust-openssl/rust-openssl/compare/openssl-v0.10.72...openssl-v0.10.73

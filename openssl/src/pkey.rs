@@ -107,7 +107,7 @@ impl Id {
     pub const POLY1305: Id = Id(ffi::EVP_PKEY_POLY1305);
 
     /// Creates a `Id` from an integer representation.
-    pub fn from_raw(value: c_int) -> Id {
+    pub const fn from_raw(value: c_int) -> Id {
         Id(value)
     }
 

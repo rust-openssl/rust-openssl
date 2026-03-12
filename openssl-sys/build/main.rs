@@ -134,6 +134,7 @@ fn main() {
     println!("cargo:rustc-check-cfg=cfg(libressl)");
     println!("cargo:rustc-check-cfg=cfg(boringssl)");
     println!("cargo:rustc-check-cfg=cfg(awslc)");
+    println!("cargo:rustc-check-cfg=cfg(awslc_pregenerated)");
 
     println!("cargo:rustc-check-cfg=cfg(libressl250)");
     println!("cargo:rustc-check-cfg=cfg(libressl251)");

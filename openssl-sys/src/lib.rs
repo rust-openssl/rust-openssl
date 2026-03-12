@@ -34,6 +34,7 @@ extern crate aws_lc_sys;
 
 #[cfg(awslc)]
 #[path = "."]
+#[allow(unpredictable_function_pointer_comparisons)]
 mod aws_lc {
     #[cfg(all(feature = "aws-lc", not(feature = "aws-lc-fips")))]
     pub use aws_lc_sys::*;
@@ -54,6 +55,31 @@ mod aws_lc {
     #[allow(non_snake_case, clippy::not_unsafe_ptr_arg_deref)]
     pub fn BIO_get_mem_data(b: *mut BIO, pp: *mut *mut c_char) -> c_long {
         unsafe { BIO_ctrl(b, BIO_CTRL_INFO, 0, pp.cast::<c_void>()) }
+    }
+
+    // ERR_GET_{LIB,REASON,FUNC} are macros/static inlines in AWS-LC and
+    // therefore not emitted by pregenerated bindings. We provide pure-Rust
+    // implementations matching the logic in aws-lc-sys.
+    //
+    // When aws-lc-sys is used (feature = "aws-lc" or "aws-lc-fips"), these
+    // come from the glob import instead. When normal bindgen runs
+    // (wrap_static_fns), they're in the generated output.
+    #[cfg(awslc_pregenerated)]
+    #[allow(non_snake_case, clippy::cast_possible_wrap)]
+    pub fn ERR_GET_LIB(packed_error: ::libc::c_uint) -> ::libc::c_int {
+        ((packed_error >> 24) & 0xFF) as ::libc::c_int
+    }
+
+    #[cfg(awslc_pregenerated)]
+    #[allow(non_snake_case, clippy::cast_possible_wrap)]
+    pub fn ERR_GET_REASON(packed_error: ::libc::c_uint) -> ::libc::c_int {
+        (packed_error & 0xFFF) as ::libc::c_int
+    }
+
+    #[cfg(awslc_pregenerated)]
+    #[allow(non_snake_case)]
+    pub fn ERR_GET_FUNC(_packed_error: ::libc::c_uint) -> ::libc::c_int {
+        0
     }
 }
 #[cfg(awslc)]

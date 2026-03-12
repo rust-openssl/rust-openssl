@@ -2,6 +2,29 @@
 
 ## [Unreleased]
 
+## [v0.9.112] - 2026-03-11
+
+### Added
+
+* Added bindings for HKDF support.
+* Added `OSSL_PARAM_BLD_push_int`.
+* Added bindings for `EVP_PKEY_new_raw_public_key_ex`, `EVP_PKEY_new_raw_private_key_ex`, and `EVP_PKEY_is_a`.
+* Added brainpool curve NID constants.
+* Added NID for `AES_*_OCB`.
+* Unconditionally exposed `X509_NAME_dup` and other `*_dup()` functions.
+* Added support for pregenerated Rust bindings from AWS-LC installations.
+* Added support for LibreSSL 4.3.0.
+
+### Changed
+
+* Bumped `aws-lc-sys` from 0.27 to 0.38. 0.38 includes security fixes (CVEs).
+
+### Removed
+
+* Removed `ASN1_STRING_data` for LibreSSL 4.3.0.
+* Removed `X509_VERIFY_PARAM_ID` for LibreSSL 4.3.0.
+* Removed `ASN1_ENCODING` for LibreSSL 4.3.0.
+
 ## [v0.9.111] - 2025-11-07
 
 ### Added
@@ -686,7 +709,8 @@ Fixed builds against OpenSSL built with `no-cast`.
 * Added `X509_verify` and `X509_REQ_verify`.
 * Added `EVP_MD_type` and `EVP_GROUP_get_curve_name`.
 
-[Unreleased]: https://github.com/rust-openssl/rust-openssl/compare/openssl-sys-v0.9.111..master
+[Unreleased]: https://github.com/rust-openssl/rust-openssl/compare/openssl-sys-v0.9.112..master
+[v0.9.112]: https://github.com/rust-openssl/rust-openssl/compare/openssl-sys-v0.9.111...openssl-sys-v0.9.112
 [v0.9.111]: https://github.com/rust-openssl/rust-openssl/compare/openssl-sys-v0.9.110...openssl-sys-v0.9.111
 [v0.9.110]: https://github.com/rust-openssl/rust-openssl/compare/openssl-sys-v0.9.109...openssl-sys-v0.9.110
 [v0.9.109]: https://github.com/rust-openssl/rust-openssl/compare/openssl-sys-v0.9.108...openssl-sys-v0.9.109
