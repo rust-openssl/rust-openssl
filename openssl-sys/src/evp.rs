@@ -30,6 +30,8 @@ pub const EVP_PKEY_CMAC: c_int = NID_cmac;
 pub const EVP_PKEY_POLY1305: c_int = NID_poly1305;
 #[cfg(any(ossl110, libressl360))]
 pub const EVP_PKEY_HKDF: c_int = NID_hkdf;
+#[cfg(ossl110)]
+pub const EVP_PKEY_TLS1_PRF: c_int = NID_tls1_prf;
 
 #[cfg(ossl110)]
 pub const EVP_CIPHER_CTX_FLAG_WRAP_ALLOW: c_int = 0x1;
@@ -254,6 +256,13 @@ pub const EVP_PKEY_CTRL_HKDF_INFO: c_int = EVP_PKEY_ALG_CTRL + 6;
 #[cfg(any(ossl111, libressl360))]
 pub const EVP_PKEY_CTRL_HKDF_MODE: c_int = EVP_PKEY_ALG_CTRL + 7;
 
+#[cfg(ossl110)]
+pub const EVP_PKEY_CTRL_TLS_MD: c_int = EVP_PKEY_ALG_CTRL;
+#[cfg(ossl110)]
+pub const EVP_PKEY_CTRL_TLS_SECRET: c_int = EVP_PKEY_ALG_CTRL + 1;
+#[cfg(ossl110)]
+pub const EVP_PKEY_CTRL_TLS_SEED: c_int = EVP_PKEY_ALG_CTRL + 2;
+
 #[cfg(any(all(ossl111, not(ossl300)), libressl360))]
 pub unsafe fn EVP_PKEY_CTX_set_hkdf_mode(ctx: *mut EVP_PKEY_CTX, mode: c_int) -> c_int {
     EVP_PKEY_CTX_ctrl(
@@ -356,4 +365,48 @@ pub unsafe fn EVP_PKEY_assign_DH(pkey: *mut EVP_PKEY, dh: *mut DH) -> c_int {
 #[cfg(not(osslconf = "OPENSSL_NO_DEPRECATED_3_0"))]
 pub unsafe fn EVP_PKEY_assign_EC_KEY(pkey: *mut EVP_PKEY, ec_key: *mut EC_KEY) -> c_int {
     EVP_PKEY_assign(pkey, EVP_PKEY_EC, ec_key as *mut c_void)
+}
+
+#[cfg(all(ossl110, not(ossl300)))]
+pub unsafe fn EVP_PKEY_CTX_set_tls1_prf_md(ctx: *mut EVP_PKEY_CTX, md: *const EVP_MD) -> c_int {
+    EVP_PKEY_CTX_ctrl(
+        ctx,
+        -1,
+        EVP_PKEY_OP_DERIVE,
+        EVP_PKEY_CTRL_TLS_MD,
+        0,
+        md as *mut c_void,
+    )
+}
+
+#[cfg(all(ossl110, not(ossl300)))]
+pub unsafe fn EVP_PKEY_CTX_set1_tls1_prf_secret(
+    ctx: *mut EVP_PKEY_CTX,
+    key: *const u8,
+    keylen: c_int,
+) -> c_int {
+    EVP_PKEY_CTX_ctrl(
+        ctx,
+        -1,
+        EVP_PKEY_OP_DERIVE,
+        EVP_PKEY_CTRL_TLS_SECRET,
+        keylen,
+        key as *mut c_void,
+    )
+}
+
+#[cfg(all(ossl110, not(ossl300)))]
+pub unsafe fn EVP_PKEY_CTX_add1_tls1_prf_seed(
+    ctx: *mut EVP_PKEY_CTX,
+    seed: *const u8,
+    seedlen: c_int,
+) -> c_int {
+    EVP_PKEY_CTX_ctrl(
+        ctx,
+        -1,
+        EVP_PKEY_OP_DERIVE,
+        EVP_PKEY_CTRL_TLS_SEED,
+        seedlen,
+        seed as *mut c_void,
+    )
 }
