@@ -2,9 +2,10 @@ use std::cmp::Ordering;
 
 use crate::asn1::{Asn1Object, Asn1OctetString, Asn1Time};
 use crate::bn::{BigNum, MsbOption};
+use crate::error::ErrorStack;
 use crate::hash::MessageDigest;
 use crate::nid::Nid;
-use crate::pkey::{PKey, Private};
+use crate::pkey::{PKey, PKeyRef, Private};
 use crate::rsa::Rsa;
 #[cfg(not(any(boringssl, awslc)))]
 use crate::ssl::SslFiletype;
@@ -19,7 +20,7 @@ use crate::x509::store::X509StoreBuilder;
 use crate::x509::verify::{X509VerifyFlags, X509VerifyParam};
 #[cfg(any(ossl110, boringssl, awslc))]
 use crate::x509::X509PurposeId;
-use crate::x509::X509PurposeRef;
+use crate::x509::{CrlNumber, X509CrlBuilder, X509PurposeRef, X509Ref, X509RevokedBuilder};
 #[cfg(ossl110)]
 use crate::x509::{CrlReason, X509Builder};
 use crate::x509::{
@@ -379,6 +380,7 @@ fn x509_extension_new_from_der() {
 #[test]
 fn x509_extension_to_der() {
     let builder = X509::builder().unwrap();
+    let bn = BigNum::from_u32(42).unwrap();
 
     for (ext, expected) in [
         (
@@ -408,6 +410,13 @@ fn x509_extension_to_der() {
                 .build()
                 .unwrap(),
             b"0\x22\x06\x03U\x1d%\x04\x1b0\x19\x06\x08+\x06\x01\x05\x05\x07\x03\x01\x06\x03\x887\x01\x06\x08+\x06\x01\x05\x05\x07\x03\x02",
+        ),
+        (
+            CrlNumber::new(bn)
+                .unwrap()
+                .build()
+                .unwrap(),
+            b"\x30\x0a\x06\x03\x55\x1d\x14\x04\x03\x02\x01\x2a",
         ),
     ] {
         assert_eq!(&ext.to_der().unwrap(), expected);
@@ -1250,4 +1259,119 @@ fn test_store_all_certificates() {
     };
 
     assert_eq!(store.all_certificates().len(), 1);
+}
+
+#[test]
+fn test_x509_revoked_builder() {
+    let mut builder = X509RevokedBuilder::new().unwrap();
+    let bn = BigNum::from_u32(1024).unwrap();
+    let d = Asn1Time::from_unix(0).unwrap();
+
+    builder
+        .set_serial_number(&bn.to_asn1_integer().unwrap())
+        .unwrap();
+    builder.set_revocation_date(&d).unwrap();
+
+    let revoked = builder.build();
+
+    assert_eq!(revoked.serial_number().to_bn().unwrap(), bn);
+    assert_eq!(
+        revoked.revocation_date().compare(&d).unwrap(),
+        Ordering::Equal
+    )
+}
+
+fn build_ca() -> Result<(PKey<Private>, X509), ErrorStack> {
+    let rsa = Rsa::generate(2048)?;
+    let pkey = PKey::from_rsa(rsa)?;
+
+    let mut name = X509Name::builder()?;
+    name.append_entry_by_nid(Nid::COMMONNAME, "foorbar.com")?;
+    let name = name.build();
+
+    // Build certificate
+    let mut builder = X509::builder()?;
+    builder.set_version(2)?;
+    builder.set_subject_name(&name)?;
+    builder.set_issuer_name(&name)?;
+    builder.set_pubkey(&pkey)?;
+    builder.set_not_before(&*Asn1Time::days_from_now(0)?)?;
+    builder.set_not_after(&*Asn1Time::days_from_now(365)?)?;
+
+    let exts = {
+        let ctx = builder.x509v3_context(None, None);
+        let san = SubjectAlternativeName::new()
+            .dns("foobar.com")
+            .build(&ctx)?;
+        vec![san]
+    };
+
+    for ext in exts {
+        builder.append_extension(ext)?;
+    }
+
+    builder.sign(&pkey, MessageDigest::sha256())?;
+    let ca_cert = builder.build();
+    Ok((pkey, ca_cert))
+}
+
+fn build_crl(
+    key: &PKeyRef<Private>,
+    cert: &X509Ref,
+    extensions: Vec<X509Extension>,
+) -> Result<X509Crl, ErrorStack> {
+    let mut builder = X509RevokedBuilder::new()?;
+    let bn = BigNum::from_u32(1024)?;
+    let d = Asn1Time::from_unix(0)?;
+
+    builder.set_serial_number(&*bn.to_asn1_integer()?)?;
+    builder.set_revocation_date(&d)?;
+    let revoked = builder.build();
+    let revokeds = vec![revoked];
+
+    let mut builder = X509CrlBuilder::new()?;
+
+    builder.set_issuer_name(cert.issuer_name())?;
+    builder.set_last_update(&*Asn1Time::days_from_now(0)?)?;
+    builder.set_next_update(&*Asn1Time::days_from_now(30)?)?;
+
+    for ext in extensions {
+        builder.append_extension(ext)?;
+    }
+    for revoked in revokeds {
+        builder.add_revoked(revoked)?;
+    }
+
+    builder.sign(key, MessageDigest::sha256())?;
+
+    builder.build()
+}
+
+#[test]
+fn test_x509_crl_builder() {
+    let (pkey, ca_cert) = build_ca().unwrap();
+
+    let dummy = X509::builder().unwrap();
+    let ctx = dummy.x509v3_context(Some(ca_cert.as_ref()), None);
+    let aki = AuthorityKeyIdentifier::new()
+        .issuer(true)
+        .build(&ctx)
+        .unwrap();
+    let n = CrlNumber::new(BigNum::from_u32(42).unwrap())
+        .unwrap()
+        .build()
+        .unwrap();
+
+    let exts = vec![aki, n];
+    let crl = build_crl(&pkey, &ca_cert, exts).unwrap();
+    assert!(crl.verify(&pkey).unwrap());
+
+    assert_eq!(crl.get_revoked().unwrap().len(), 1);
+
+    let (critical, n) = crl
+        .extension::<CrlNumber>()
+        .unwrap()
+        .expect("Crl Number extension should be present");
+    assert!(!critical, "Crl Number extension is not critical");
+    assert_eq!(n.to_bn().unwrap().to_string(), "42");
 }
