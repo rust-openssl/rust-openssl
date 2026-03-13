@@ -417,6 +417,67 @@ impl X509Ref {
         }
     }
 
+    /// Returns this certificate's extensions for the given [Nid].
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use openssl::nid::Nid;
+    /// use openssl::x509::X509;
+    ///
+    /// let cert = X509::from_pem(include_bytes!("../../test/extensions.pem")).unwrap();
+    /// let nid = Nid::create(&"1.3.6.1.4.1.41482.5.3", &"fw", &"firmware").unwrap();
+    /// let extension = cert.get_ext_by_nid(nid).unwrap().unwrap();
+    /// let value = extension.data().as_slice();
+    /// assert_eq!(value, [4, 3, 5, 2, 7]);
+    /// ```
+    #[corresponds(X509_get_ext_by_NID)]
+    pub fn get_ext_by_nid(&self, nid: Nid) -> Result<Option<&X509ExtensionRef>, ErrorStack> {
+        unsafe {
+            let loc = ffi::X509_get_ext_by_NID(self.as_ptr(), nid.as_raw(), -1);
+            Ok(if loc >= 0 {
+                Some(X509ExtensionRef::from_ptr(cvt_p(ffi::X509_get_ext(
+                    self.as_ptr(),
+                    loc,
+                ))?))
+            } else {
+                None
+            })
+        }
+    }
+
+    /// Returns this certificate's extensions for the given [Asn1Object].
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use openssl::asn1::Asn1Object;
+    /// use openssl::x509::X509;
+    ///
+    /// let cert = X509::from_pem(include_bytes!("../../test/extensions.pem")).unwrap();
+    /// let obj = Asn1Object::from_str(&"1.3.6.1.4.1.41482.5.3").unwrap();
+    /// let extension = cert.get_ext_by_obj(&obj).unwrap().unwrap();
+    /// let value = extension.data().as_slice();
+    /// assert_eq!(value, [4, 3, 5, 2, 7]);
+    /// ```
+    #[corresponds(X509_get_ext_by_OBJ)]
+    pub fn get_ext_by_obj(
+        &self,
+        obj: &Asn1ObjectRef,
+    ) -> Result<Option<&X509ExtensionRef>, ErrorStack> {
+        unsafe {
+            let loc = ffi::X509_get_ext_by_OBJ(self.as_ptr(), obj.as_ptr(), -1);
+            Ok(if loc >= 0 {
+                Some(X509ExtensionRef::from_ptr(cvt_p(ffi::X509_get_ext(
+                    self.as_ptr(),
+                    loc,
+                ))?))
+            } else {
+                None
+            })
+        }
+    }
+
     /// Returns this certificate's subject alternative name entries, if they exist.
     #[corresponds(X509_get_ext_d2i)]
     pub fn subject_alt_names(&self) -> Option<Stack<GeneralName>> {
@@ -1052,6 +1113,29 @@ impl X509ExtensionRef {
         #[corresponds(i2d_X509_EXTENSION)]
         to_der,
         ffi::i2d_X509_EXTENSION
+    }
+
+    /// Returns the field value of an `X509Extension`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use openssl::asn1::{Asn1Object, Asn1OctetString};
+    /// use openssl::x509::X509Extension;
+    ///
+    /// let extension = X509Extension::new_from_der(&Asn1Object::from_str("2.999").unwrap(),
+    ///       true,
+    ///      &Asn1OctetString::new_from_bytes(b"\x30\x03\x01\x01\xff").unwrap(),
+    ///   ).unwrap();
+    /// let value = extension.data().as_slice();
+    /// assert_eq!(value, [48, 3, 1, 1, 255]);
+    /// ```
+    #[corresponds(X509_EXTENSION_get_data)]
+    pub fn data(&self) -> &Asn1OctetStringRef {
+        unsafe {
+            let data = ffi::X509_EXTENSION_get_data(self.as_ptr());
+            Asn1OctetStringRef::from_ptr(data)
+        }
     }
 }
 
