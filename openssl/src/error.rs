@@ -54,6 +54,11 @@ impl ErrorStack {
             error.put();
         }
     }
+
+    /// Clear the error stack
+    pub(crate) fn clear() {
+        unsafe { ffi::ERR_clear_error() }
+    }
 }
 
 impl ErrorStack {
