@@ -8,20 +8,17 @@ use crate::error::ErrorStack;
 use crate::lib_ctx::LibCtxRef;
 use crate::nid::Nid;
 use cfg_if::cfg_if;
+use foreign_types::ForeignType;
 use foreign_types::{ForeignTypeRef, Opaque};
 use openssl_macros::corresponds;
 #[cfg(ossl300)]
 use std::ffi::CString;
+use std::ops::{Deref, DerefMut};
 #[cfg(ossl300)]
 use std::ptr;
 
 cfg_if! {
     if #[cfg(ossl300)] {
-        use foreign_types::ForeignType;
-        use std::ops::{Deref, DerefMut};
-
-        type Inner = *mut ffi::EVP_MD;
-
         impl Drop for Md {
             #[inline]
             fn drop(&mut self) {
@@ -30,51 +27,51 @@ cfg_if! {
                 }
             }
         }
+    }
+}
 
-        impl ForeignType for Md {
-            type CType = ffi::EVP_MD;
-            type Ref = MdRef;
+impl ForeignType for Md {
+    type CType = ffi::EVP_MD;
+    type Ref = MdRef;
 
-            #[inline]
-            unsafe fn from_ptr(ptr: *mut Self::CType) -> Self {
-                Md(ptr)
-            }
+    #[inline]
+    unsafe fn from_ptr(ptr: *mut Self::CType) -> Self {
+        Md(ptr)
+    }
 
-            #[inline]
-            fn as_ptr(&self) -> *mut Self::CType {
-                self.0
-            }
-        }
+    #[inline]
+    fn as_ptr(&self) -> *mut Self::CType {
+        self.0
+    }
+}
 
-        impl Deref for Md {
-            type Target = MdRef;
+impl Deref for Md {
+    type Target = MdRef;
 
-            #[inline]
-            fn deref(&self) -> &Self::Target {
-                unsafe {
-                    MdRef::from_ptr(self.as_ptr())
-                }
-            }
-        }
+    #[inline]
+    fn deref(&self) -> &Self::Target {
+        unsafe { MdRef::from_ptr(self.as_ptr()) }
+    }
+}
 
-        impl DerefMut for Md {
-            #[inline]
-            fn deref_mut(&mut self) -> &mut Self::Target {
-                unsafe {
-                    MdRef::from_ptr_mut(self.as_ptr())
-                }
-            }
-        }
-    } else {
-        enum Inner {}
+impl DerefMut for Md {
+    #[inline]
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        unsafe { MdRef::from_ptr_mut(self.as_ptr()) }
     }
 }
 
 /// A message digest algorithm.
-pub struct Md(Inner);
+pub struct Md(*mut ffi::EVP_MD);
 
 unsafe impl Sync for Md {}
 unsafe impl Send for Md {}
+
+impl From<crate::hash::MessageDigest> for Md {
+    fn from(value: crate::hash::MessageDigest) -> Self {
+        unsafe { Md::from_ptr(value.as_ptr() as *mut _) }
+    }
+}
 
 impl Md {
     /// Returns the `Md` corresponding to an [`Nid`].
