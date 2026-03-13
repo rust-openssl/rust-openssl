@@ -324,6 +324,15 @@ bitflags! {
         /// Do not use this unless you know what you're doing!
         #[cfg(not(libressl))]
         const SEND_FALLBACK_SCSV = ffi::SSL_MODE_SEND_FALLBACK_SCSV;
+
+        /// Enable asynchronous processing.
+        ///
+        /// TLS I/O operations may indicate a retry with SSL_ERROR_WANT_ASYNC with this mode set
+        /// if an asynchronous capable engine is used to perform cryptographic operations.
+        ///
+        /// Do not use this unless you know what you're doing!
+        #[cfg(ossl110)]
+        const ASYNC = ffi::SSL_MODE_ASYNC;
     }
 }
 
@@ -673,11 +682,13 @@ cfg_if! {
         type SslCacheTy = i64;
         type SslCacheSize = libc::c_ulong;
         type MtuTy = u32;
+        type ModeTy = u32;
         type SizeTy = usize;
     } else {
         type SslCacheTy = i64;
         type SslCacheSize = c_long;
         type MtuTy = c_long;
+        type ModeTy = c_long;
         type SizeTy = u32;
     }
 }
@@ -845,11 +856,31 @@ impl SslContextBuilder {
         }
     }
 
-    /// Sets the mode used by the context, returning the previous mode.
+    /// Sets the bit mask in mode to the mode set used by the context, returning the new mode bit mask.
+    ///
+    /// Options already set before are not cleared.
     #[corresponds(SSL_CTX_set_mode)]
     pub fn set_mode(&mut self, mode: SslMode) -> SslMode {
         unsafe {
-            let bits = ffi::SSL_CTX_set_mode(self.as_ptr(), mode.bits() as MtuTy) as SslBitType;
+            let bits = ffi::SSL_CTX_set_mode(self.as_ptr(), mode.bits() as ModeTy) as SslBitType;
+            SslMode::from_bits_retain(bits)
+        }
+    }
+
+    /// Clear the bit mask in mode to the mode set used by the context, returning the new mode bit mask.
+    #[corresponds(SSL_CTX_clear_mode)]
+    pub fn clear_mode(&mut self, mode: SslMode) -> SslMode {
+        unsafe {
+            let bits = ffi::SSL_CTX_clear_mode(self.as_ptr(), mode.bits() as ModeTy) as SslBitType;
+            SslMode::from_bits_retain(bits)
+        }
+    }
+
+    /// Returns the mode set for the context.
+    #[corresponds(SSL_CTX_get_mode)]
+    pub fn mode(&self) -> SslMode {
+        unsafe {
+            let bits = ffi::SSL_CTX_get_mode(self.as_ptr()) as SslBitType;
             SslMode::from_bits_retain(bits)
         }
     }
@@ -2353,6 +2384,35 @@ impl SslRef {
 
     fn get_error(&self, ret: c_int) -> ErrorCode {
         unsafe { ErrorCode::from_raw(ffi::SSL_get_error(self.as_ptr(), ret)) }
+    }
+
+    /// Sets the bit mask in mode to the mode set used by the SSL, returning the new mode bit mask.
+    ///
+    /// Options already set before are not cleared.
+    #[corresponds(SSL_set_mode)]
+    pub fn set_mode(&mut self, mode: SslMode) -> SslMode {
+        unsafe {
+            let bits = ffi::SSL_set_mode(self.as_ptr(), mode.bits() as ModeTy) as SslBitType;
+            SslMode::from_bits_retain(bits)
+        }
+    }
+
+    /// Clear the bit mask in mode to the mode set used by the SSL, returning the new mode bit mask.
+    #[corresponds(SSL_clear_mode)]
+    pub fn clear_mode(&mut self, mode: SslMode) -> SslMode {
+        unsafe {
+            let bits = ffi::SSL_clear_mode(self.as_ptr(), mode.bits() as ModeTy) as SslBitType;
+            SslMode::from_bits_retain(bits)
+        }
+    }
+
+    /// Returns the mode set for the SSL.
+    #[corresponds(SSL_get_mode)]
+    pub fn mode(&self) -> SslMode {
+        unsafe {
+            let bits = ffi::SSL_get_mode(self.as_ptr()) as SslBitType;
+            SslMode::from_bits_retain(bits)
+        }
     }
 
     /// Configure as an outgoing stream from a client.
