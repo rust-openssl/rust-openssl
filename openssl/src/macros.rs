@@ -131,6 +131,31 @@ macro_rules! from_pem {
     }
 }
 
+macro_rules! digest {
+    ($(#[$m:meta])* $n:ident, $f:path) => {
+        $(#[$m])*
+        pub fn $n(&self, hash_type: crate::hash::MessageDigest)
+            -> Result<crate::hash::DigestBytes, crate::error::ErrorStack> {
+            unsafe {
+                let mut digest = DigestBytes {
+                    buf: [0; ffi::EVP_MAX_MD_SIZE as usize],
+                    len: ffi::EVP_MAX_MD_SIZE as usize,
+                };
+                let mut len = ffi::EVP_MAX_MD_SIZE as c_uint;
+                crate::cvt($f(
+                    ::foreign_types::ForeignTypeRef::as_ptr(self),
+                    hash_type.as_ptr(),
+                    digest.buf.as_mut_ptr() as *mut _,
+                    &mut len,
+                ))?;
+                digest.len = len as usize;
+
+                Ok(digest)
+            }
+        }
+    };
+}
+
 macro_rules! foreign_type_and_impl_send_sync {
     (
         $(#[$impl_attr:meta])*
