@@ -16,6 +16,8 @@ pub use self::encoder::*;
 pub use self::err::*;
 pub use self::evp::*;
 pub use self::hmac::*;
+#[cfg(ossl320)]
+pub use self::hpke::*;
 pub use self::kdf::*;
 pub use self::object::*;
 pub use self::ocsp::*;
@@ -60,6 +62,8 @@ mod encoder;
 mod err;
 mod evp;
 mod hmac;
+#[cfg(ossl320)]
+mod hpke;
 mod kdf;
 mod object;
 mod ocsp;
