@@ -19,6 +19,7 @@ mod run_bindgen;
 
 #[derive(PartialEq)]
 enum Version {
+    Openssl4xx,
     Openssl3xx,
     Openssl11x,
     Libressl,
@@ -226,7 +227,9 @@ fn main() {
             }
         }
         None => match version {
-            Version::Openssl3xx | Version::Openssl11x if target.contains("windows-msvc") => {
+            Version::Openssl4xx | Version::Openssl3xx | Version::Openssl11x
+                if target.contains("windows-msvc") =>
+            {
                 vec!["libssl", "libcrypto"]
             }
             _ => vec!["ssl", "crypto"],
@@ -437,7 +440,7 @@ See rust-openssl documentation for more information:
         println!("cargo:version_number={openssl_version:x}");
 
         if openssl_version >= 0x4_00_00_00_0 {
-            version_error()
+            Version::Openssl4xx
         } else if openssl_version >= 0x3_00_00_00_0 {
             Version::Openssl3xx
         } else if openssl_version >= 0x1_01_01_00_0 {
