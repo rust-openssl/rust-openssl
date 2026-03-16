@@ -82,6 +82,49 @@ const INCLUDES: &str = "
 #endif
 ";
 
+/// Attempts to find and use pre-generated AWS-LC Rust bindings from the
+/// installation directory. Returns `true` if pre-generated bindings were
+/// found and installed, `false` otherwise.
+///
+/// AWS-LC installations may ship pre-generated bindings at:
+///   $PREFIX/share/rust/aws_lc_bindings.rs
+///
+/// where $PREFIX is the parent of the include directory. These bindings are
+/// generated with the same bindgen options used by aws-lc-sys, and the
+/// handful of static inline functions that matter (e.g., BIO_get_mem_data)
+/// are already implemented in pure Rust in src/lib.rs.
+///
+/// **Contract:** The pregenerated bindings must not contain `extern "C"`
+/// declarations for static inline wrapper functions (i.e., those that would
+/// normally be compiled from `awslc_static_wrapper.c`). When this function
+/// returns `true`, the caller skips both bindgen and the static wrapper
+/// compilation step; the required shims are instead provided as pure Rust
+/// in `openssl-sys/src/lib.rs`.
+fn try_pregenerated_awslc_bindings(include_dirs: &[PathBuf]) -> bool {
+    for include_dir in include_dirs {
+        let Some(prefix_dir) = include_dir.parent() else {
+            continue;
+        };
+        let bindings_path = prefix_dir
+            .join("share")
+            .join("rust")
+            .join("aws_lc_bindings.rs");
+        if bindings_path.exists() {
+            let out_dir = PathBuf::from(env::var_os("OUT_DIR").unwrap());
+            println!(
+                "cargo:warning=Using pre-generated AWS-LC bindings from {}",
+                bindings_path.display()
+            );
+            println!("cargo:rerun-if-changed={}", bindings_path.display());
+            println!("cargo:rustc-cfg=awslc_pregenerated");
+            fs::copy(&bindings_path, out_dir.join("bindgen.rs"))
+                .expect("Failed to copy pre-generated AWS-LC Rust bindings");
+            return true;
+        }
+    }
+    false
+}
+
 #[cfg(feature = "bindgen")]
 pub fn run(include_dirs: &[PathBuf]) {
     let out_dir = PathBuf::from(env::var_os("OUT_DIR").unwrap());
@@ -255,6 +298,12 @@ mod bindgen_options {
 
 #[cfg(feature = "bindgen")]
 pub fn run_awslc(include_dirs: &[PathBuf], symbol_prefix: Option<String>) {
+    // If the AWS-LC installation ships pre-generated Rust bindings, use them
+    // directly. These bindings already handle symbol prefix stripping.
+    if try_pregenerated_awslc_bindings(include_dirs) {
+        return;
+    }
+
     let out_dir = PathBuf::from(env::var_os("OUT_DIR").unwrap());
 
     fs::File::create(out_dir.join("awslc_static_wrapper.h"))
@@ -302,6 +351,12 @@ pub fn run_awslc(include_dirs: &[PathBuf], symbol_prefix: Option<String>) {
 
 #[cfg(not(feature = "bindgen"))]
 pub fn run_awslc(include_dirs: &[PathBuf], symbol_prefix: Option<String>) {
+    // If the AWS-LC installation ships pre-generated Rust bindings, use them
+    // directly. These bindings already handle symbol prefix stripping.
+    if try_pregenerated_awslc_bindings(include_dirs) {
+        return;
+    }
+
     if symbol_prefix.is_some() {
         panic!("aws-lc installation has prefixed symbols, but bindgen-cli does not support removing prefixes. \
         Enable the bindgen crate feature to support this installation.")
