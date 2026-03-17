@@ -177,6 +177,9 @@ pub mod memcmp;
 /// Unified ML-DSA API that works with both OpenSSL and BoringSSL
 #[cfg(any(ossl350, boringssl))]
 pub mod ml_dsa;
+/// Unified ML-KEM API that works with both OpenSSL and BoringSSL
+#[cfg(any(ossl350, boringssl))]
+pub mod ml_kem;
 pub mod nid;
 #[cfg(not(osslconf = "OPENSSL_NO_OCSP"))]
 pub mod ocsp;
