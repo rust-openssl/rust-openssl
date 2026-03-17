@@ -28,6 +28,7 @@ mod boringssl {
 
     // BoringSSL-specific PQC bindings
     pub mod mldsa;
+    pub mod mlkem;
 
     // BoringSSL does not require initialization.
     pub fn init() {}
