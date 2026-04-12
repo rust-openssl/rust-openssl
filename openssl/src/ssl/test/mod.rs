@@ -273,6 +273,7 @@ fn clear_ctx_options() {
 }
 
 #[test]
+#[cfg_attr(ossl400, ignore)]
 fn zero_length_buffers() {
     let server = Server::builder().build();
 
@@ -965,7 +966,7 @@ fn cert_store() {
 }
 
 #[test]
-#[cfg_attr(any(boringssl, awslc), ignore)]
+#[cfg_attr(any(boringssl, awslc, ossl400), ignore)]
 fn tmp_dh_callback() {
     static CALLED_BACK: AtomicBool = AtomicBool::new(false);
 
@@ -989,7 +990,7 @@ fn tmp_dh_callback() {
 }
 
 #[test]
-#[cfg_attr(any(boringssl, awslc), ignore)]
+#[cfg_attr(any(boringssl, awslc, ossl400), ignore)]
 fn tmp_dh_callback_ssl() {
     static CALLED_BACK: AtomicBool = AtomicBool::new(false);
 

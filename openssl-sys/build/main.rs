@@ -180,6 +180,7 @@ fn main() {
     println!("cargo:rustc-check-cfg=cfg(ossl320)");
     println!("cargo:rustc-check-cfg=cfg(ossl330)");
     println!("cargo:rustc-check-cfg=cfg(ossl340)");
+    println!("cargo:rustc-check-cfg=cfg(ossl400)");
 
     check_ssl_kind();
 
@@ -436,7 +437,8 @@ See rust-openssl documentation for more information:
         let openssl_version = openssl_version.unwrap();
         println!("cargo:version_number={openssl_version:x}");
 
-        if openssl_version >= 0x4_00_00_00_0 {
+        // Only allow 4.0.0 pre-releases for now
+        if openssl_version >= 0x4_00_00_00_f {
             version_error()
         } else if openssl_version >= 0x3_00_00_00_0 {
             Version::Openssl3xx
@@ -460,7 +462,7 @@ fn version_error() -> ! {
     panic!(
         "
 
-This crate is only compatible with OpenSSL (version 1.1.0, 1.1.1, or 3.x), or LibreSSL 3.5.0
+This crate is only compatible with OpenSSL (version 1.1.0, 1.1.1, 3.x, or 4.0.0 betas), or LibreSSL 3.5.0
 through 4.2.x, but a different version of OpenSSL was found. The build is now aborting
 due to this version mismatch.
 
