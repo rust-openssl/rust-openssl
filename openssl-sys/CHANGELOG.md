@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+## [v0.9.113] - 2026-04-12
+
+### Added
+
+* Exposed `EVP_MD_CTX_reset` on LibreSSL.
+
+### Changed
+
+* Bumped `aws-lc-sys` to 0.39.
+
 ## [v0.9.112] - 2026-03-11
 
 ### Added
@@ -709,7 +719,8 @@ Fixed builds against OpenSSL built with `no-cast`.
 * Added `X509_verify` and `X509_REQ_verify`.
 * Added `EVP_MD_type` and `EVP_GROUP_get_curve_name`.
 
-[Unreleased]: https://github.com/rust-openssl/rust-openssl/compare/openssl-sys-v0.9.112..master
+[Unreleased]: https://github.com/rust-openssl/rust-openssl/compare/openssl-sys-v0.9.113..master
+[v0.9.113]: https://github.com/rust-openssl/rust-openssl/compare/openssl-sys-v0.9.112...openssl-sys-v0.9.113
 [v0.9.112]: https://github.com/rust-openssl/rust-openssl/compare/openssl-sys-v0.9.111...openssl-sys-v0.9.112
 [v0.9.111]: https://github.com/rust-openssl/rust-openssl/compare/openssl-sys-v0.9.110...openssl-sys-v0.9.111
 [v0.9.110]: https://github.com/rust-openssl/rust-openssl/compare/openssl-sys-v0.9.109...openssl-sys-v0.9.110

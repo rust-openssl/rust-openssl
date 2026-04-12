@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## [v0.10.77] - 2026-04-12
+
+### Added
+
+* Enabled `MdCtxRef::digest_sign`, `MdCtxRef::digest_sign_to_vec`, `MdCtxRef::digest_verify`, and `MdCtxRef::reset` on BoringSSL, LibreSSL, and AWS-LC.
+
 ## [v0.10.76] - 2026-03-11
 
 ### Added
@@ -1043,7 +1049,8 @@
 
 Look at the [release tags] for information about older releases.
 
-[Unreleased]: https://github.com/rust-openssl/rust-openssl/compare/openssl-v0.10.76...master
+[Unreleased]: https://github.com/rust-openssl/rust-openssl/compare/openssl-v0.10.77...master
+[v0.10.77]: https://github.com/rust-openssl/rust-openssl/compare/openssl-v0.10.76...openssl-v0.10.77
 [v0.10.76]: https://github.com/rust-openssl/rust-openssl/compare/openssl-v0.10.75...openssl-v0.10.76
 [v0.10.75]: https://github.com/rust-openssl/rust-openssl/compare/openssl-v0.10.74...openssl-v0.10.75
 [v0.10.74]: https://github.com/rust-openssl/rust-openssl/compare/openssl-v0.10.73...openssl-v0.10.74
