@@ -228,7 +228,9 @@ fn main() {
             }
         }
         None => match version {
-            Version::Openssl4xx | Version::Openssl3xx | Version::Openssl11x if target.contains("windows-msvc") => {
+            Version::Openssl4xx | Version::Openssl3xx | Version::Openssl11x
+                if target.contains("windows-msvc") =>
+            {
                 vec!["libssl", "libcrypto"]
             }
             _ => vec!["ssl", "crypto"],
