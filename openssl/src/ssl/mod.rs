@@ -150,6 +150,11 @@ bitflags! {
         /// Disables a countermeasure against an SSLv3/TLSv1.0 vulnerability affecting CBC ciphers.
         const DONT_INSERT_EMPTY_FRAGMENTS = ffi::SSL_OP_DONT_INSERT_EMPTY_FRAGMENTS as SslOptionsRepr;
 
+        /// If set, a peer closing the connection without sending a close_notify alert is
+        /// treated as a normal EOF rather than an error.
+        #[cfg(ossl400)]
+        const IGNORE_UNEXPECTED_EOF = ffi::SSL_OP_IGNORE_UNEXPECTED_EOF as SslOptionsRepr;
+
         /// A "reasonable default" set of options which enables compatibility flags.
         #[cfg(not(any(boringssl, awslc)))]
         const ALL = ffi::SSL_OP_ALL as SslOptionsRepr;
