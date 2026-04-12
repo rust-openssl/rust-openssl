@@ -82,7 +82,7 @@ cfg_if! {
 }
 #[cfg(ossl110)]
 pub const SSL_OP_SAFARI_ECDHE_ECDSA_BUG: ssl_op_type!() = 0x00000040;
-#[cfg(ossl400)]
+#[cfg(ossl300)]
 pub const SSL_OP_IGNORE_UNEXPECTED_EOF: ssl_op_type!() = 0x00000080;
 
 pub const SSL_OP_DONT_INSERT_EMPTY_FRAGMENTS: ssl_op_type!() = 0x00000800;

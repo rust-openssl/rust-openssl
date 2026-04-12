@@ -152,7 +152,7 @@ bitflags! {
 
         /// If set, a peer closing the connection without sending a close_notify alert is
         /// treated as a normal EOF rather than an error.
-        #[cfg(ossl400)]
+        #[cfg(ossl300)]
         const IGNORE_UNEXPECTED_EOF = ffi::SSL_OP_IGNORE_UNEXPECTED_EOF as SslOptionsRepr;
 
         /// A "reasonable default" set of options which enables compatibility flags.
