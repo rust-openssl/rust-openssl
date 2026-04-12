@@ -332,7 +332,13 @@ extern "C" {
     pub fn X509_CRL_get_REVOKED(crl: *mut X509_CRL) -> *mut stack_st_X509_REVOKED;
     pub fn X509_CRL_get0_nextUpdate(x: *const X509_CRL) -> *const ASN1_TIME;
     pub fn X509_CRL_get0_lastUpdate(x: *const X509_CRL) -> *const ASN1_TIME;
-    pub fn X509_CRL_get_issuer(x: *const X509_CRL) -> *mut X509_NAME;
+}
+const_ptr_api! {
+    extern "C" {
+        pub fn X509_CRL_get_issuer(x: *const X509_CRL) -> #[const_ptr_if(ossl400)] X509_NAME;
+    }
+}
+extern "C" {
 
     #[cfg(ossl110)]
     pub fn X509_get0_extensions(req: *const X509) -> *const stack_st_X509_EXTENSION;
@@ -370,8 +376,8 @@ const_ptr_api! {
             set: c_int,
         ) -> c_int;
         pub fn i2d_X509_NAME(n: #[const_ptr_if(ossl300)] X509_NAME, buf: *mut *mut u8) -> c_int;
-        pub fn X509_NAME_ENTRY_get_object(ne: *const X509_NAME_ENTRY) -> *mut ASN1_OBJECT;
-        pub fn X509_NAME_ENTRY_get_data(ne: *const X509_NAME_ENTRY) -> *mut ASN1_STRING;
+        pub fn X509_NAME_ENTRY_get_object(ne: *const X509_NAME_ENTRY) -> #[const_ptr_if(ossl400)] ASN1_OBJECT;
+        pub fn X509_NAME_ENTRY_get_data(ne: *const X509_NAME_ENTRY) -> #[const_ptr_if(ossl400)] ASN1_STRING;
     }
 }
 extern "C" {

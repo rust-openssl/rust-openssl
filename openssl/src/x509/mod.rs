@@ -1324,7 +1324,7 @@ impl X509NameEntryRef {
     pub fn data(&self) -> &Asn1StringRef {
         unsafe {
             let data = ffi::X509_NAME_ENTRY_get_data(self.as_ptr());
-            Asn1StringRef::from_ptr(data)
+            Asn1StringRef::from_ptr(data as *mut _)
         }
     }
 
@@ -1334,7 +1334,7 @@ impl X509NameEntryRef {
     pub fn object(&self) -> &Asn1ObjectRef {
         unsafe {
             let object = ffi::X509_NAME_ENTRY_get_object(self.as_ptr());
-            Asn1ObjectRef::from_ptr(object)
+            Asn1ObjectRef::from_ptr(object as *mut _)
         }
     }
 }
@@ -1873,7 +1873,7 @@ impl X509CrlRef {
         unsafe {
             let name = X509_CRL_get_issuer(self.as_ptr());
             assert!(!name.is_null());
-            X509NameRef::from_ptr(name)
+            X509NameRef::from_ptr(name as *mut _)
         }
     }
 
