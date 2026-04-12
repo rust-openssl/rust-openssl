@@ -3731,6 +3731,10 @@ impl<S: Read + Write> SslStream<S> {
     /// then the first `n` bytes of `buf` are guaranteed to be initialized.
     #[corresponds(SSL_read_ex)]
     pub fn ssl_read_uninit(&mut self, buf: &mut [MaybeUninit<u8>]) -> Result<usize, Error> {
+        if buf.is_empty() {
+            return Ok(0);
+        }
+
         cfg_if! {
             if #[cfg(any(ossl111, libressl))] {
                 let mut readbytes = 0;
@@ -3749,10 +3753,6 @@ impl<S: Read + Write> SslStream<S> {
                     Err(self.make_error(ret))
                 }
             } else {
-                if buf.is_empty() {
-                    return Ok(0);
-                }
-
                 let len = usize::min(c_int::MAX as usize, buf.len()) as c_int;
                 let ret = unsafe {
                     ffi::SSL_read(self.ssl().as_ptr(), buf.as_mut_ptr().cast(), len)
@@ -3772,6 +3772,10 @@ impl<S: Read + Write> SslStream<S> {
     /// OpenSSL is waiting on read or write readiness.
     #[corresponds(SSL_write_ex)]
     pub fn ssl_write(&mut self, buf: &[u8]) -> Result<usize, Error> {
+        if buf.is_empty() {
+            return Ok(0);
+        }
+
         cfg_if! {
             if #[cfg(any(ossl111, libressl))] {
                 let mut written = 0;
@@ -3790,10 +3794,6 @@ impl<S: Read + Write> SslStream<S> {
                     Err(self.make_error(ret))
                 }
             } else {
-                if buf.is_empty() {
-                    return Ok(0);
-                }
-
                 let len = usize::min(c_int::MAX as usize, buf.len()) as c_int;
                 let ret = unsafe {
                     ffi::SSL_write(self.ssl().as_ptr(), buf.as_ptr().cast(), len)

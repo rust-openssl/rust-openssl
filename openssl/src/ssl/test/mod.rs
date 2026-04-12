@@ -273,7 +273,6 @@ fn clear_ctx_options() {
 }
 
 #[test]
-#[cfg_attr(ossl400, ignore)]
 fn zero_length_buffers() {
     let server = Server::builder().build();
 
