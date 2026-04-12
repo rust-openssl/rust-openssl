@@ -334,7 +334,7 @@ impl MdCtxRef {
     ///
     /// Requires OpenSSL 1.1.1 or newer.
     #[corresponds(EVP_DigestSign)]
-    #[cfg(ossl111)]
+    #[cfg(any(ossl111, boringssl, awslc, libressl))]
     #[inline]
     pub fn digest_sign(&mut self, from: &[u8], to: Option<&mut [u8]>) -> Result<usize, ErrorStack> {
         let mut len = to.as_ref().map_or(0, |b| b.len());
@@ -353,7 +353,7 @@ impl MdCtxRef {
     }
 
     /// Like [`Self::digest_sign`] but appends the signature to a [`Vec`].
-    #[cfg(ossl111)]
+    #[cfg(any(ossl111, boringssl, awslc, libressl))]
     pub fn digest_sign_to_vec(
         &mut self,
         from: &[u8],
@@ -374,7 +374,7 @@ impl MdCtxRef {
     ///
     /// Requires OpenSSL 1.1.1 or newer.
     #[corresponds(EVP_DigestVerify)]
-    #[cfg(ossl111)]
+    #[cfg(any(ossl111, boringssl, awslc, libressl))]
     #[inline]
     pub fn digest_verify(&mut self, data: &[u8], signature: &[u8]) -> Result<bool, ErrorStack> {
         unsafe {
@@ -398,7 +398,7 @@ impl MdCtxRef {
 
     /// Resets the underlying EVP_MD_CTX instance
     #[corresponds(EVP_MD_CTX_reset)]
-    #[cfg(ossl111)]
+    #[cfg(any(ossl111, boringssl, awslc, libressl))]
     #[inline]
     pub fn reset(&mut self) -> Result<(), ErrorStack> {
         unsafe {
@@ -515,7 +515,7 @@ mod test {
     }
 
     #[test]
-    #[cfg(ossl111)]
+    #[cfg(any(ossl111, boringssl, awslc, libressl))]
     fn verify_md_ctx_reset() {
         let hello_expected =
             hex::decode("185f8db32271fe25f561a6fc938b2e264306ec304eda518007d1764826381969")
