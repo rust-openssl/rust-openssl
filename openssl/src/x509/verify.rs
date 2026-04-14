@@ -51,9 +51,9 @@ bitflags! {
         #[cfg(ossl110)]
         const SUITEB_128_LOS_ONLY = ffi::X509_V_FLAG_SUITEB_128_LOS_ONLY;
         #[cfg(ossl110)]
-        const SUITEB_192_LOS = ffi::X509_V_FLAG_SUITEB_128_LOS;
+        const SUITEB_128_LOS = ffi::X509_V_FLAG_SUITEB_128_LOS;
         #[cfg(ossl110)]
-        const SUITEB_128_LOS = ffi::X509_V_FLAG_SUITEB_192_LOS;
+        const SUITEB_192_LOS = ffi::X509_V_FLAG_SUITEB_192_LOS;
         const PARTIAL_CHAIN = ffi::X509_V_FLAG_PARTIAL_CHAIN as _;
         const NO_ALT_CHAINS = ffi::X509_V_FLAG_NO_ALT_CHAINS as _;
         const NO_CHECK_TIME = ffi::X509_V_FLAG_NO_CHECK_TIME as _;
