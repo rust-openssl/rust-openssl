@@ -183,7 +183,7 @@ jobs:
             - name: openssl
               version: vendored
             - name: openssl
-              version: 4.0.0-beta1
+              version: 4.0.0
             - name: openssl
               version: 3.6.0
             - name: openssl
