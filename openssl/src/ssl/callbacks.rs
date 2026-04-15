@@ -1,3 +1,7 @@
+#[cfg(not(osslconf = "OPENSSL_NO_PSK"))]
+use ffi::EVP_MD;
+#[cfg(not(osslconf = "OPENSSL_NO_PSK"))]
+use ffi::SSL_SESSION;
 use foreign_types::ForeignType;
 use foreign_types::ForeignTypeRef;
 #[cfg(any(ossl111, not(osslconf = "OPENSSL_NO_PSK")))]
@@ -9,12 +13,16 @@ use libc::{c_int, c_uchar, c_uint, c_void};
 use std::ffi::CStr;
 use std::mem;
 use std::ptr;
+#[cfg(not(osslconf = "OPENSSL_NO_PSK"))]
+use std::ptr::null_mut;
 #[cfg(any(ossl111, boringssl, awslc))]
 use std::str;
 use std::sync::Arc;
 
 use crate::dh::Dh;
 use crate::error::ErrorStack;
+#[cfg(not(osslconf = "OPENSSL_NO_PSK"))]
+use crate::hash::MessageDigest;
 use crate::pkey::Params;
 use crate::ssl::AlpnError;
 use crate::ssl::{
@@ -125,6 +133,64 @@ where
         let psk_sl = util::from_raw_parts_mut(psk as *mut u8, max_psk_len as usize);
         match (*callback)(ssl, identity, psk_sl) {
             Ok(psk_len) => psk_len as u32,
+            Err(e) => {
+                e.put();
+                0
+            }
+        }
+    }
+}
+
+#[cfg(not(osslconf = "OPENSSL_NO_PSK"))]
+pub extern "C" fn raw_psk_use_session<F>(
+    ssl: *mut ffi::SSL,
+    msg_digest: *const EVP_MD,
+    identity: *mut *const c_uchar,
+    identity_len: *mut c_uint,
+    session: *mut *mut SSL_SESSION
+) -> c_int
+where
+    F: Fn(&mut SslRef, Option<MessageDigest>, &mut SslSessionRef) -> Result<Option<Vec<u8>>, ErrorStack>
+        + 'static
+        + Sync
+        + Send,
+{
+    unsafe {
+        let ssl = SslRef::from_ptr_mut(ssl);
+        let callback_idx = SslContext::cached_ex_index::<F>();
+
+        let callback = ssl
+            .ssl_context()
+            .ex_data(callback_idx)
+            .expect("BUG: psk callback missing") as *const F;
+        
+        let msg_digest = if msg_digest.is_null() {
+            None
+        } else {
+            Some(MessageDigest::from_ptr(msg_digest))
+        };
+        // Create the session, it has to be done and simplifies the callback signature
+        let cb_session = if (*session).is_null() {
+            SslSessionRef::from_ptr_mut(ffi::SSL_SESSION_new())
+        } else {
+            SslSessionRef::from_ptr_mut(*session)
+        };
+
+        match (*callback)(ssl, msg_digest, cb_session) {
+            Ok(result) => {
+                match result {
+                    Some(cb_identity) => {
+                        // tell OpenSSL we're going ahead with PSK by supplying the session parameter
+                        *session = cb_session.as_ptr();
+                        *identity_len = cb_identity.len() as u32;
+                        *identity = cb_identity.as_ptr();
+                    },
+                    None => {
+                        *session = null_mut::<SSL_SESSION>();
+                    }
+                };
+                1
+            },
             Err(e) => {
                 e.put();
                 0

@@ -1388,6 +1388,30 @@ impl SslContextBuilder {
         }
     }
 
+    /// Sets the callback for providing an identity and pre-shared key for
+    /// TLS 1.3 clients.
+    ///
+    /// These functions cannot be used for TLSv1.2 and below PSKs.
+    /// The callback will be called with the SSL context, an optional message digest,
+    /// and, a mutable slice for storing the psk identity. The callback returns the number of
+    /// bytes in the identity string.
+    /// A session instance will be created and passed to the callback, this will be return
+    /// to OpenSSL if the callback is sucessfull
+    #[corresponds(SSL_CTX_set_psk_use_session_callback)]
+    #[cfg(not(osslconf = "OPENSSL_NO_PSK"))]
+    pub fn set_psk_use_session_callback<F>(&mut self, callback: F)
+    where
+        F: Fn(&mut SslRef, Option<MessageDigest>, &mut SslSessionRef) -> Result<Option<Vec<u8>>, ErrorStack>
+            + 'static
+            + Sync
+            + Send,
+    {
+        unsafe {
+            self.set_ex_data(SslContext::cached_ex_index::<F>(), callback);
+            ffi::SSL_CTX_set_psk_use_session_callback(self.as_ptr(), Some(raw_psk_use_session::<F>));
+        }
+    }
+
     /// Sets the callback which is called when new sessions are negotiated.
     ///
     /// This can be used by clients to implement session caching. While in TLSv1.2 the session is
@@ -2107,6 +2131,22 @@ impl SslCipherRef {
             id.to_be_bytes()
         }
     }
+
+    /// Returns a cipher matching the name
+    /// 
+    /// Requires OpenSSL 1.1.1 or newer.
+    #[corresponds(SSL_CIPHER_find)]
+    #[cfg(ossl111)]
+    pub fn find<'a>(ssl: &'a SslRef, name: &'a [u8]) -> Option<&'a SslCipherRef> {
+        unsafe {
+            let cipher = ffi::SSL_CIPHER_find(ssl.as_ptr(), name.as_ptr());
+            if cipher.is_null() {
+                None
+            } else {
+                Some(SslCipherRef::from_const_ptr(cipher))
+            }
+        }
+    }
 }
 
 impl fmt::Debug for SslCipherRef {
@@ -2176,6 +2216,29 @@ impl SslSessionRef {
         }
     }
 
+    #[corresponds(SSL_SESSION_cipher)]
+    pub fn cipher(&self) -> Option<&SslCipherRef> {
+        unsafe {
+            let p = ffi::SSL_SESSION_get0_cipher(self.as_ptr());
+            if p.is_null() {
+                Some(SslCipherRef::from_const_ptr(p))
+            } else {
+                None
+            }
+        }
+    }
+
+    #[corresponds(SSL_SESSION_set_cipher)]
+    pub fn set_cipher(&self, cipher: Option<&SslCipherRef>) -> Result<(), ErrorStack> {
+        unsafe {
+            let p = match cipher {
+                Some(cipher) => cipher.as_ptr(),
+                None => ptr::null()
+            };
+            cvt(ffi::SSL_SESSION_set_cipher(self.as_ptr(), p) as c_int).map(|_| ())
+        }
+    }
+
     /// Returns the length of the master key.
     #[corresponds(SSL_SESSION_get_master_key)]
     pub fn master_key_len(&self) -> usize {
@@ -2188,6 +2251,14 @@ impl SslSessionRef {
     #[corresponds(SSL_SESSION_get_master_key)]
     pub fn master_key(&self, buf: &mut [u8]) -> usize {
         unsafe { SSL_SESSION_get_master_key(self.as_ptr(), buf.as_mut_ptr(), buf.len()) }
+    }
+
+    /// Copies the buffer into the master key.
+    ///
+    /// Returns sucess or failure.
+    #[corresponds(SSL_SESSION_set1_master_key)]
+    pub fn set_master_key(&self, buf: &[u8]) -> i32 {
+        unsafe { SSL_SESSION_set1_master_key(self.as_ptr(), buf.as_ptr(), buf.len()) }
     }
 
     /// Gets the maximum amount of early data that can be sent on this session.
@@ -2224,6 +2295,17 @@ impl SslSessionRef {
         unsafe {
             let version = ffi::SSL_SESSION_get_protocol_version(self.as_ptr());
             SslVersion(version)
+        }
+    }
+
+    /// Returns the session's TLS protocol version.
+    ///
+    /// Requires LibreSSL or OpenSSL 1.1.0 or newer.
+    #[corresponds(SSL_SESSION_set_protocol_version)]
+    #[cfg(any(ossl110, libressl))]
+    pub fn set_protocol_version(&self, version: SslVersion) -> i32 {
+        unsafe {
+            ffi::SSL_SESSION_set_protocol_version(self.as_ptr(), version.0)
         }
     }
 
@@ -4185,7 +4267,7 @@ bitflags! {
     }
 }
 
-use ffi::{SSL_CTX_up_ref, SSL_SESSION_get_master_key, SSL_SESSION_up_ref, SSL_is_server};
+use ffi::{SSL_CTX_up_ref, SSL_SESSION_get_master_key, SSL_SESSION_set1_master_key, SSL_SESSION_up_ref, SSL_is_server};
 cfg_if! {
     if #[cfg(ossl300)] {
         use ffi::SSL_get1_peer_certificate;

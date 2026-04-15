@@ -1427,6 +1427,76 @@ fn psk_ciphers() {
     assert!(CLIENT_CALLED.load(Ordering::SeqCst));
 }
 
+#[cfg(ossl111)]
+#[cfg(not(osslconf = "OPENSSL_NO_PSK"))]
+#[test]
+fn psk_1_3_ciphers() {
+    const CIPHER: &str = "TLS_AES_256_GCM_SHA384";
+    static PSK: &[u8] = b"thisisaverysecurekeythatis32byte";
+    static CLIENT_IDENT: &[u8] = b"thisisaclient";
+    static CLIENT_CALLED: AtomicBool = AtomicBool::new(false);
+    static SERVER_CALLED: AtomicBool = AtomicBool::new(false);
+    static TLS13_AES128GCMSHA256_ID: &[u8] = &[0x13, 0x01];
+
+    let mut server = Server::builder();
+    server.ctx().set_ciphersuites(CIPHER).unwrap();
+    server.ctx().set_psk_server_callback(|_, identity, psk| {
+        assert!(identity.unwrap_or(&[]) == CLIENT_IDENT);
+        psk[..PSK.len()].copy_from_slice(PSK);
+        SERVER_CALLED.store(true, Ordering::SeqCst);
+        Ok(PSK.len())
+    });
+
+    let server = server.build();
+
+    let mut client = server.client();
+    // This test relies on TLS 1.2 suites
+    #[cfg(any(boringssl, ossl111, awslc))]
+    client.ctx().set_options(super::SslOptions::NO_TLSV1_2);
+    client.ctx().set_ciphersuites(CIPHER).unwrap();
+    client
+        .ctx()
+        .set_psk_use_session_callback(move |ssl, msg_digest, session| {
+            
+            let result = match msg_digest {
+                None => {
+                    // This is the first call
+
+                    use crate::ssl::SslCipherRef;
+                    session.set_cipher(SslCipherRef::find(ssl, TLS13_AES128GCMSHA256_ID))?;
+                    session.set_master_key(PSK);
+                    session.set_protocol_version(SslVersion::TLS1_3);
+                    Some(CLIENT_IDENT.to_owned())
+                },
+                Some(msg_digest) => {
+                    if let Some(cipher) = session.cipher() {
+                        if let Some(hs_digest) = cipher.handshake_digest() {
+                            if hs_digest == msg_digest {
+                                Some(CLIENT_IDENT.to_owned())
+                            } else {
+                                None
+                            }
+                        } else {
+                            // cant do PSK but its not an error
+                            None
+                        }
+                    } else {
+                        None
+                    }
+                }
+            };
+
+            CLIENT_CALLED.store(true, Ordering::SeqCst);
+
+            Ok(result)
+        });
+
+    client.connect();
+
+    assert!(SERVER_CALLED.load(Ordering::SeqCst));
+    assert!(CLIENT_CALLED.load(Ordering::SeqCst));
+}
+
 #[test]
 fn sni_callback_swapped_ctx() {
     static CALLED_BACK: AtomicBool = AtomicBool::new(false);
