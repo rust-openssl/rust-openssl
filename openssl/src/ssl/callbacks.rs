@@ -183,7 +183,7 @@ where
                         // tell OpenSSL we're going ahead with PSK by supplying the session parameter
                         *session = cb_session.as_ptr();
                         *identity_len = cb_identity.len() as u32;
-                        *identity = cb_identity.as_ptr();
+                        *identity = std::ffi::CString::new(cb_identity).unwrap().into_raw() as *const u8;
                     },
                     None => {
                         *session = null_mut::<SSL_SESSION>();
