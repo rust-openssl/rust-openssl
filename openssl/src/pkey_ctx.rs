@@ -644,7 +644,7 @@ impl<T> PkeyCtxRef<T> {
         let len = LenType::try_from(label.len()).unwrap();
 
         unsafe {
-            let p = ffi::OPENSSL_malloc(label.len() as _);
+            let p = cvt_p(ffi::OPENSSL_malloc(label.len() as _))?;
             ptr::copy_nonoverlapping(label.as_ptr(), p as *mut _, label.len());
 
             let r = cvt(ffi::EVP_PKEY_CTX_set0_rsa_oaep_label(
