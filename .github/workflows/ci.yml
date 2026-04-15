@@ -261,6 +261,7 @@ jobs:
           id: rust-version
         - run: rustup target add ${{ matrix.target }}
         - name: Install packages
+          timeout-minutes: 3
           run: |
             case "${{ matrix.target }}" in
             "x86_64-unknown-linux-gnu")
