@@ -24,6 +24,12 @@ pub const EVP_PKEY_ED25519: c_int = NID_ED25519;
 pub const EVP_PKEY_X448: c_int = NID_X448;
 #[cfg(ossl111)]
 pub const EVP_PKEY_ED448: c_int = NID_ED448;
+#[cfg(ossl350)]
+pub const EVP_PKEY_ML_DSA_44: c_int = NID_ML_DSA_44;
+#[cfg(ossl350)]
+pub const EVP_PKEY_ML_DSA_65: c_int = NID_ML_DSA_65;
+#[cfg(ossl350)]
+pub const EVP_PKEY_ML_DSA_87: c_int = NID_ML_DSA_87;
 pub const EVP_PKEY_HMAC: c_int = NID_hmac;
 pub const EVP_PKEY_CMAC: c_int = NID_cmac;
 #[cfg(ossl111)]

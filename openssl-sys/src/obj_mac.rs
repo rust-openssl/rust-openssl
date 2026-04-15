@@ -1047,3 +1047,15 @@ cfg_if! {
         pub const NID_ac_auditEntity: c_int = 287;
     }
 }
+#[cfg(ossl350)]
+pub const NID_ML_KEM_512: c_int = 1454;
+#[cfg(ossl350)]
+pub const NID_ML_KEM_768: c_int = 1455;
+#[cfg(ossl350)]
+pub const NID_ML_KEM_1024: c_int = 1456;
+#[cfg(ossl350)]
+pub const NID_ML_DSA_44: c_int = 1457;
+#[cfg(ossl350)]
+pub const NID_ML_DSA_65: c_int = 1458;
+#[cfg(ossl350)]
+pub const NID_ML_DSA_87: c_int = 1459;
