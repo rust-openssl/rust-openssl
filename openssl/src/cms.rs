@@ -629,9 +629,16 @@ mod test {
         )
         .expect("failed to create partial CMS");
 
-        // Add a second signer (same cert/key for test purposes)
-        cms.add1_signer(&cert, &key, None, CMSOptions::PARTIAL)
-            .expect("failed to add signer");
+        // Add a second signer (same cert/key for test purposes).
+        // NOCERTS is required because the cert was already added by the initial sign() call;
+        // older OpenSSL versions (e.g. 1.1.0) reject duplicate certificates in CMS_add0_cert.
+        cms.add1_signer(
+            &cert,
+            &key,
+            None,
+            CMSOptions::PARTIAL | CMSOptions::CMS_NOCERTS,
+        )
+        .expect("failed to add signer");
 
         // Finalize
         cms.finalize(data, None, CMSOptions::empty())
