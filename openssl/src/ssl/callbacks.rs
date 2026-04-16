@@ -515,9 +515,6 @@ where
         match (*callback)(ssl, ectx, cert) {
             Ok(None) => 0,
             Ok(Some(buf)) => {
-                *outlen = buf.as_ref().len();
-                *out = buf.as_ref().as_ptr();
-
                 let idx = Ssl::cached_ex_index::<CustomExtAddState<T>>();
                 let mut buf = Some(buf);
                 let new = match ssl.ex_data_mut(idx) {
@@ -530,6 +527,15 @@ where
                 if new {
                     ssl.set_ex_data(idx, CustomExtAddState(buf));
                 }
+
+                // We must captures the out pointer AFTER buf has been moved into
+                // ex_data -- otherwise moving a type like [u8; N] would
+                // invalidate the captured pointer.
+                let stored = ssl.ex_data(idx).unwrap();
+                let data = stored.0.as_ref().unwrap().as_ref();
+                *outlen = data.len();
+                *out = data.as_ptr();
+
                 1
             }
             Err(alert) => {

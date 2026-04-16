@@ -1252,6 +1252,44 @@ fn custom_extensions() {
     assert!(FOUND_EXTENSION.load(Ordering::SeqCst));
 }
 
+#[test]
+#[cfg(ossl111)]
+fn custom_extensions_inline_buffer() {
+    static FOUND_EXTENSION: AtomicBool = AtomicBool::new(false);
+    const EXPECTED: [u8; 128] = [0xAB; 128];
+
+    let mut server = Server::builder();
+    server
+        .ctx()
+        .add_custom_ext(
+            12345,
+            ExtensionContext::CLIENT_HELLO,
+            |_, _, _| -> Result<Option<[u8; 128]>, _> { unreachable!() },
+            |_, _, data, _| {
+                FOUND_EXTENSION.store(data == EXPECTED, Ordering::SeqCst);
+                Ok(())
+            },
+        )
+        .unwrap();
+
+    let server = server.build();
+
+    let mut client = server.client();
+    client
+        .ctx()
+        .add_custom_ext(
+            12345,
+            ssl::ExtensionContext::CLIENT_HELLO,
+            move |_, _, _| Ok(Some(EXPECTED)),
+            |_, _, _, _| unreachable!(),
+        )
+        .unwrap();
+
+    client.connect();
+
+    assert!(FOUND_EXTENSION.load(Ordering::SeqCst));
+}
+
 fn _check_kinds() {
     fn is_send<T: Send>() {}
     fn is_sync<T: Sync>() {}
