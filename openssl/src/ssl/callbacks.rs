@@ -199,6 +199,58 @@ where
     }
 }
 
+#[cfg(not(osslconf = "OPENSSL_NO_PSK"))]
+pub extern "C" fn raw_psk_find_session<F>(
+    ssl: *mut ffi::SSL,
+    identity: *const c_uchar,
+    identity_len: c_uint,
+    session: *mut *mut SSL_SESSION
+) -> c_int
+where
+    F: Fn(&mut SslRef, Option<&[u8]>, &mut SslSessionRef) -> Result<bool, ErrorStack>
+        + 'static
+        + Sync
+        + Send,
+{
+    unsafe {
+        let ssl = SslRef::from_ptr_mut(ssl);
+        let callback_idx = SslContext::cached_ex_index::<F>();
+
+        let callback = ssl
+            .ssl_context()
+            .ex_data(callback_idx)
+            .expect("BUG: psk callback missing") as *const F;
+        
+        let identity = if identity.is_null() {
+            None
+        } else {
+            Some(util::from_raw_parts(identity, identity_len as usize))
+        };
+        // Create the session, it has to be done and simplifies the callback signature
+        let cb_session = if (*session).is_null() {
+            SslSessionRef::from_ptr_mut(ffi::SSL_SESSION_new())
+        } else {
+            SslSessionRef::from_ptr_mut(*session)
+        };
+
+        match (*callback)(ssl, identity, cb_session) {
+            Ok(true) => {
+                // tell OpenSSL we're going ahead with PSK by supplying the session parameter
+                *session = cb_session.as_ptr();
+                1
+            },
+            Ok(false) => {
+                *session = null_mut::<SSL_SESSION>();
+                1
+            },
+            Err(e) => {
+                e.put();
+                0
+            }
+        }
+    }
+}
+
 pub extern "C" fn ssl_raw_verify<F>(
     preverify_ok: c_int,
     x509_ctx: *mut ffi::X509_STORE_CTX,

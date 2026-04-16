@@ -1392,11 +1392,15 @@ impl SslContextBuilder {
     /// TLS 1.3 clients.
     ///
     /// These functions cannot be used for TLSv1.2 and below PSKs.
-    /// The callback will be called with the SSL context, an optional message digest,
-    /// and, a mutable slice for storing the psk identity. The callback returns the number of
-    /// bytes in the identity string.
-    /// A session instance will be created and passed to the callback, this will be return
-    /// to OpenSSL if the callback is sucessfull
+    /// The callback will be called with the SSL context. A message digest will not be provided on the first call to this callback.
+    /// Subsequent calls will provide a message digest that should be checked.
+    /// A session instance will be created and passed to the callback, 
+    /// if the PSK handshake should continue, the caller should set the master key and ciphersuite on the session and
+    ///     return Ok(Some(psk))
+    /// if the handshake should continue without PSK, the caller should
+    ///     return Ok(None)
+    /// if the handshake must be aborted altogether, the call must
+    ///     return Err(_)
     #[corresponds(SSL_CTX_set_psk_use_session_callback)]
     #[cfg(not(osslconf = "OPENSSL_NO_PSK"))]
     pub fn set_psk_use_session_callback<F>(&mut self, callback: F)
@@ -1409,6 +1413,34 @@ impl SslContextBuilder {
         unsafe {
             self.set_ex_data(SslContext::cached_ex_index::<F>(), callback);
             ffi::SSL_CTX_set_psk_use_session_callback(self.as_ptr(), Some(raw_psk_use_session::<F>));
+        }
+    }
+
+    /// Sets the callback for providing a pre-shared key based on an identity for
+    /// TLS 1.3 servers.
+    ///
+    /// These functions cannot be used for TLSv1.2 and below PSKs.
+    /// The callback will be called with the SSL context and the identity the client is proposing and a session.
+    /// 
+    /// A session instance will be created and passed to the callback.
+    /// if the PSK handshake should continue, the caller should set the master key and ciphersuite on the session and
+    ///     return Ok(true)
+    /// if the handshake should continue without PSK, the caller should
+    ///     return Ok(false)
+    /// if the handshake must be aborted altogether, the call must
+    ///     return Err(_)
+    #[corresponds(SSL_CTX_set_psk_use_session_callback)]
+    #[cfg(not(osslconf = "OPENSSL_NO_PSK"))]
+    pub fn set_psk_find_session_callback<F>(&mut self, callback: F)
+    where
+        F: Fn(&mut SslRef, Option<&[u8]>, &mut SslSessionRef) -> Result<bool, ErrorStack>
+            + 'static
+            + Sync
+            + Send,
+    {
+        unsafe {
+            self.set_ex_data(SslContext::cached_ex_index::<F>(), callback);
+            ffi::SSL_CTX_set_psk_find_session_callback(self.as_ptr(), Some(raw_psk_find_session::<F>));
         }
     }
 

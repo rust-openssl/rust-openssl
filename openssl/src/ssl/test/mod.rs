@@ -1440,11 +1440,14 @@ fn psk_1_3_ciphers() {
 
     let mut server = Server::builder();
     server.ctx().set_ciphersuites(CIPHER).unwrap();
-    server.ctx().set_psk_server_callback(|_, identity, psk| {
+    server.ctx().set_psk_find_session_callback(|ssl, identity, session| {
+        use crate::ssl::SslCipherRef;
+
         assert!(identity.unwrap_or(&[]) == CLIENT_IDENT);
-        psk[..PSK.len()].copy_from_slice(PSK);
+        session.set_cipher(SslCipherRef::find(ssl, TLS13_AES128GCMSHA256_ID))?;
+        session.set_master_key(PSK);
         SERVER_CALLED.store(true, Ordering::SeqCst);
-        Ok(PSK.len())
+        Ok(true)
     });
 
     let server = server.build();
