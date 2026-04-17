@@ -51,6 +51,8 @@ use crate::error::ErrorStack;
 use crate::lib_ctx::LibCtxRef;
 #[cfg(any(ossl110, boringssl, libressl370, awslc))]
 use crate::pkey_ctx::PkeyCtx;
+#[cfg(ossl350)]
+use crate::pkey_ml_dsa;
 use crate::rsa::Rsa;
 use crate::symm::Cipher;
 use crate::util::{invoke_passwd_cb, CallbackState};
@@ -229,6 +231,35 @@ impl<T> PKeyRef<T> {
         unsafe {
             let ec_key = cvt_p(ffi::EVP_PKEY_get1_EC_KEY(self.as_ptr()))?;
             Ok(EcKey::from_ptr(ec_key))
+        }
+    }
+
+    /// Extracts ML-DSA parameters from this key.
+    ///
+    /// Returns `None` if the key is not an ML-DSA key of the specified variant.
+    #[cfg(ossl350)]
+    pub fn ml_dsa(
+        &self,
+        variant: pkey_ml_dsa::Variant,
+    ) -> Result<Option<pkey_ml_dsa::PKeyMlDsaParams<T>>, ErrorStack> {
+        // Check if this is an ML-DSA key of the specified variant
+        if !self.is_a(variant.as_key_type()) {
+            return Ok(None);
+        }
+
+        unsafe {
+            let mut params_ptr: *mut ffi::OSSL_PARAM = ptr::null_mut();
+            let selection =
+                ffi::OSSL_KEYMGMT_SELECT_PUBLIC_KEY | ffi::OSSL_KEYMGMT_SELECT_PRIVATE_KEY;
+            cvt(ffi::EVP_PKEY_todata(
+                self.as_ptr(),
+                selection,
+                &mut params_ptr,
+            ))?;
+
+            Ok(Some(pkey_ml_dsa::PKeyMlDsaParams::from_params_ptr(
+                params_ptr,
+            )))
         }
     }
 
@@ -933,6 +964,14 @@ impl PKey<Private> {
             ))?;
             Ok(PKey::from_ptr(pkey))
         }
+    }
+
+    /// Generates an ML-DSA key pair of the specified variant
+    #[cfg(ossl350)]
+    pub fn generate_ml_dsa(variant: pkey_ml_dsa::Variant) -> Result<PKey<Private>, ErrorStack> {
+        let mut ctx = PkeyCtx::new_from_name(None, variant.as_str(), None)?;
+        ctx.keygen_init()?;
+        ctx.keygen()
     }
 }
 
