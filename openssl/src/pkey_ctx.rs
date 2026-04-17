@@ -821,6 +821,27 @@ impl<T> PkeyCtxRef<T> {
     /// If `buf` is set to `None`, an upper bound on the number of bytes required for the buffer will be returned.
     #[corresponds(EVP_PKEY_derive)]
     pub fn derive(&mut self, buf: Option<&mut [u8]>) -> Result<usize, ErrorStack> {
+        // On OpenSSL 1.1.x, the X25519/X448/HKDF-extract pmeths ignore the
+        // incoming *keylen and unconditionally write the full shared secret,
+        // so verify the buffer is large enough first. 3.x providers check
+        // this themselves. usize::MAX is a sentinel for caller-chosen output
+        // length (e.g., HKDF expand modes), where *keylen is honored.
+        #[cfg(all(ossl110, not(ossl300)))]
+        {
+            if let Some(ref b) = buf {
+                let mut required = 0;
+                unsafe {
+                    cvt(ffi::EVP_PKEY_derive(
+                        self.as_ptr(),
+                        ptr::null_mut(),
+                        &mut required,
+                    ))?;
+                }
+                if required != usize::MAX && b.len() < required {
+                    return Err(ErrorStack::get());
+                }
+            }
+        }
         let mut len = buf.as_ref().map_or(0, |b| b.len());
         unsafe {
             cvt(ffi::EVP_PKEY_derive(
@@ -1040,6 +1061,19 @@ mod test {
 
         let mut buf = vec![];
         ctx.derive_to_vec(&mut buf).unwrap();
+    }
+
+    #[test]
+    fn derive_undersized_buffer_returns_error() {
+        let key1 = PKey::generate_x25519().unwrap();
+        let key2 = PKey::generate_x25519().unwrap();
+
+        let mut ctx = PkeyCtx::new(&key1).unwrap();
+        ctx.derive_init().unwrap();
+        ctx.derive_set_peer(&key2).unwrap();
+
+        let mut buf = [0u8; 4];
+        ctx.derive(Some(&mut buf)).unwrap_err();
     }
 
     #[test]

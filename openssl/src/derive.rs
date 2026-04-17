@@ -131,6 +131,18 @@ impl<'a> Deriver<'a> {
     /// Returns the number of bytes written.
     #[corresponds(EVP_PKEY_derive)]
     pub fn derive(&mut self, buf: &mut [u8]) -> Result<usize, ErrorStack> {
+        // On OpenSSL 1.1.x, the X25519/X448/HKDF-extract pmeths ignore the
+        // incoming *keylen and unconditionally write the full shared secret,
+        // so verify the buffer is large enough first. 3.x providers check
+        // this themselves. usize::MAX is a sentinel for caller-chosen output
+        // length (e.g., HKDF expand modes), where *keylen is honored.
+        #[cfg(all(ossl110, not(ossl300)))]
+        {
+            let required = self.len()?;
+            if required != usize::MAX && buf.len() < required {
+                return Err(ErrorStack::get());
+            }
+        }
         let mut len = buf.len();
         unsafe {
             cvt(ffi::EVP_PKEY_derive(
@@ -193,6 +205,16 @@ mod test {
         deriver.set_peer(&pkey2).unwrap();
         let shared = deriver.derive_to_vec().unwrap();
         assert!(!shared.is_empty());
+    }
+
+    #[test]
+    fn derive_undersized_buffer_returns_error() {
+        let pkey = PKey::generate_x25519().unwrap();
+        let pkey2 = PKey::generate_x25519().unwrap();
+        let mut deriver = Deriver::new(&pkey).unwrap();
+        deriver.set_peer(&pkey2).unwrap();
+        let mut buf = [0u8; 4];
+        deriver.derive(&mut buf).unwrap_err();
     }
 
     #[test]
