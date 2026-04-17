@@ -53,6 +53,8 @@ use crate::lib_ctx::LibCtxRef;
 use crate::pkey_ctx::PkeyCtx;
 #[cfg(ossl350)]
 use crate::pkey_ml_dsa;
+#[cfg(ossl350)]
+use crate::pkey_ml_kem;
 use crate::rsa::Rsa;
 use crate::symm::Cipher;
 use crate::util::{invoke_passwd_cb, CallbackState};
@@ -258,6 +260,35 @@ impl<T> PKeyRef<T> {
             ))?;
 
             Ok(Some(pkey_ml_dsa::PKeyMlDsaParams::from_params_ptr(
+                params_ptr,
+            )))
+        }
+    }
+
+    /// Extracts ML-KEM parameters from this key.
+    ///
+    /// Returns `None` if the key is not an ML-KEM key of the specified variant.
+    #[cfg(ossl350)]
+    pub fn ml_kem(
+        &self,
+        variant: pkey_ml_kem::Variant,
+    ) -> Result<Option<pkey_ml_kem::PKeyMlKemParams<T>>, ErrorStack> {
+        // Check if this is an ML-KEM key of the specified variant
+        if !self.is_a(variant.as_key_type()) {
+            return Ok(None);
+        }
+
+        unsafe {
+            let mut params_ptr: *mut ffi::OSSL_PARAM = ptr::null_mut();
+            let selection =
+                ffi::OSSL_KEYMGMT_SELECT_PUBLIC_KEY | ffi::OSSL_KEYMGMT_SELECT_PRIVATE_KEY;
+            cvt(ffi::EVP_PKEY_todata(
+                self.as_ptr(),
+                selection,
+                &mut params_ptr,
+            ))?;
+
+            Ok(Some(pkey_ml_kem::PKeyMlKemParams::from_params_ptr(
                 params_ptr,
             )))
         }
@@ -973,6 +1004,14 @@ impl PKey<Private> {
         ctx.keygen_init()?;
         ctx.keygen()
     }
+
+    /// Generates an ML-KEM key pair of the specified variant
+    #[cfg(ossl350)]
+    pub fn generate_ml_kem(variant: pkey_ml_kem::Variant) -> Result<PKey<Private>, ErrorStack> {
+        let mut ctx = PkeyCtx::new_from_name(None, variant.as_str(), None)?;
+        ctx.keygen_init()?;
+        ctx.keygen()
+    }
 }
 
 impl PKey<Public> {
@@ -1030,7 +1069,9 @@ impl PKey<Public> {
     /// property query string.
     ///
     /// This is required for algorithms that are only available via OpenSSL
-    /// 3.0+ providers and have no associated `Id`, such as ML-DSA.
+    /// 3.0+ providers and have no associated `Id`.
+    ///
+    /// Algorithm types that support raw public keys are ED25519, ED448, X25519, X448, ML-DSA-44, ML-DSA-65, ML-DSA-87, ML-KEM-512, ML-KEM-768, and ML-KEM-1024.
     #[corresponds(EVP_PKEY_new_raw_public_key_ex)]
     #[cfg(ossl300)]
     pub fn public_key_from_raw_bytes_ex(
