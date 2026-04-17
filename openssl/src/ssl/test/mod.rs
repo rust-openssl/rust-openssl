@@ -1441,13 +1441,15 @@ fn psk_1_3_ciphers() {
     let mut server = Server::builder();
     server.ctx().set_ciphersuites(CIPHER).unwrap();
     server.ctx().set_psk_find_session_callback(|ssl, identity, session| {
-        use crate::ssl::SslCipherRef;
+        use crate::ssl::{SslCipherRef, SslSession};
 
         assert!(identity.unwrap_or(&[]) == CLIENT_IDENT);
+        
+        let session = session.insert(SslSession::new());
         session.set_cipher(SslCipherRef::find(ssl, TLS13_AES128GCMSHA256_ID))?;
         session.set_master_key(PSK);
         SERVER_CALLED.store(true, Ordering::SeqCst);
-        Ok(true)
+        Ok(())
     });
 
     let server = server.build();
@@ -1465,14 +1467,15 @@ fn psk_1_3_ciphers() {
                 None => {
                     // This is the first call
 
-                    use crate::ssl::SslCipherRef;
+                    use crate::ssl::{SslCipherRef, SslSession};
+                    let session = session.insert(SslSession::new());
                     session.set_cipher(SslCipherRef::find(ssl, TLS13_AES128GCMSHA256_ID))?;
                     session.set_master_key(PSK);
                     session.set_protocol_version(SslVersion::TLS1_3);
                     Some(CLIENT_IDENT.to_owned())
                 },
                 Some(msg_digest) => {
-                    if let Some(cipher) = session.cipher() {
+                    if let Some(cipher) = session.as_ref().unwrap().cipher() {
                         if let Some(hs_digest) = cipher.handshake_digest() {
                             if hs_digest == msg_digest {
                                 Some(CLIENT_IDENT.to_owned())

@@ -1392,10 +1392,12 @@ impl SslContextBuilder {
     /// TLS 1.3 clients.
     ///
     /// These functions cannot be used for TLSv1.2 and below PSKs.
-    /// The callback will be called with the SSL context. A message digest will not be provided on the first call to this callback.
+    /// The callback will be called with the SSL context. A message digest and session will not be provided to this callback on the first call.
     /// Subsequent calls will provide a message digest that should be checked.
-    /// A session instance will be created and passed to the callback, 
-    /// if the PSK handshake should continue, the caller should set the master key and ciphersuite on the session and
+    /// 
+    /// if the PSK handshake should continue:
+    ///     The callback should set the session parameter to Some(session).
+    ///     Set the master key and ciphersuite on the session
     ///     return Ok(Some(psk))
     /// if the handshake should continue without PSK, the caller should
     ///     return Ok(None)
@@ -1405,7 +1407,7 @@ impl SslContextBuilder {
     #[cfg(not(osslconf = "OPENSSL_NO_PSK"))]
     pub fn set_psk_use_session_callback<F>(&mut self, callback: F)
     where
-        F: Fn(&mut SslRef, Option<MessageDigest>, &mut SslSessionRef) -> Result<Option<Vec<u8>>, ErrorStack>
+        F: Fn(&mut SslRef, Option<MessageDigest>, &mut Option<SslSession>) -> Result<Option<Vec<u8>>, ErrorStack>
             + 'static
             + Sync
             + Send,
@@ -1422,8 +1424,9 @@ impl SslContextBuilder {
     /// These functions cannot be used for TLSv1.2 and below PSKs.
     /// The callback will be called with the SSL context and the identity the client is proposing and a session.
     /// 
-    /// A session instance will be created and passed to the callback.
-    /// if the PSK handshake should continue, the caller should set the master key and ciphersuite on the session and
+    /// if the PSK handshake should continue:
+    ///     The callback should set the session parameter to Some(session).
+    ///     Set the master key and ciphersuite on the session
     ///     return Ok(true)
     /// if the handshake should continue without PSK, the caller should
     ///     return Ok(false)
@@ -1433,7 +1436,7 @@ impl SslContextBuilder {
     #[cfg(not(osslconf = "OPENSSL_NO_PSK"))]
     pub fn set_psk_find_session_callback<F>(&mut self, callback: F)
     where
-        F: Fn(&mut SslRef, Option<&[u8]>, &mut SslSessionRef) -> Result<bool, ErrorStack>
+        F: Fn(&mut SslRef, Option<&[u8]>, &mut Option<SslSession>) -> Result<(), ErrorStack>
             + 'static
             + Sync
             + Send,
@@ -2223,6 +2226,12 @@ impl SslSession {
         SslSession,
         ffi::d2i_SSL_SESSION
     }
+
+    pub fn new() -> SslSession {
+        unsafe {
+            SslSession::from_ptr(ffi::SSL_SESSION_new())
+        }
+    }
 }
 
 impl ToOwned for SslSessionRef {
@@ -2234,9 +2243,18 @@ impl ToOwned for SslSessionRef {
             SslSession(self.as_ptr())
         }
     }
+
 }
 
 impl SslSessionRef {
+
+    pub fn new<'a>() -> &'a mut SslSessionRef {
+        unsafe {
+            let p = ffi::SSL_SESSION_new();
+            SslSessionRef::from_ptr_mut(p)
+        }
+    }
+
     /// Returns the SSL session ID.
     #[corresponds(SSL_SESSION_get_id)]
     pub fn id(&self) -> &[u8] {

@@ -32,6 +32,8 @@ use crate::ssl::{
 #[cfg(ossl111)]
 use crate::ssl::{ClientHelloResponse, ExtensionContext};
 use crate::util;
+#[cfg(not(osslconf = "OPENSSL_NO_PSK"))]
+use crate::util::ForeignTypeExt;
 #[cfg(any(ossl111, boringssl, awslc))]
 use crate::util::ForeignTypeRefExt;
 #[cfg(ossl111)]
@@ -150,7 +152,7 @@ pub extern "C" fn raw_psk_use_session<F>(
     session: *mut *mut SSL_SESSION
 ) -> c_int
 where
-    F: Fn(&mut SslRef, Option<MessageDigest>, &mut SslSessionRef) -> Result<Option<Vec<u8>>, ErrorStack>
+    F: Fn(&mut SslRef, Option<MessageDigest>, &mut Option<SslSession>) -> Result<Option<Vec<u8>>, ErrorStack>
         + 'static
         + Sync
         + Send,
@@ -169,19 +171,14 @@ where
         } else {
             Some(MessageDigest::from_ptr(msg_digest))
         };
-        // Create the session, it has to be done and simplifies the callback signature
-        let cb_session = if (*session).is_null() {
-            SslSessionRef::from_ptr_mut(ffi::SSL_SESSION_new())
-        } else {
-            SslSessionRef::from_ptr_mut(*session)
-        };
+        
+        let mut cb_session = SslSession::from_ptr_opt(*session);
 
-        match (*callback)(ssl, msg_digest, cb_session) {
+        let result = match (*callback)(ssl, msg_digest, &mut cb_session) {
             Ok(result) => {
                 match result {
                     Some(cb_identity) => {
                         // tell OpenSSL we're going ahead with PSK by supplying the session parameter
-                        *session = cb_session.as_ptr();
                         *identity_len = cb_identity.len() as u32;
                         *identity = std::ffi::CString::new(cb_identity).unwrap().into_raw() as *const u8;
                     },
@@ -195,7 +192,17 @@ where
                 e.put();
                 0
             }
-        }
+        };
+
+        // pass the chosen session back to openssl
+        *session = match cb_session {
+            Some(cb_session) => SslSessionRef::from_ptr(
+                    cb_session.as_ptr()
+                ).as_ptr(),
+            None => null_mut::<SSL_SESSION>()
+        };
+
+        result
     }
 }
 
@@ -207,7 +214,7 @@ pub extern "C" fn raw_psk_find_session<F>(
     session: *mut *mut SSL_SESSION
 ) -> c_int
 where
-    F: Fn(&mut SslRef, Option<&[u8]>, &mut SslSessionRef) -> Result<bool, ErrorStack>
+    F: Fn(&mut SslRef, Option<&[u8]>, &mut Option<SslSession>) -> Result<(), ErrorStack>
         + 'static
         + Sync
         + Send,
@@ -227,27 +234,25 @@ where
             Some(util::from_raw_parts(identity, identity_len as usize))
         };
         // Create the session, it has to be done and simplifies the callback signature
-        let cb_session = if (*session).is_null() {
-            SslSessionRef::from_ptr_mut(ffi::SSL_SESSION_new())
-        } else {
-            SslSessionRef::from_ptr_mut(*session)
-        };
+        let mut cb_session = SslSession::from_ptr_opt(*session);
 
-        match (*callback)(ssl, identity, cb_session) {
-            Ok(true) => {
-                // tell OpenSSL we're going ahead with PSK by supplying the session parameter
-                *session = cb_session.as_ptr();
-                1
-            },
-            Ok(false) => {
-                *session = null_mut::<SSL_SESSION>();
-                1
-            },
+        let result = match (*callback)(ssl, identity, &mut cb_session) {
+            Ok(()) => 1,
             Err(e) => {
                 e.put();
                 0
             }
-        }
+        };
+
+        // pass the chosen session back to openssl
+        *session = match cb_session {
+            Some(cb_session) => SslSessionRef::from_ptr(
+                    cb_session.as_ptr()
+                ).as_ptr(),
+            None => null_mut::<SSL_SESSION>()
+        };
+
+        result
     }
 }
 
