@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+## [v0.9.114] - 2026-04-17
+
+### Added
+
+* Added support for OpenSSL 4.x.
+
+### Changed
+
+* `BIO_get_mem_data` on AWS-LC is now marked `unsafe`.
+
 ## [v0.9.113] - 2026-04-12
 
 ### Added
@@ -719,7 +729,8 @@ Fixed builds against OpenSSL built with `no-cast`.
 * Added `X509_verify` and `X509_REQ_verify`.
 * Added `EVP_MD_type` and `EVP_GROUP_get_curve_name`.
 
-[Unreleased]: https://github.com/rust-openssl/rust-openssl/compare/openssl-sys-v0.9.113..master
+[Unreleased]: https://github.com/rust-openssl/rust-openssl/compare/openssl-sys-v0.9.114..master
+[v0.9.114]: https://github.com/rust-openssl/rust-openssl/compare/openssl-sys-v0.9.113...openssl-sys-v0.9.114
 [v0.9.113]: https://github.com/rust-openssl/rust-openssl/compare/openssl-sys-v0.9.112...openssl-sys-v0.9.113
 [v0.9.112]: https://github.com/rust-openssl/rust-openssl/compare/openssl-sys-v0.9.111...openssl-sys-v0.9.112
 [v0.9.111]: https://github.com/rust-openssl/rust-openssl/compare/openssl-sys-v0.9.110...openssl-sys-v0.9.111

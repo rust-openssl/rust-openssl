@@ -2,6 +2,21 @@
 
 ## [Unreleased]
 
+## [v0.10.78] - 2026-04-17
+
+### Added
+
+* Added support for OpenSSL 4.x.
+
+### Fixed
+
+* Fixed dangling stack pointer in custom extension add callback.
+* Fixed panic for overlong OIDs by clamping to maximum buffer size.
+* `Crypter::new` now panics when an IV is required but not provided, matching documented behavior.
+* Fixed zero-length `SSL_read_ex`/`SSL_write_ex` calling into OpenSSL unnecessarily.
+* Fixed Suite B flag assignments in `verify.rs`.
+* Use `cvt_p` for `OPENSSL_malloc` error handling.
+
 ## [v0.10.77] - 2026-04-12
 
 ### Added
@@ -1049,7 +1064,8 @@
 
 Look at the [release tags] for information about older releases.
 
-[Unreleased]: https://github.com/rust-openssl/rust-openssl/compare/openssl-v0.10.77...master
+[Unreleased]: https://github.com/rust-openssl/rust-openssl/compare/openssl-v0.10.78...master
+[v0.10.78]: https://github.com/rust-openssl/rust-openssl/compare/openssl-v0.10.77...openssl-v0.10.78
 [v0.10.77]: https://github.com/rust-openssl/rust-openssl/compare/openssl-v0.10.76...openssl-v0.10.77
 [v0.10.76]: https://github.com/rust-openssl/rust-openssl/compare/openssl-v0.10.75...openssl-v0.10.76
 [v0.10.75]: https://github.com/rust-openssl/rust-openssl/compare/openssl-v0.10.74...openssl-v0.10.75
