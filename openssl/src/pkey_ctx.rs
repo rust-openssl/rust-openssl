@@ -826,7 +826,7 @@ impl<T> PkeyCtxRef<T> {
         // so verify the buffer is large enough first. 3.x providers check
         // this themselves. usize::MAX is a sentinel for caller-chosen output
         // length (e.g., HKDF expand modes), where *keylen is honored.
-        #[cfg(all(ossl110, not(ossl300)))]
+        #[cfg(any(all(ossl110, not(ossl300)), libressl))]
         {
             if let Some(ref b) = buf {
                 let mut required = 0;
