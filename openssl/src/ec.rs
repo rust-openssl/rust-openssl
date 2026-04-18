@@ -1098,6 +1098,7 @@ mod test {
     use super::*;
     use crate::bn::{BigNum, BigNumContext};
     use crate::nid::Nid;
+    use crate::symm::Cipher;
 
     #[test]
     fn key_new_by_curve_name() {
@@ -1108,6 +1109,25 @@ mod test {
     fn generate() {
         let group = EcGroup::from_curve_name(Nid::X9_62_PRIME256V1).unwrap();
         EcKey::generate(&group).unwrap();
+    }
+
+    #[test]
+    fn test_password_callback_oversize_return_is_rejected() {
+        // The password callback trampoline must reject a user-returned
+        // length that exceeds the size of the buffer it handed out.
+        // Otherwise some versions of OpenSSL read past the buffer when
+        // deriving the decryption key.
+        let group = EcGroup::from_curve_name(Nid::X9_62_PRIME256V1).unwrap();
+        let key = EcKey::generate(&group).unwrap();
+        let encrypted = key
+            .private_key_to_pem_passphrase(Cipher::aes_128_cbc(), b"correct-pw")
+            .unwrap();
+
+        let result = EcKey::private_key_from_pem_callback(&encrypted, |buf| {
+            buf[..10].copy_from_slice(b"correct-pw");
+            Ok(buf.len() * 10)
+        });
+        assert!(result.is_err());
     }
 
     #[test]
