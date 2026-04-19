@@ -1069,6 +1069,7 @@ mod test {
     }
 
     #[test]
+    #[cfg(any(ossl111, boringssl, libressl370, awslc))]
     fn derive_undersized_buffer_returns_error() {
         let key1 = PKey::generate_x25519().unwrap();
         let key2 = PKey::generate_x25519().unwrap();
