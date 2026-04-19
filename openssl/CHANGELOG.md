@@ -2,6 +2,26 @@
 
 ## [Unreleased]
 
+## [v0.10.78] - 2026-04-19
+
+### Added
+
+* Added support for OpenSSL 4.x.
+* Added support for LibreSSL 4.3.x.
+
+### Fixed
+
+* Fixed several soundness issues where safe Rust callers could trigger out-of-bounds reads or writes:
+    * `MdCtxRef::digest_final` now returns an error when the output buffer is shorter than the digest size.
+    * `PkeyCtxRef::derive` now checks the output buffer length on OpenSSL 1.1.x and LibreSSL, where some key types (X25519, X448, HKDF-extract) ignore the caller-supplied length.
+    * Callbacks for key-loading passwords and SSL PSK and cookie generation now reject values longer than the length of the slice.
+    * Fixed a dangling stack pointer in the SSL custom extension callback when using a fixed-length array.
+    * Fixed an inverted bounds assertion in AES key unwrap.
+* `Crypter::new` now panics, as documented, when an IV is required by the cipher but not provided (previously it silently used an all-zero IV).
+* Avoided a panic when formatting overlong OIDs; the value is now truncated with trailing dots.
+* Fixed Suite B flag assignments in `X509VerifyParam`.
+* Handle errors on `OPENSSL_malloc` in `PkeyCtxRef::set_rsa_oaep_label`.
+
 ## [v0.10.77] - 2026-04-12
 
 ### Added
@@ -1049,7 +1069,8 @@
 
 Look at the [release tags] for information about older releases.
 
-[Unreleased]: https://github.com/rust-openssl/rust-openssl/compare/openssl-v0.10.77...master
+[Unreleased]: https://github.com/rust-openssl/rust-openssl/compare/openssl-v0.10.78...master
+[v0.10.78]: https://github.com/rust-openssl/rust-openssl/compare/openssl-v0.10.77...openssl-v0.10.78
 [v0.10.77]: https://github.com/rust-openssl/rust-openssl/compare/openssl-v0.10.76...openssl-v0.10.77
 [v0.10.76]: https://github.com/rust-openssl/rust-openssl/compare/openssl-v0.10.75...openssl-v0.10.76
 [v0.10.75]: https://github.com/rust-openssl/rust-openssl/compare/openssl-v0.10.74...openssl-v0.10.75
