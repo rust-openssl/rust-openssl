@@ -301,8 +301,7 @@ mod test {
     fn test_unwrap_key_out_oversized() {
         let raw_key = Vec::from_hex("000102030405060708090A0B0C0D0E0F").unwrap();
         let key_data = Vec::from_hex("00112233445566778899AABBCCDDEEFF").unwrap();
-        let wrapped =
-            Vec::from_hex("1FA68B0A8112B447AEF34BD8FB5A7B829D3E862371D2CFE5").unwrap();
+        let wrapped = Vec::from_hex("1FA68B0A8112B447AEF34BD8FB5A7B829D3E862371D2CFE5").unwrap();
         let dec_key = AesKey::new_decrypt(&raw_key).unwrap();
 
         let mut out = vec![0u8; 32]; // larger than the 16 bytes that will be written
@@ -316,8 +315,7 @@ mod test {
     #[should_panic]
     fn test_unwrap_key_out_too_small_panics() {
         let raw_key = Vec::from_hex("000102030405060708090A0B0C0D0E0F").unwrap();
-        let wrapped =
-            Vec::from_hex("1FA68B0A8112B447AEF34BD8FB5A7B829D3E862371D2CFE5").unwrap();
+        let wrapped = Vec::from_hex("1FA68B0A8112B447AEF34BD8FB5A7B829D3E862371D2CFE5").unwrap();
         let dec_key = AesKey::new_decrypt(&raw_key).unwrap();
 
         let mut out = vec![0u8; 8]; // too small: needs 16 bytes
