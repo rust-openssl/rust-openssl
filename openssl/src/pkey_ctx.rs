@@ -820,30 +820,54 @@ impl<T> PkeyCtxRef<T> {
     ///
     /// If `buf` is set to `None`, an upper bound on the number of bytes required for the buffer will be returned.
     #[corresponds(EVP_PKEY_derive)]
-    pub fn derive(&mut self, buf: Option<&mut [u8]>) -> Result<usize, ErrorStack> {
-        // On OpenSSL 1.1.x, the X25519/X448/HKDF-extract pmeths ignore the
-        // incoming *keylen and unconditionally write the full shared secret,
-        // so verify the buffer is large enough first. 3.x providers check
-        // this themselves. usize::MAX is a sentinel for caller-chosen output
-        // length (e.g., HKDF expand modes), where *keylen is honored.
+    #[allow(unused_mut)]
+    pub fn derive(&mut self, mut buf: Option<&mut [u8]>) -> Result<usize, ErrorStack> {
+        // On OpenSSL 1.1.x some pmeths ignore *keylen and unconditionally
+        // write the full natural output size (X25519, X448, HKDF-extract),
+        // which can overflow a shorter caller-provided buffer. Others honor
+        // *keylen by truncating the output (notably the default ECDH
+        // EVP_PKEY_EC pmeth, where the OpenSSL source explicitly documents
+        // that *keylen below the natural size "is not an error, the result
+        // is truncated").
         //
-        // Some pmeths (e.g. HKDF in extract-and-expand or expand-only mode)
-        // don't support the NULL-out probe and will fail it; those honor
-        // *keylen during derivation so the probe isn't needed for safety.
-        // If the probe fails, clear the error stack and proceed.
+        // We can't distinguish those two groups from the probe alone, so
+        // when the probe reports a natural size larger than the caller's
+        // buffer, derive into a temporary buffer of the probed size and
+        // copy the leading bytes out. This prevents the OOB write for the
+        // ignore-*keylen group and produces the same bytes for the
+        // honor-*keylen group (ECDH_compute_key copies leading bytes of
+        // the shared secret either way).
+        //
+        // Some pmeths (HKDF extract-and-expand and expand-only on 1.1.x)
+        // don't support the NULL-out probe and fail it with an empty error
+        // stack; those honor *keylen during derivation, so clear the
+        // errors and proceed with the direct path. usize::MAX is a
+        // sentinel some pmeths use when *keylen is caller-chosen.
+        //
+        // 3.0+ providers check the buffer size themselves, so this whole
+        // dance is cfg-gated to 1.1.x and LibreSSL.
         #[cfg(any(all(ossl110, not(ossl300)), libressl))]
         {
-            if let Some(ref b) = buf {
+            if let Some(b) = buf.as_deref_mut() {
                 let mut required = 0;
                 let probe_ok = unsafe {
                     ffi::EVP_PKEY_derive(self.as_ptr(), ptr::null_mut(), &mut required) == 1
                 };
-                if probe_ok {
-                    if required != usize::MAX && b.len() < required {
-                        return Err(ErrorStack::get());
-                    }
-                } else {
+                if !probe_ok {
                     let _ = ErrorStack::get();
+                } else if required != usize::MAX && b.len() < required {
+                    let mut temp = vec![0u8; required];
+                    let mut len = required;
+                    unsafe {
+                        cvt(ffi::EVP_PKEY_derive(
+                            self.as_ptr(),
+                            temp.as_mut_ptr(),
+                            &mut len,
+                        ))?;
+                    }
+                    let copy_len = b.len().min(len);
+                    b[..copy_len].copy_from_slice(&temp[..copy_len]);
+                    return Ok(copy_len);
                 }
             }
         }
@@ -1069,8 +1093,13 @@ mod test {
     }
 
     #[test]
-    #[cfg(any(ossl111, boringssl, libressl370, awslc))]
-    fn derive_undersized_buffer_returns_error() {
+    #[cfg(any(ossl111, libressl370))]
+    fn derive_undersized_buffer() {
+        // Without the temp-buffer fallback in this crate, X25519 on 1.1.x
+        // would OOB into a 4-byte buffer because it ignores *keylen.
+        // On 1.1.x / LibreSSL the fallback kicks in and we return the
+        // truncated prefix. On 3.0+ the provider rejects undersized
+        // buffers before any write happens, so the call errors out.
         let key1 = PKey::generate_x25519().unwrap();
         let key2 = PKey::generate_x25519().unwrap();
 
@@ -1079,7 +1108,11 @@ mod test {
         ctx.derive_set_peer(&key2).unwrap();
 
         let mut buf = [0u8; 4];
-        ctx.derive(Some(&mut buf)).unwrap_err();
+        let result = ctx.derive(Some(&mut buf));
+        #[cfg(any(all(ossl110, not(ossl300)), libressl))]
+        assert_eq!(result.unwrap(), 4);
+        #[cfg(all(ossl300, not(libressl)))]
+        assert!(result.is_err());
     }
 
     #[test]
