@@ -826,19 +826,24 @@ impl<T> PkeyCtxRef<T> {
         // so verify the buffer is large enough first. 3.x providers check
         // this themselves. usize::MAX is a sentinel for caller-chosen output
         // length (e.g., HKDF expand modes), where *keylen is honored.
+        //
+        // Some pmeths (e.g. HKDF in extract-and-expand or expand-only mode)
+        // don't support the NULL-out probe and will fail it; those honor
+        // *keylen during derivation so the probe isn't needed for safety.
+        // If the probe fails, clear the error stack and proceed.
         #[cfg(any(all(ossl110, not(ossl300)), libressl))]
         {
             if let Some(ref b) = buf {
                 let mut required = 0;
-                unsafe {
-                    cvt(ffi::EVP_PKEY_derive(
-                        self.as_ptr(),
-                        ptr::null_mut(),
-                        &mut required,
-                    ))?;
-                }
-                if required != usize::MAX && b.len() < required {
-                    return Err(ErrorStack::get());
+                let probe_ok = unsafe {
+                    ffi::EVP_PKEY_derive(self.as_ptr(), ptr::null_mut(), &mut required) == 1
+                };
+                if probe_ok {
+                    if required != usize::MAX && b.len() < required {
+                        return Err(ErrorStack::get());
+                    }
+                } else {
+                    let _ = ErrorStack::get();
                 }
             }
         }
