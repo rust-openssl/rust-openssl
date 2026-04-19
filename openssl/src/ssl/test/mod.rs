@@ -1298,86 +1298,68 @@ fn _check_kinds() {
     is_sync::<SslStream<TcpStream>>();
 }
 
+#[cfg(ossl111)]
+#[derive(Debug)]
+struct MemoryStream {
+    incoming: io::Cursor<Vec<u8>>,
+    outgoing: Vec<u8>,
+}
+
+#[cfg(ossl111)]
+impl MemoryStream {
+    fn new() -> Self {
+        Self {
+            incoming: io::Cursor::new(Vec::new()),
+            outgoing: Vec::new(),
+        }
+    }
+
+    fn extend_incoming(&mut self, data: &[u8]) {
+        self.incoming.get_mut().extend_from_slice(data);
+    }
+
+    fn take_outgoing(&mut self) -> Vec<u8> {
+        mem::take(&mut self.outgoing)
+    }
+}
+
+#[cfg(ossl111)]
+impl Read for MemoryStream {
+    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+        let n = self.incoming.read(buf)?;
+        if self.incoming.position() == self.incoming.get_ref().len() as u64 {
+            self.incoming.set_position(0);
+            self.incoming.get_mut().clear();
+        }
+        if n == 0 {
+            return Err(io::Error::new(
+                io::ErrorKind::WouldBlock,
+                "no data available",
+            ));
+        }
+        Ok(n)
+    }
+}
+
+#[cfg(ossl111)]
+impl Write for MemoryStream {
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        self.outgoing.write(buf)
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        Ok(())
+    }
+}
+
+#[cfg(ossl111)]
+fn send(from: &mut MemoryStream, to: &mut MemoryStream) {
+    to.extend_incoming(&from.take_outgoing());
+}
+
 #[test]
 #[cfg(ossl111)]
 fn stateless() {
-    use super::SslOptions;
-
-    #[derive(Debug)]
-    struct MemoryStream {
-        incoming: io::Cursor<Vec<u8>>,
-        outgoing: Vec<u8>,
-    }
-
-    impl MemoryStream {
-        pub fn new() -> Self {
-            Self {
-                incoming: io::Cursor::new(Vec::new()),
-                outgoing: Vec::new(),
-            }
-        }
-
-        pub fn extend_incoming(&mut self, data: &[u8]) {
-            self.incoming.get_mut().extend_from_slice(data);
-        }
-
-        pub fn take_outgoing(&mut self) -> Outgoing<'_> {
-            Outgoing(&mut self.outgoing)
-        }
-    }
-
-    impl Read for MemoryStream {
-        fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-            let n = self.incoming.read(buf)?;
-            if self.incoming.position() == self.incoming.get_ref().len() as u64 {
-                self.incoming.set_position(0);
-                self.incoming.get_mut().clear();
-            }
-            if n == 0 {
-                return Err(io::Error::new(
-                    io::ErrorKind::WouldBlock,
-                    "no data available",
-                ));
-            }
-            Ok(n)
-        }
-    }
-
-    impl Write for MemoryStream {
-        fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-            self.outgoing.write(buf)
-        }
-
-        fn flush(&mut self) -> io::Result<()> {
-            Ok(())
-        }
-    }
-
-    pub struct Outgoing<'a>(&'a mut Vec<u8>);
-
-    impl Drop for Outgoing<'_> {
-        fn drop(&mut self) {
-            self.0.clear();
-        }
-    }
-
-    impl ::std::ops::Deref for Outgoing<'_> {
-        type Target = [u8];
-        fn deref(&self) -> &[u8] {
-            self.0
-        }
-    }
-
-    impl AsRef<[u8]> for Outgoing<'_> {
-        fn as_ref(&self) -> &[u8] {
-            self.0
-        }
-    }
-
-    fn send(from: &mut MemoryStream, to: &mut MemoryStream) {
-        to.extend_incoming(&from.take_outgoing());
-    }
-
     //
     // Setup
     //
@@ -1465,6 +1447,149 @@ fn psk_ciphers() {
 
     assert!(SERVER_CALLED.load(Ordering::SeqCst));
     assert!(CLIENT_CALLED.load(Ordering::SeqCst));
+}
+
+// Regression tests: the PSK/cookie trampolines used to forward the callback's
+// returned `usize` to OpenSSL without checking it against the slice length.
+
+#[cfg(not(osslconf = "OPENSSL_NO_PSK"))]
+#[cfg(target_pointer_width = "64")]
+#[test]
+fn psk_client_cb_oversize_psk_len_rejected() {
+    // Without the fix, `psk_len as u32` truncates the returned length; the low
+    // 32 bits match `PSK.len()` and slip past OpenSSL's `> PSK_MAX_PSK_LEN`
+    // check. (Rust's slice length equals `PSK_MAX_PSK_LEN`, so truncation is
+    // the only way to differentiate — hence the 64-bit guard.)
+    const CIPHER: &str = "PSK-AES256-CBC-SHA";
+    const PSK: &[u8] = b"thisisaverysecurekey";
+    const CLIENT_IDENT: &[u8] = b"thisisaclient";
+
+    let mut server = Server::builder();
+    server.ctx().set_cipher_list(CIPHER).unwrap();
+    server.ctx().set_psk_server_callback(|_, _identity, psk| {
+        psk[..PSK.len()].copy_from_slice(PSK);
+        Ok(PSK.len())
+    });
+    server.should_error();
+    let server = server.build();
+
+    let mut client = server.client();
+    #[cfg(any(boringssl, ossl111, awslc))]
+    client.ctx().set_options(SslOptions::NO_TLSV1_3);
+    client.ctx().set_cipher_list(CIPHER).unwrap();
+    client
+        .ctx()
+        .set_psk_client_callback(move |_, _, identity, psk| {
+            identity[..CLIENT_IDENT.len()].copy_from_slice(CLIENT_IDENT);
+            identity[CLIENT_IDENT.len()] = 0;
+            psk[..PSK.len()].copy_from_slice(PSK);
+            Ok((u32::MAX as usize) + 1 + PSK.len())
+        });
+
+    client.connect_err();
+}
+
+#[cfg(not(osslconf = "OPENSSL_NO_PSK"))]
+#[cfg(target_pointer_width = "64")]
+#[test]
+fn psk_server_cb_oversize_psk_len_rejected() {
+    // Server-side counterpart — same `as u32` truncation bypass.
+    const CIPHER: &str = "PSK-AES256-CBC-SHA";
+    const PSK: &[u8] = b"thisisaverysecurekey";
+    const CLIENT_IDENT: &[u8] = b"thisisaclient";
+
+    let mut server = Server::builder();
+    server.ctx().set_cipher_list(CIPHER).unwrap();
+    server.ctx().set_psk_server_callback(|_, _identity, psk| {
+        psk[..PSK.len()].copy_from_slice(PSK);
+        Ok((u32::MAX as usize) + 1 + PSK.len())
+    });
+    server.should_error();
+    let server = server.build();
+
+    let mut client = server.client();
+    #[cfg(any(boringssl, ossl111, awslc))]
+    client.ctx().set_options(SslOptions::NO_TLSV1_3);
+    client.ctx().set_cipher_list(CIPHER).unwrap();
+    client
+        .ctx()
+        .set_psk_client_callback(move |_, _, identity, psk| {
+            identity[..CLIENT_IDENT.len()].copy_from_slice(CLIENT_IDENT);
+            identity[CLIENT_IDENT.len()] = 0;
+            psk[..PSK.len()].copy_from_slice(PSK);
+            Ok(PSK.len())
+        });
+
+    client.connect_err();
+}
+
+#[test]
+#[cfg(ossl111)]
+fn stateless_cookie_cb_oversize_length_rejected() {
+    // Callback claims a length past the slice end. The fix makes the
+    // trampoline report failure so stateless() errors cleanly.
+    let mut client_ctx = SslContext::builder(SslMethod::tls()).unwrap();
+    client_ctx.clear_options(SslOptions::ENABLE_MIDDLEBOX_COMPAT);
+    let mut client_stream =
+        SslStream::new(Ssl::new(&client_ctx.build()).unwrap(), MemoryStream::new()).unwrap();
+
+    let mut server_ctx = SslContext::builder(SslMethod::tls()).unwrap();
+    server_ctx
+        .set_certificate_file(Path::new("test/cert.pem"), SslFiletype::PEM)
+        .unwrap();
+    server_ctx
+        .set_private_key_file(Path::new("test/key.pem"), SslFiletype::PEM)
+        .unwrap();
+    server_ctx.set_stateless_cookie_generate_cb(|_, buf| Ok(buf.len() + 1));
+    server_ctx.set_stateless_cookie_verify_cb(|_, _| true);
+    let mut server_stream =
+        SslStream::new(Ssl::new(&server_ctx.build()).unwrap(), MemoryStream::new()).unwrap();
+
+    client_stream.connect().unwrap_err();
+    send(client_stream.get_mut(), server_stream.get_mut());
+    assert!(server_stream.stateless().is_err());
+}
+
+#[test]
+#[cfg(not(any(boringssl, awslc)))]
+fn dtls_cookie_generate_cb_oversize_length_rejected() {
+    // Rust hands the callback `DTLS1_COOKIE_LENGTH - 1` bytes but OpenSSL's
+    // internal cookie buffer is `DTLS1_COOKIE_LENGTH`; returning `buf.len() + 1`
+    // passes OpenSSL's `cookie_leni > sizeof(s->d1->cookie)` check. Without the
+    // fix, the server sends a HelloVerifyRequest containing one unwritten byte
+    // and the verify callback fires on the client's echo.
+    static VERIFY_CALLED: AtomicBool = AtomicBool::new(false);
+    VERIFY_CALLED.store(false, Ordering::SeqCst);
+
+    let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+    let addr = listener.local_addr().unwrap();
+
+    let server = thread::spawn(move || {
+        let stream = listener.accept().unwrap().0;
+        let mut ctx = SslContext::builder(SslMethod::dtls()).unwrap();
+        ctx.set_certificate_file(Path::new("test/cert.pem"), SslFiletype::PEM)
+            .unwrap();
+        ctx.set_private_key_file(Path::new("test/key.pem"), SslFiletype::PEM)
+            .unwrap();
+        ctx.set_options(SslOptions::COOKIE_EXCHANGE);
+        ctx.set_cookie_generate_cb(|_, buf| Ok(buf.len() + 1));
+        ctx.set_cookie_verify_cb(|_, _| {
+            VERIFY_CALLED.store(true, Ordering::SeqCst);
+            true
+        });
+        let mut ssl = Ssl::new(&ctx.build()).unwrap();
+        ssl.set_mtu(1500).unwrap();
+        let _ = ssl.accept(stream);
+    });
+
+    let stream = TcpStream::connect(addr).unwrap();
+    let ctx = SslContext::builder(SslMethod::dtls()).unwrap();
+    let mut ssl = Ssl::new(&ctx.build()).unwrap();
+    ssl.set_mtu(1500).unwrap();
+    let _ = ssl.connect(stream);
+
+    server.join().unwrap();
+    assert!(!VERIFY_CALLED.load(Ordering::SeqCst));
 }
 
 #[test]

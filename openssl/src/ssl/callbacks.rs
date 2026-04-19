@@ -84,8 +84,10 @@ where
         let identity_sl = util::from_raw_parts_mut(identity as *mut u8, max_identity_len as usize);
         #[allow(clippy::unnecessary_cast)]
         let psk_sl = util::from_raw_parts_mut(psk as *mut u8, max_psk_len as usize);
+        let psk_cap = psk_sl.len();
         match (*callback)(ssl, hint, identity_sl, psk_sl) {
-            Ok(psk_len) => psk_len as u32,
+            Ok(psk_len) if psk_len <= psk_cap => psk_len as u32,
+            Ok(_) => 0,
             Err(e) => {
                 e.put();
                 0
@@ -123,8 +125,10 @@ where
         // Give the callback mutable slices into which it can write the psk.
         #[allow(clippy::unnecessary_cast)]
         let psk_sl = util::from_raw_parts_mut(psk as *mut u8, max_psk_len as usize);
+        let psk_cap = psk_sl.len();
         match (*callback)(ssl, identity, psk_sl) {
-            Ok(psk_len) => psk_len as u32,
+            Ok(psk_len) if psk_len <= psk_cap => psk_len as u32,
+            Ok(_) => 0,
             Err(e) => {
                 e.put();
                 0
@@ -392,11 +396,13 @@ where
         .expect("BUG: stateless cookie generate callback missing") as *const F;
     #[allow(clippy::unnecessary_cast)]
     let slice = util::from_raw_parts_mut(cookie as *mut u8, ffi::SSL_COOKIE_LENGTH as usize);
+    let cap = slice.len();
     match (*callback)(ssl, slice) {
-        Ok(len) => {
+        Ok(len) if len <= cap => {
             *cookie_len = len as size_t;
             1
         }
+        Ok(_) => 0,
         Err(e) => {
             e.put();
             0
@@ -443,11 +449,13 @@ where
         #[allow(clippy::unnecessary_cast)]
         let slice =
             util::from_raw_parts_mut(cookie as *mut u8, ffi::DTLS1_COOKIE_LENGTH as usize - 1);
+        let cap = slice.len();
         match (*callback)(ssl, slice) {
-            Ok(len) => {
+            Ok(len) if len <= cap => {
                 *cookie_len = len as c_uint;
                 1
             }
+            Ok(_) => 0,
             Err(e) => {
                 e.put();
                 0
