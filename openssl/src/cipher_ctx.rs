@@ -296,6 +296,38 @@ impl CipherCtxRef {
         }
     }
 
+    #[cfg(not(any(boringssl, awslc)))]
+    fn is_wrap_mode(&self) -> bool {
+        unsafe {
+            let cipher = EVP_CIPHER_CTX_get0_cipher(self.as_ptr());
+            if cipher.is_null() {
+                return false;
+            }
+            ffi::EVP_CIPHER_flags(cipher) & ffi::EVP_CIPH_MODE == ffi::EVP_CIPH_WRAP_MODE
+        }
+    }
+
+    #[cfg(any(boringssl, awslc))]
+    fn is_wrap_mode(&self) -> bool {
+        false
+    }
+
+    fn cipher_update_output_size(&self, input_len: usize) -> usize {
+        // Wrap-mode ciphers have EVP_CIPH_FLAG_CUSTOM_CIPHER set and emit their
+        // entire output (plaintext rounded up to 8 bytes + 8-byte IV) in a
+        // single update call, so the usual `inlen + block_size` bound is too
+        // small for key-wrap-with-padding inputs that aren't already a
+        // multiple of 8.
+        if self.is_wrap_mode() {
+            return input_len.saturating_add(7) / 8 * 8 + 8;
+        }
+        let mut block_size = self.block_size();
+        if block_size == 1 {
+            block_size = 0;
+        }
+        input_len + block_size
+    }
+
     /// Returns the block size of the context's cipher.
     ///
     /// Stream ciphers will report a block size of 1.
@@ -552,11 +584,7 @@ impl CipherCtxRef {
         output: Option<&mut [u8]>,
     ) -> Result<usize, ErrorStack> {
         if let Some(output) = &output {
-            let mut block_size = self.block_size();
-            if block_size == 1 {
-                block_size = 0;
-            }
-            let min_output_size = input.len() + block_size;
+            let min_output_size = self.cipher_update_output_size(input.len());
             assert!(
                 output.len() >= min_output_size,
                 "Output buffer size should be at least {} bytes.",
@@ -612,7 +640,7 @@ impl CipherCtxRef {
         output: &mut Vec<u8>,
     ) -> Result<usize, ErrorStack> {
         let base = output.len();
-        output.resize(base + input.len() + self.block_size(), 0);
+        output.resize(base + self.cipher_update_output_size(input.len()), 0);
         let len = self.cipher_update(input, Some(&mut output[base..]))?;
         output.truncate(base + len);
 
@@ -1267,5 +1295,25 @@ mod test {
         let key = "603deb1015ca71be2b73aef0857d77811f352c073b6108d72d9810a30914dff4";
 
         cipher_wrap_test(Cipher::aes_256_wrap_pad(), pt, ct, key, None);
+    }
+
+    #[test]
+    #[cfg(ossl110)]
+    fn test_aes_wrap_pad_cipher_update_vec_buffer_size() {
+        let cipher = Cipher::aes_256_wrap_pad();
+        let key = [0u8; 32];
+        let iv = [0u8; 4];
+        let pt = [0u8; 9];
+
+        let mut ctx = CipherCtx::new().unwrap();
+        ctx.set_flags(CipherCtxFlags::FLAG_WRAP_ALLOW);
+        ctx.encrypt_init(Some(cipher), Some(&key), Some(&iv))
+            .unwrap();
+
+        let mut out = vec![];
+        let len = ctx.cipher_update_vec(&pt, &mut out).unwrap();
+        // The vec must be large enough to fit the amount of data we wrote.
+        assert!(out.capacity() >= len);
+        assert_eq!(len, 24);
     }
 }
