@@ -1341,6 +1341,22 @@ impl SslContextBuilder {
         }
     }
 
+    // Sets the pre-shared key identity hint the server sends in the ServerKeyExchange
+    // message during handshake.
+    #[corresponds(SSL_CTX_use_psk_identity_hint)]
+    #[cfg(not(osslconf = "OPENSSL_NO_PSK"))]
+    pub fn use_psk_identity_hint(&mut self, hint: &str) -> Result<c_int, c_int> {
+        let hint = CString::new(hint).unwrap();
+        unsafe {
+            let res = ffi::SSL_CTX_use_psk_identity_hint(self.as_ptr(), hint.as_ptr());
+            if res == 0 {
+                Ok(res)
+            } else {
+                Err(res)
+            }
+        }
+    }
+
     /// Sets the callback for providing an identity and pre-shared key for a TLS-PSK client.
     ///
     /// The callback will be called with the SSL context, an identity hint if one was provided
@@ -3193,6 +3209,22 @@ impl SslRef {
                 None
             } else {
                 Some(CStr::from_ptr(ptr).to_bytes())
+            }
+        }
+    }
+
+    // Sets the pre-shared key identity hint the server sends in the ServerKeyExchange
+    // message during handshake.
+    #[corresponds(SSL_use_psk_identity_hint)]
+    #[cfg(not(osslconf = "OPENSSL_NO_PSK"))]
+    pub fn use_psk_identity_hint(&mut self, hint: &str) -> Result<c_int, c_int> {
+        let hint = CString::new(hint).unwrap();
+        unsafe {
+            let res = ffi::SSL_use_psk_identity_hint(self.as_ptr(), hint.as_ptr());
+            if res == 0 {
+                Ok(res)
+            } else {
+                Err(res)
             }
         }
     }
