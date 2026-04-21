@@ -1953,6 +1953,18 @@ impl SslContextRef {
     pub fn security_level(&self) -> u32 {
         unsafe { ffi::SSL_CTX_get_security_level(self.as_ptr()) as u32 }
     }
+
+    /// Gets the list of supported ciphers.
+    #[corresponds(SSL_CTX_get_ciphers)]
+    pub fn ciphers(&self) -> Result<impl Iterator<Item = &SslCipherRef>, ErrorStack> {
+        unsafe {
+            let ciphers = ffi::SSL_CTX_get_ciphers(self.as_ptr());
+            match StackRef::<SslCipher>::from_const_ptr_opt(ciphers) {
+                Some(ciphers) => Ok(ciphers.into_iter()),
+                None => Err(ErrorStack::get()),
+            }
+        }
+    }
 }
 
 /// Information about the state of a cipher.
