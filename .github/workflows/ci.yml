@@ -200,7 +200,6 @@ jobs:
             - name: openssl
               version: 1.1.0l
               old: true
-              dl-path: /old/1.1.0
           include:
             - target: x86_64-unknown-linux-gnu
               bindgen: true
@@ -295,7 +294,7 @@ jobs:
             case "${{ matrix.library.name }}" in
             "openssl"*)
               if [[ "${{ matrix.library.old }}" == "true" ]]; then
-                url="https://www.openssl.org/source${{ matrix.library.dl-path }}/openssl-${{ matrix.library.version }}.tar.gz"
+                url="https://www.openssl.org/source/openssl-${{ matrix.library.version }}.tar.gz"
               else
                 url="https://github.com/openssl/openssl/releases/download/openssl-${{ matrix.library.version }}/openssl-${{ matrix.library.version }}.tar.gz"
               fi
