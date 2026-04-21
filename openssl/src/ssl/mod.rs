@@ -2101,6 +2101,42 @@ impl SslCipherRef {
         }
     }
 
+    /// Returns the NID corresponding to the key exchange.
+    ///
+    /// If any appropriate key exchange algorithm can be used (as in the case of TLS 1.3
+    /// cipher suites) `Nid::KX_ANY` is returned.
+    #[corresponds(SSL_CIPHER_get_kx_nid)]
+    pub fn kx_nid(&self) -> Option<Nid> {
+        let n = unsafe { ffi::SSL_CIPHER_get_kx_nid(self.as_ptr()) };
+        if n == 0 {
+            None
+        } else {
+            Some(Nid::from_raw(n))
+        }
+    }
+
+    /// Returns the NID corresponding to the authentication.
+    ///
+    /// If any appropriate authentication algorithm can be used (as in the case of TLS 1.3
+    /// cipher suites) `Nid::AUTH_ANY` is returned.
+    #[corresponds(SSL_CIPHER_get_auth_nid)]
+    pub fn auth_nid(&self) -> Option<Nid> {
+        let n = unsafe { ffi::SSL_CIPHER_get_auth_nid(self.as_ptr()) };
+        if n == 0 {
+            None
+        } else {
+            Some(Nid::from_raw(n))
+        }
+    }
+
+    /// Returns the NID corresponding to the authentication.
+    ///
+    /// Returns whether the cipher is AEAD (e.g. GCM or ChaCha20/Poly1305).
+    #[corresponds(SSL_CIPHER_is_aead)]
+    pub fn is_aead(&self) -> bool {
+        unsafe { ffi::SSL_CIPHER_is_aead(self.as_ptr()) != 0 }
+    }
+
     /// Returns the two-byte ID of the cipher
     ///
     /// Requires OpenSSL 1.1.1 or newer.

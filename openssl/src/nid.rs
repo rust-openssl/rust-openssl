@@ -1107,6 +1107,28 @@ impl Nid {
     pub const SHAKE256: Nid = Nid(ffi::NID_shake256);
     #[cfg(any(ossl110, libressl, awslc))]
     pub const CHACHA20_POLY1305: Nid = Nid(ffi::NID_chacha20_poly1305);
+
+    pub const KX_RSA: Nid = Nid(ffi::NID_kx_rsa);
+    pub const KX_ECDHE: Nid = Nid(ffi::NID_kx_ecdhe);
+    pub const KX_DHE: Nid = Nid(ffi::NID_kx_dhe);
+    pub const KX_ECDHE_PSK: Nid = Nid(ffi::NID_kx_ecdhe_psk);
+    pub const KX_DHE_PSK: Nid = Nid(ffi::NID_kx_dhe_psk);
+    pub const KX_RSA_PSK: Nid = Nid(ffi::NID_kx_rsa_psk);
+    pub const KX_PSK: Nid = Nid(ffi::NID_kx_psk);
+    pub const KX_SRP: Nid = Nid(ffi::NID_kx_srp);
+    pub const KX_GOST: Nid = Nid(ffi::NID_kx_gost);
+    pub const KX_GOST18: Nid = Nid(ffi::NID_kx_gost18);
+    pub const KX_ANY: Nid = Nid(ffi::NID_kx_any);
+
+    pub const AUTH_RSA: Nid = Nid(ffi::NID_auth_rsa);
+    pub const AUTH_ECDSA: Nid = Nid(ffi::NID_auth_ecdsa);
+    pub const AUTH_PSK: Nid = Nid(ffi::NID_auth_psk);
+    pub const AUTH_DSS: Nid = Nid(ffi::NID_auth_dss);
+    pub const AUTH_GOST01: Nid = Nid(ffi::NID_auth_gost01);
+    pub const AUTH_GOST12: Nid = Nid(ffi::NID_auth_gost12);
+    pub const AUTH_SRP: Nid = Nid(ffi::NID_auth_srp);
+    pub const AUTH_NULL: Nid = Nid(ffi::NID_auth_null);
+    pub const AUTH_ANY: Nid = Nid(ffi::NID_auth_any);
 }
 
 impl fmt::Debug for Nid {
