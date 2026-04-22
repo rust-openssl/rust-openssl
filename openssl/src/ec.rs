@@ -398,13 +398,21 @@ impl EcPointRef {
     }
 
     /// Computes `q * m`, storing the result in `self`.
+    ///
+    /// This method is deprecated because it takes a shared reference to the
+    /// `BigNumContext`, which is unsound: `EC_POINT_mul` mutates the context's
+    /// internal stack of temporaries, so sharing it across threads can race.
+    /// Use [`EcPointRef::mul2`] instead.
     #[corresponds(EC_POINT_mul)]
+    #[deprecated(
+        since = "0.10.79",
+        note = "Unsound: ctx is mutated internally. Use mul2 instead."
+    )]
     pub fn mul(
         &mut self,
         group: &EcGroupRef,
         q: &EcPointRef,
         m: &BigNumRef,
-        // FIXME should be &mut
         ctx: &BigNumContextRef,
     ) -> Result<(), ErrorStack> {
         unsafe {
@@ -420,14 +428,65 @@ impl EcPointRef {
         }
     }
 
-    /// Computes `generator * n`, storing the result in `self`.
+    /// Computes `q * m`, storing the result in `self`.
     #[corresponds(EC_POINT_mul)]
+    pub fn mul2(
+        &mut self,
+        group: &EcGroupRef,
+        q: &EcPointRef,
+        m: &BigNumRef,
+        ctx: &mut BigNumContextRef,
+    ) -> Result<(), ErrorStack> {
+        unsafe {
+            cvt(ffi::EC_POINT_mul(
+                group.as_ptr(),
+                self.as_ptr(),
+                ptr::null(),
+                q.as_ptr(),
+                m.as_ptr(),
+                ctx.as_ptr(),
+            ))
+            .map(|_| ())
+        }
+    }
+
+    /// Computes `generator * n`, storing the result in `self`.
+    ///
+    /// This method is deprecated because it takes a shared reference to the
+    /// `BigNumContext`, which is unsound: `EC_POINT_mul` mutates the context's
+    /// internal stack of temporaries, so sharing it across threads can race.
+    /// Use [`EcPointRef::mul_generator2`] instead.
+    #[corresponds(EC_POINT_mul)]
+    #[deprecated(
+        since = "0.10.79",
+        note = "Unsound: ctx is mutated internally. Use mul_generator2 instead."
+    )]
     pub fn mul_generator(
         &mut self,
         group: &EcGroupRef,
         n: &BigNumRef,
-        // FIXME should be &mut
         ctx: &BigNumContextRef,
+    ) -> Result<(), ErrorStack> {
+        unsafe {
+            cvt(ffi::EC_POINT_mul(
+                group.as_ptr(),
+                self.as_ptr(),
+                n.as_ptr(),
+                ptr::null(),
+                ptr::null(),
+                ctx.as_ptr(),
+            ))
+            .map(|_| ())
+        }
+    }
+
+    /// Computes `generator * n`, storing the result in `self`.
+    #[corresponds(EC_POINT_mul)]
+    pub fn mul_generator2(
+        &mut self,
+        group: &EcGroupRef,
+        n: &BigNumRef,
+        ctx: &mut BigNumContextRef,
     ) -> Result<(), ErrorStack> {
         unsafe {
             cvt(ffi::EC_POINT_mul(
@@ -466,9 +525,34 @@ impl EcPointRef {
     }
 
     /// Inverts `self`.
+    ///
+    /// This method is deprecated because it takes a shared reference to the
+    /// `BigNumContext`, which is unsound: `EC_POINT_invert` mutates the
+    /// context's internal stack of temporaries, so sharing it across threads
+    /// can race. Use [`EcPointRef::invert2`] instead.
     #[corresponds(EC_POINT_invert)]
-    // FIXME should be mutable
+    #[deprecated(
+        since = "0.10.79",
+        note = "Unsound: ctx is mutated internally. Use invert2 instead."
+    )]
     pub fn invert(&mut self, group: &EcGroupRef, ctx: &BigNumContextRef) -> Result<(), ErrorStack> {
+        unsafe {
+            cvt(ffi::EC_POINT_invert(
+                group.as_ptr(),
+                self.as_ptr(),
+                ctx.as_ptr(),
+            ))
+            .map(|_| ())
+        }
+    }
+
+    /// Inverts `self`.
+    #[corresponds(EC_POINT_invert)]
+    pub fn invert2(
+        &mut self,
+        group: &EcGroupRef,
+        ctx: &mut BigNumContextRef,
+    ) -> Result<(), ErrorStack> {
         unsafe {
             cvt(ffi::EC_POINT_invert(
                 group.as_ptr(),
@@ -1306,7 +1390,7 @@ mod test {
         let mut ctx = BigNumContext::new().unwrap();
         let mut public_key = EcPoint::new(&group).unwrap();
         public_key
-            .mul_generator(&group, key.private_key(), &ctx)
+            .mul_generator2(&group, key.private_key(), &mut ctx)
             .unwrap();
         assert!(public_key.eq(&group, key.public_key(), &mut ctx).unwrap());
     }
@@ -1318,7 +1402,7 @@ mod test {
         let one = BigNum::from_u32(1).unwrap();
         let mut ctx = BigNumContext::new().unwrap();
         let mut ecp = EcPoint::new(&group).unwrap();
-        ecp.mul_generator(&group, &one, &ctx).unwrap();
+        ecp.mul_generator2(&group, &one, &mut ctx).unwrap();
         assert!(ecp.eq(&group, gen, &mut ctx).unwrap());
     }
 
@@ -1424,7 +1508,7 @@ mod test {
         let mut order = BigNum::new().unwrap();
         group.order(&mut order, &mut ctx).unwrap();
         let mut inf = EcPoint::new(&group).unwrap();
-        inf.mul_generator(&group, &order, &ctx).unwrap();
+        inf.mul_generator2(&group, &order, &mut ctx).unwrap();
         assert!(inf.is_infinity(&group));
     }
 
