@@ -31,7 +31,7 @@ use crate::error::ErrorStack;
 use crate::ex_data::Index;
 use crate::hash::{DigestBytes, MessageDigest};
 use crate::nid::Nid;
-use crate::pkey::{HasPrivate, HasPublic, PKey, PKeyRef, Public};
+use crate::pkey::{HasPrivate, HasPublic, PKey, PKeyRef, Private, Public};
 use crate::ssl::SslRef;
 use crate::stack::{Stack, StackRef, Stackable};
 use crate::string::OpensslString;
@@ -662,6 +662,12 @@ impl X509Ref {
                 Some(util::from_raw_parts(ptr, len as usize))
             }
         }
+    }
+
+    /// Checks for consistency between the private key and this certificate.
+    #[corresponds(X509_check_private_key)]
+    pub fn check_private_key(&self, pkey: &PKeyRef<Private>) -> Result<(), ErrorStack> {
+        unsafe { cvt(ffi::X509_check_private_key(self.as_ptr(), pkey.as_ptr())).map(|_| ()) }
     }
 
     to_pem! {
@@ -1565,6 +1571,18 @@ impl X509ReqRef {
         unsafe {
             let extensions = cvt_p(ffi::X509_REQ_get_extensions(self.as_ptr()))?;
             Ok(Stack::from_ptr(extensions))
+        }
+    }
+
+    /// Checks for consistency between the private key and this certificate request.
+    #[corresponds(X509_REQ_check_private_key)]
+    pub fn check_private_key(&self, pkey: &PKeyRef<Private>) -> Result<(), ErrorStack> {
+        unsafe {
+            cvt(ffi::X509_REQ_check_private_key(
+                self.as_ptr(),
+                pkey.as_ptr(),
+            ))
+            .map(|_| ())
         }
     }
 }
