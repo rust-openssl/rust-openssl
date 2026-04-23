@@ -144,6 +144,10 @@ use crate::error::ErrorStack;
 mod macros;
 
 mod bio;
+
+pub mod engine;
+pub mod ui;
+
 #[macro_use]
 mod util;
 pub mod aes;
