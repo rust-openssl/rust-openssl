@@ -61,6 +61,13 @@ extern "C" {
         len: *mut c_uint,
     ) -> c_int;
 
+    pub fn X509_pubkey_digest(
+        x: *const X509,
+        digest: *const EVP_MD,
+        buf: *mut c_uchar,
+        len: *mut c_uint,
+    ) -> c_int;
+
     pub fn X509_REQ_sign(x: *mut X509_REQ, pkey: *mut EVP_PKEY, md: *const EVP_MD) -> c_int;
 }
 

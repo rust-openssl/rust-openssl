@@ -552,6 +552,27 @@ impl X509Ref {
         }
     }
 
+    /// Returns a digest of the DER representation of the public key in the certificate.
+    #[corresponds(X509_pubkey_digest)]
+    pub fn pubkey_digest(&self, hash_type: MessageDigest) -> Result<DigestBytes, ErrorStack> {
+        unsafe {
+            let mut digest = DigestBytes {
+                buf: [0; ffi::EVP_MAX_MD_SIZE as usize],
+                len: ffi::EVP_MAX_MD_SIZE as usize,
+            };
+            let mut len = ffi::EVP_MAX_MD_SIZE as c_uint;
+            cvt(ffi::X509_pubkey_digest(
+                self.as_ptr(),
+                hash_type.as_ptr(),
+                digest.buf.as_mut_ptr() as *mut _,
+                &mut len,
+            ))?;
+            digest.len = len as usize;
+
+            Ok(digest)
+        }
+    }
+
     #[deprecated(since = "0.10.9", note = "renamed to digest")]
     pub fn fingerprint(&self, hash_type: MessageDigest) -> Result<Vec<u8>, ErrorStack> {
         self.digest(hash_type).map(|b| b.to_vec())
