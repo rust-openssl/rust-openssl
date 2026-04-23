@@ -72,4 +72,6 @@ extern "C" {
     pub fn OSSL_LIB_CTX_new() -> *mut OSSL_LIB_CTX;
     #[cfg(ossl300)]
     pub fn OSSL_LIB_CTX_free(libcts: *mut OSSL_LIB_CTX);
+    #[cfg(ossl300)]
+    pub fn OSSL_LIB_CTX_get0_global_default() -> *mut OSSL_LIB_CTX;
 }
