@@ -687,6 +687,17 @@ fn test_load_crl() {
         cert.serial_number().to_bn().unwrap(),
         "revoked and cert serial numbers should match"
     );
+
+    let revoked = match crl.get_by_cert(cert.as_ref()) {
+        CrlStatus::Revoked(revoked) => revoked,
+        _ => panic!("cert should be revoked"),
+    };
+
+    assert_eq!(
+        revoked.serial_number().to_bn().unwrap(),
+        cert.serial_number().to_bn().unwrap(),
+        "revoked and cert serial numbers should match"
+    );
 }
 
 #[test]

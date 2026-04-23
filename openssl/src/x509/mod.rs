@@ -1858,7 +1858,7 @@ impl X509CrlRef {
 
     /// Get the revocation status of a certificate
     #[corresponds(X509_CRL_get0_by_cert)]
-    pub fn get_by_cert<'a>(&'a self, cert: &X509) -> CrlStatus<'a> {
+    pub fn get_by_cert<'a>(&'a self, cert: &X509Ref) -> CrlStatus<'a> {
         unsafe {
             let mut ret = ptr::null_mut::<ffi::X509_REVOKED>();
             let status =
