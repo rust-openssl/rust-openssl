@@ -22,7 +22,7 @@ use std::ptr;
 use std::str;
 
 use crate::asn1::{
-    Asn1BitStringRef, Asn1Enumerated, Asn1IntegerRef, Asn1Object, Asn1ObjectRef,
+    Asn1BitStringRef, Asn1Enumerated, Asn1Integer, Asn1IntegerRef, Asn1Object, Asn1ObjectRef,
     Asn1OctetStringRef, Asn1StringRef, Asn1TimeRef, Asn1Type,
 };
 use crate::bio::MemBioSlice;
@@ -38,6 +38,8 @@ use crate::string::OpensslString;
 use crate::util::{self, ForeignTypeExt, ForeignTypeRefExt};
 use crate::{cvt, cvt_n, cvt_p, cvt_p_const};
 use openssl_macros::corresponds;
+
+pub use crate::x509::extension::CrlNumber;
 
 pub mod verify;
 
@@ -1597,6 +1599,49 @@ impl CrlReason {
     }
 }
 
+/// A builder used to construct an `X509Revoked`.
+pub struct X509RevokedBuilder(X509Revoked);
+
+impl X509RevokedBuilder {
+    /// Creates a new builder.
+    #[corresponds(X509_REVOKED_new)]
+    pub fn new() -> Result<Self, ErrorStack> {
+        unsafe {
+            ffi::init();
+            cvt_p(ffi::X509_REVOKED_new()).map(|p| X509RevokedBuilder(X509Revoked(p)))
+        }
+    }
+
+    /// Set the revocation date of the `X509Revoked`.
+    #[corresponds(X509_REVOKED_set_revocationDate)]
+    pub fn set_revocation_date(&mut self, date: &Asn1TimeRef) -> Result<(), ErrorStack> {
+        unsafe {
+            cvt(ffi::X509_REVOKED_set_revocationDate(
+                self.0.as_ptr(),
+                date.as_ptr(),
+            ))
+            .map(|_| ())
+        }
+    }
+
+    /// Set the serial number of the `X509Revoked`.
+    #[corresponds(X509_REVOKED_set_serialNumber)]
+    pub fn set_serial_number(&mut self, serial: &Asn1IntegerRef) -> Result<(), ErrorStack> {
+        unsafe {
+            cvt(ffi::X509_REVOKED_set_serialNumber(
+                self.0.as_ptr(),
+                serial.as_ptr(),
+            ))
+            .map(|_| ())
+        }
+    }
+
+    /// Consumes the builder, returning the `X509Revoked`.
+    pub fn build(self) -> X509Revoked {
+        self.0
+    }
+}
+
 foreign_type_and_impl_send_sync! {
     type CType = ffi::X509_REVOKED;
     fn drop = ffi::X509_REVOKED_free;
@@ -1690,7 +1735,7 @@ impl X509RevokedRef {
 /// this is as defined in RFC 5280 Section 5.3.1.
 pub enum ReasonCode {}
 
-// SAFETY: CertificateIssuer is defined to be a stack of GeneralName in the RFC
+// SAFETY: ReasonCode is defined to be an Asn1Enumerated in the RFC
 // and in OpenSSL.
 unsafe impl ExtensionType for ReasonCode {
     const NID: Nid = Nid::from_raw(ffi::NID_crl_reason);
@@ -1719,6 +1764,158 @@ unsafe impl ExtensionType for AuthorityInformationAccess {
     const NID: Nid = Nid::from_raw(ffi::NID_info_access);
 
     type Output = Stack<AccessDescription>;
+}
+
+// SAFETY: CrlNumber is defined to be an Asn1Integer in the RFC
+// and in OpenSSL.
+unsafe impl ExtensionType for CrlNumber {
+    const NID: Nid = Nid::CRL_NUMBER;
+
+    type Output = Asn1Integer;
+}
+
+/// A builder used to construct a version 2 `X509Crl`.
+pub struct X509CrlBuilder(X509Crl);
+
+impl X509CrlBuilder {
+    /// Creates a new builder.
+    #[corresponds(X509_CRL_new)]
+    pub fn new() -> Result<Self, ErrorStack> {
+        unsafe {
+            ffi::init();
+            let ptr = cvt_p(ffi::X509_CRL_new())?;
+            cvt(ffi::X509_CRL_set_version(ptr, 1)).map(|_| ())?;
+
+            Ok(Self(X509Crl(ptr)))
+        }
+    }
+
+    /// Set the issuer name of the CRL.
+    #[corresponds(X509_CRL_set_issuer_name)]
+    pub fn set_issuer_name(&mut self, issuer_name: &X509NameRef) -> Result<(), ErrorStack> {
+        unsafe {
+            cvt(ffi::X509_CRL_set_issuer_name(
+                self.0.as_ptr(),
+                issuer_name.as_ptr(),
+            ))
+            .map(|_| ())
+        }
+    }
+
+    /// Set the lastUpdate (thisUpdate) time indicating when the CRL was issued.
+    #[corresponds(X509_CRL_set1_lastUpdate)]
+    pub fn set_last_update(&mut self, t: &Asn1TimeRef) -> Result<(), ErrorStack> {
+        unsafe { cvt(ffi::X509_CRL_set1_lastUpdate(self.0.as_ptr(), t.as_ptr())).map(|_| ()) }
+    }
+
+    /// Set the nextUpdate timestamp indicating when a newer CRL is expected.
+    #[corresponds(X509_CRL_set1_nextUpdate)]
+    pub fn set_next_update(&mut self, t: &Asn1TimeRef) -> Result<(), ErrorStack> {
+        unsafe { cvt(ffi::X509_CRL_set1_nextUpdate(self.0.as_ptr(), t.as_ptr())).map(|_| ()) }
+    }
+
+    /// Add an X509 extension value to the CRL.
+    ///
+    /// This works just as `append_extension` except it takes ownership of the `X509Extension`.
+    pub fn append_extension(&mut self, extension: X509Extension) -> Result<(), ErrorStack> {
+        self.append_extension2(&extension)
+    }
+
+    /// Add an X509 extension value to the CRL.
+    #[corresponds(X509_CRL_add_ext)]
+    pub fn append_extension2(&mut self, extension: &X509ExtensionRef) -> Result<(), ErrorStack> {
+        unsafe {
+            cvt(ffi::X509_CRL_add_ext(
+                self.0.as_ptr(),
+                extension.as_ptr(),
+                -1,
+            ))
+            .map(|_| ())
+        }
+    }
+
+    /// Add a revoked certificate to the CRL.
+    #[corresponds(X509_CRL_add0_revoked)]
+    pub fn add_revoked(&mut self, revoked: X509Revoked) -> Result<(), ErrorStack> {
+        unsafe {
+            let r = cvt(ffi::X509_CRL_add0_revoked(
+                self.0.as_ptr(),
+                revoked.as_ptr(),
+            ))
+            .map(|_| ());
+            std::mem::forget(revoked);
+            r
+        }
+    }
+
+    /// Sort the CRL.
+    #[corresponds(X509_CRL_sort)]
+    pub fn sort(&mut self) -> Result<(), ErrorStack> {
+        unsafe { cvt(ffi::X509_CRL_sort(self.0.as_ptr())).map(|_| ()) }
+    }
+
+    /// Signs the CRL with a private key.
+    #[corresponds(X509_CRL_sign)]
+    pub fn sign<T>(&mut self, key: &PKeyRef<T>, hash: MessageDigest) -> Result<(), ErrorStack>
+    where
+        T: HasPrivate,
+    {
+        unsafe {
+            cvt(ffi::X509_CRL_sign(
+                self.0.as_ptr(),
+                key.as_ptr(),
+                hash.as_ptr(),
+            ))
+            .map(|_| ())
+        }
+    }
+
+    /// Consumes the builder, returning the CRL.
+    ///
+    /// # Panics
+    ///
+    /// Panics if any of nextUpdate, revoked, AuthorityKeyIdentifier or CrlNumber is missing
+    pub fn build(self) -> Result<X509Crl, ErrorStack> {
+        unsafe {
+            let loc = ffi::X509_CRL_get_ext_by_NID(
+                self.0.as_ptr(),
+                Nid::AUTHORITY_KEY_IDENTIFIER.as_raw(),
+                -1,
+            );
+            assert!(
+                loc >= 0,
+                "CRL must have an Authority Key Identifier extension"
+            );
+            let ext = ffi::X509_CRL_get_ext(self.0.as_ptr(), loc);
+            assert_eq!(
+                ffi::X509_EXTENSION_get_critical(ext),
+                0,
+                "Authority Key Identifier extension must not be critical"
+            );
+
+            let loc = ffi::X509_CRL_get_ext_by_NID(self.0.as_ptr(), Nid::CRL_NUMBER.as_raw(), -1);
+            assert!(loc >= 0, "CRL must have a Crl Number extension");
+            let ext = ffi::X509_CRL_get_ext(self.0.as_ptr(), loc);
+            assert_eq!(
+                ffi::X509_EXTENSION_get_critical(ext),
+                0,
+                "Crl Number extension must not be critical"
+            );
+
+            assert!(
+                !X509_CRL_get0_nextUpdate(self.0.as_ptr()).is_null(),
+                "CRL must have nextUpdate time set"
+            );
+            let revoked = self.0.get_revoked();
+            assert!(
+                // XXX - switch to is_none_or() once MSRV is 1.82.
+                revoked.is_none() || revoked.is_some_and(|r| !r.is_empty()),
+                "Revoked must be absent or non-empty"
+            );
+        }
+
+        Ok(self.0)
+    }
 }
 
 foreign_type_and_impl_send_sync! {
