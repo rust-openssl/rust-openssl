@@ -8,12 +8,13 @@
 use bitflags::bitflags;
 use foreign_types::{ForeignType, ForeignTypeRef};
 use libc::c_uint;
-use std::ptr;
+use std::{mem, ptr};
 
 use crate::bio::{MemBio, MemBioSlice};
 use crate::error::ErrorStack;
+use crate::md::MdRef;
 use crate::pkey::{HasPrivate, PKeyRef};
-use crate::stack::StackRef;
+use crate::stack::{Stack, StackRef};
 use crate::symm::Cipher;
 use crate::x509::{store::X509StoreRef, X509Ref, X509};
 use crate::{cvt, cvt_p};
@@ -45,6 +46,8 @@ bitflags! {
         const DEBUG_DECRYPT = ffi::CMS_DEBUG_DECRYPT;
         const KEY_PARAM = ffi::CMS_KEY_PARAM;
         const ASCIICRLF = ffi::CMS_ASCIICRLF;
+        #[cfg(ossl300)]
+        const CADES = ffi::CMS_CADES;
     }
 }
 
@@ -66,6 +69,20 @@ foreign_type_and_impl_send_sync! {
     /// [`CMSContentInfo`]:struct.CmsContentInfo.html
     pub struct CmsContentInfoRef;
 }
+
+/// Opaque reference to a CMS signer info structure.
+///
+/// A `CmsSignerInfoRef` is always borrowed from a [`CmsContentInfoRef`] — there is no
+/// owned variant because the underlying `CMS_SignerInfo` is managed by its parent
+/// `CMS_ContentInfo`.
+pub struct CmsSignerInfoRef(::foreign_types::Opaque);
+
+impl ForeignTypeRef for CmsSignerInfoRef {
+    type CType = ffi::CMS_SignerInfo;
+}
+
+unsafe impl Send for CmsSignerInfoRef {}
+unsafe impl Sync for CmsSignerInfoRef {}
 
 impl CmsContentInfoRef {
     /// Given the sender's private key, `pkey` and the recipient's certificate, `cert`,
@@ -132,6 +149,118 @@ impl CmsContentInfoRef {
         #[corresponds(PEM_write_bio_CMS)]
         to_pem,
         ffi::PEM_write_bio_CMS
+    }
+
+    /// Add a signer to a CMS_ContentInfo signed data structure.
+    ///
+    /// The CMS_ContentInfo structure should be obtained from an initial call to
+    /// [`CmsContentInfo::sign`] with the `CMS_PARTIAL` flag set.
+    ///
+    /// If `md` is `None`, the default digest for the key's algorithm will be used.
+    ///
+    /// Returns a reference to the [`CmsSignerInfoRef`] that was added. The returned
+    /// reference is borrowed from this CMS structure.
+    #[corresponds(CMS_add1_signer)]
+    pub fn add1_signer<T>(
+        &mut self,
+        signer: &X509Ref,
+        pk: &PKeyRef<T>,
+        md: Option<&MdRef>,
+        flags: CMSOptions,
+    ) -> Result<&CmsSignerInfoRef, ErrorStack>
+    where
+        T: HasPrivate,
+    {
+        let md = md.map_or(ptr::null(), |p| p.as_ptr());
+
+        unsafe {
+            let info = cvt_p(ffi::CMS_add1_signer(
+                self.as_ptr(),
+                signer.as_ptr(),
+                pk.as_ptr(),
+                md,
+                flags.bits(),
+            ))?;
+            Ok(CmsSignerInfoRef::from_ptr(info))
+        }
+    }
+
+    /// Add a certificate to a CMS_ContentInfo structure.
+    #[corresponds(CMS_add1_cert)]
+    pub fn add1_cert(&mut self, cert: &X509Ref) -> Result<(), ErrorStack> {
+        unsafe { cvt(ffi::CMS_add1_cert(self.as_ptr(), cert.as_ptr()))? };
+        Ok(())
+    }
+
+    /// Return all certificates in this CMS_ContentInfo structure.
+    ///
+    /// The returned certificates have their reference counts incremented and are
+    /// independent of this CMS structure.
+    #[corresponds(CMS_get1_certs)]
+    pub fn get1_certs(&self) -> Result<Stack<X509>, ErrorStack> {
+        unsafe {
+            let certs = cvt_p(ffi::CMS_get1_certs(self.as_ptr()))?;
+            Ok(Stack::from_ptr(certs))
+        }
+    }
+
+    /// Retrieve the signing certificate(s) from this CMS structure.
+    ///
+    /// This may only be called after a successful [`CmsContentInfo::verify`] operation.
+    /// The returned stack contains the signer certificates.
+    #[corresponds(CMS_get0_signers)]
+    pub fn get0_signers(&self) -> Result<Stack<X509>, ErrorStack> {
+        unsafe {
+            let signers = cvt_p(ffi::CMS_get0_signers(self.as_ptr()))?;
+
+            // CMS_get0_signers returns a newly allocated stack (caller must free),
+            // but the X509 certs inside are internal references whose refcounts are
+            // NOT incremented. This split ownership means we can't simply return
+            // &StackRef<X509> (the stack container would leak) or Stack<X509> as-is
+            // (dropping it would X509_free the borrowed elements). We resolve this
+            // by bumping each cert's refcount so they survive the stack's destructor.
+            let stack = Stack::<X509>::from_ptr(signers);
+            for cert in &stack {
+                mem::forget(cert.to_owned());
+            }
+
+            Ok(stack)
+        }
+    }
+
+    /// Finalize a CMS_ContentInfo structure that has been created with the `PARTIAL` flag.
+    ///
+    /// This is required after adding signers with [`CmsContentInfoRef::add1_signer`] when
+    /// the `CMS_PARTIAL` flag was used.
+    ///
+    /// The `data` parameter provides the content to be processed (e.g. for digest computation).
+    /// The `dcont` parameter, if provided, is a BIO to write processed content to; it is only
+    /// used with detached data and should usually be `None`.
+    #[corresponds(CMS_final)]
+    pub fn finalize(
+        &mut self,
+        data: &[u8],
+        dcont: Option<&[u8]>,
+        flags: CMSOptions,
+    ) -> Result<(), ErrorStack> {
+        unsafe {
+            let data_bio = MemBioSlice::new(data)?;
+
+            let dcont_bio = match dcont {
+                Some(dcont) => Some(MemBioSlice::new(dcont)?),
+                None => None,
+            };
+            let dcont_bio_ptr = dcont_bio.as_ref().map_or(ptr::null_mut(), |p| p.as_ptr());
+
+            cvt(ffi::CMS_final(
+                self.as_ptr(),
+                data_bio.as_ptr(),
+                dcont_bio_ptr,
+                flags.bits(),
+            ))?;
+
+            Ok(())
+        }
     }
 }
 
@@ -475,5 +604,135 @@ mod test {
         assert_eq!(1, error_array.len());
         let code = error_array[0].reason_code();
         assert_eq!(code, CMS_R_CERTIFICATE_VERIFY_ERROR);
+    }
+
+    #[test]
+    fn cms_add1_signer_and_final() {
+        let cert_bytes = include_bytes!("../test/cert.pem");
+        let cert = X509::from_pem(cert_bytes).expect("failed to load cert.pem");
+
+        let key_bytes = include_bytes!("../test/key.pem");
+        let key = PKey::private_key_from_pem(key_bytes).expect("failed to load key.pem");
+
+        let root_bytes = include_bytes!("../test/root-ca.pem");
+        let root = X509::from_pem(root_bytes).expect("failed to load root-ca.pem");
+
+        let data = b"Partial signing test";
+
+        // Create a partial CMS structure
+        let mut cms = CmsContentInfo::sign(
+            Some(&cert),
+            Some(&key),
+            None,
+            None,
+            CMSOptions::PARTIAL | CMSOptions::STREAM,
+        )
+        .expect("failed to create partial CMS");
+
+        // Add a second signer (same cert/key for test purposes).
+        // NOCERTS is required because the cert was already added by the initial sign() call;
+        // older OpenSSL versions (e.g. 1.1.0) reject duplicate certificates in CMS_add0_cert.
+        cms.add1_signer(
+            &cert,
+            &key,
+            None,
+            CMSOptions::PARTIAL | CMSOptions::CMS_NOCERTS,
+        )
+        .expect("failed to add signer");
+
+        // Finalize
+        cms.finalize(data, None, CMSOptions::empty())
+            .expect("failed to finalize CMS");
+
+        // Verify the result
+        let mut builder = X509StoreBuilder::new().expect("failed to create X509StoreBuilder");
+        builder.add_cert(root).expect("failed to add root-ca");
+        let store = builder.build();
+        let mut out_data: Vec<u8> = Vec::new();
+        cms.verify(
+            None,
+            Some(&store),
+            None,
+            Some(&mut out_data),
+            CMSOptions::empty(),
+        )
+        .expect("failed to verify CMS");
+
+        assert_eq!(data.to_vec(), out_data);
+    }
+
+    #[test]
+    fn cms_get0_signers_after_verify() {
+        let cert_bytes = include_bytes!("../test/cert.pem");
+        let cert = X509::from_pem(cert_bytes).expect("failed to load cert.pem");
+
+        let key_bytes = include_bytes!("../test/key.pem");
+        let key = PKey::private_key_from_pem(key_bytes).expect("failed to load key.pem");
+
+        let root_bytes = include_bytes!("../test/root-ca.pem");
+        let root = X509::from_pem(root_bytes).expect("failed to load root-ca.pem");
+
+        let data = b"Signer retrieval test";
+
+        let mut cms = CmsContentInfo::sign(
+            Some(&cert),
+            Some(&key),
+            None,
+            Some(data),
+            CMSOptions::empty(),
+        )
+        .expect("failed to sign");
+
+        let mut builder = X509StoreBuilder::new().expect("failed to create X509StoreBuilder");
+        builder.add_cert(root).expect("failed to add root-ca");
+        let store = builder.build();
+
+        cms.verify(None, Some(&store), None, None, CMSOptions::empty())
+            .expect("failed to verify");
+
+        let signers = cms.get0_signers().expect("failed to get signers");
+        assert_eq!(signers.len(), 1);
+        // The signer cert should match the one we signed with
+        assert_eq!(
+            signers[0].serial_number().to_bn().unwrap(),
+            cert.serial_number().to_bn().unwrap()
+        );
+    }
+
+    #[test]
+    fn cms_add1_cert_and_get1_certs() {
+        let cert_bytes = include_bytes!("../test/cert.pem");
+        let cert = X509::from_pem(cert_bytes).expect("failed to load cert.pem");
+
+        let key_bytes = include_bytes!("../test/key.pem");
+        let key = PKey::private_key_from_pem(key_bytes).expect("failed to load key.pem");
+
+        let root_bytes = include_bytes!("../test/root-ca.pem");
+        let root = X509::from_pem(root_bytes).expect("failed to load root-ca.pem");
+
+        let data = b"add1_cert and get1_certs test";
+
+        let mut cms = CmsContentInfo::sign(
+            Some(&cert),
+            Some(&key),
+            None,
+            Some(data),
+            CMSOptions::empty(),
+        )
+        .expect("failed to sign");
+
+        // Add the root CA as an additional certificate
+        cms.add1_cert(&root).expect("failed to add cert");
+
+        let certs = cms.get1_certs().expect("failed to get certs");
+        // Should contain both the signer cert and the added root CA
+        assert_eq!(certs.len(), 2);
+
+        let serials: Vec<_> = certs
+            .iter()
+            .map(|c| c.serial_number().to_bn().unwrap())
+            .collect();
+        assert!(serials.contains(&cert.serial_number().to_bn().unwrap()));
+        assert!(serials.contains(&root.serial_number().to_bn().unwrap()));
     }
 }
