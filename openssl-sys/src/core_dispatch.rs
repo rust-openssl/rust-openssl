@@ -1,5 +1,5 @@
 use super::*;
-use libc::*;
+use std::ffi::c_int;
 
 /* OpenSSL 3.* only */
 

@@ -1,4 +1,4 @@
-use libc::*;
+use std::ffi::{c_char, c_int, c_long, c_uchar, c_uint, c_ulong, c_void};
 use std::ptr;
 
 use super::*;

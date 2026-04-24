@@ -1,5 +1,6 @@
 use super::super::*;
-use libc::*;
+use libc::time_t;
+use std::ffi::{c_char, c_int, c_long, c_uchar, c_void};
 
 #[repr(C)]
 #[cfg(not(libressl430))]

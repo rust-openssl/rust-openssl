@@ -1,4 +1,4 @@
-use libc::*;
+use std::ffi::c_int;
 
 pub const PKCS7_TEXT: c_int = 0x1;
 pub const PKCS7_NOCERTS: c_int = 0x2;

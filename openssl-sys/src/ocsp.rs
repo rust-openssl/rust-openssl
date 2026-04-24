@@ -1,4 +1,4 @@
-use libc::*;
+use std::ffi::{c_int, c_ulong};
 
 pub const OCSP_REVOKED_STATUS_NOSTATUS: c_int = -1;
 pub const OCSP_REVOKED_STATUS_UNSPECIFIED: c_int = 0;

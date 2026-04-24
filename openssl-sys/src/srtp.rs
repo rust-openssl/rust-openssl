@@ -1,4 +1,4 @@
-use libc::*;
+use std::ffi::c_ulong;
 
 pub const SRTP_AES128_CM_SHA1_80: c_ulong = 0x0001;
 pub const SRTP_AES128_CM_SHA1_32: c_ulong = 0x0002;

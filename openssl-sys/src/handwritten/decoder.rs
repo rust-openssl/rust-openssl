@@ -1,5 +1,6 @@
 use super::super::*;
-use libc::*;
+use libc::{size_t, FILE};
+use std::ffi::{c_char, c_int, c_uchar, c_void};
 
 extern "C" {
     pub fn OSSL_DECODER_CTX_new() -> *mut OSSL_DECODER_CTX;

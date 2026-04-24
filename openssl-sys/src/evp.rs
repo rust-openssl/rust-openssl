@@ -1,5 +1,6 @@
 use super::*;
-use libc::*;
+use libc::size_t;
+use std::ffi::{c_int, c_uint, c_void};
 
 pub const EVP_MAX_MD_SIZE: c_uint = 64;
 

@@ -1,4 +1,4 @@
-use libc::*;
+use std::ffi::c_int;
 
 #[cfg(not(osslconf = "OPENSSL_NO_DEPRECATED_3_0"))]
 pub const AES_ENCRYPT: c_int = 1;

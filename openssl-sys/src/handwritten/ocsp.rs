@@ -1,5 +1,5 @@
 use super::super::*;
-use libc::*;
+use std::ffi::{c_int, c_long, c_uchar, c_ulong};
 
 pub enum OCSP_CERTID {}
 

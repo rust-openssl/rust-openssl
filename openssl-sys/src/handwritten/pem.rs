@@ -1,5 +1,5 @@
 use super::super::*;
-use libc::*;
+use std::ffi::{c_char, c_int, c_long, c_uchar, c_void};
 
 pub type pem_password_cb = Option<
     unsafe extern "C" fn(

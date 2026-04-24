@@ -1,5 +1,3 @@
-use libc::*;
-
 use super::*;
 
 pub enum EVP_PKEY {}

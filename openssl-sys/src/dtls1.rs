@@ -1,4 +1,4 @@
-use libc::*;
+use std::ffi::c_uint;
 
 cfg_if! {
     if #[cfg(ossl300)] {

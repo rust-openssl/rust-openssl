@@ -1,4 +1,5 @@
-use libc::*;
+use libc::size_t;
+use std::ffi::{c_int, c_uchar, c_void};
 
 use super::super::*;
 

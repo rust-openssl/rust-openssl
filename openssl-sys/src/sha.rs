@@ -1,5 +1,6 @@
 use super::*;
-use libc::*;
+use libc::size_t;
+use std::ffi::{c_char, c_int, c_uchar, c_uint, c_void};
 use std::ptr;
 
 #[cfg(not(osslconf = "OPENSSL_NO_DEPRECATED_3_0"))]

@@ -1,5 +1,6 @@
 use super::super::*;
-use libc::*;
+use libc::{size_t, timeval};
+use std::ffi::{c_char, c_int, c_long, c_uchar, c_uint, c_ulong, c_void};
 
 pub enum SSL_METHOD {}
 pub enum SSL_CIPHER {}
@@ -666,7 +667,7 @@ extern "C" {
 cfg_if! {
     if #[cfg(libressl)] {
         extern "C" {
-            pub fn SSL_get_current_compression(ssl: *mut SSL) -> *const libc::c_void;
+            pub fn SSL_get_current_compression(ssl: *mut SSL) -> *const c_void;
         }
     } else if #[cfg(not(osslconf = "OPENSSL_NO_COMP"))] {
         const_ptr_api! {
@@ -679,7 +680,7 @@ cfg_if! {
 cfg_if! {
     if #[cfg(libressl)] {
         extern "C" {
-            pub fn SSL_COMP_get_name(comp: *const libc::c_void) -> *const c_char;
+            pub fn SSL_COMP_get_name(comp: *const c_void) -> *const c_char;
         }
     } else if #[cfg(not(osslconf = "OPENSSL_NO_COMP"))] {
         extern "C" {
