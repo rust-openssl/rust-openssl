@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+### Added
+
+* Added `EcGroupRef::generator_opt`, which returns `Option<&EcPointRef>`.
+
+### Fixed
+
+* `EcGroupRef::generator` no longer constructs a reference from a NULL pointer when the group has no generator set (e.g. a group built with `EcGroup::from_components` before `set_generator` is called), which was immediate undefined behavior. It now panics in that case and has been deprecated in favor of `EcGroupRef::generator_opt`.
+
 ## [v0.10.78] - 2026-04-19
 
 ### Added

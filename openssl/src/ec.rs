@@ -251,11 +251,28 @@ impl EcGroupRef {
     }
 
     /// Returns the generator for the given curve as an [`EcPoint`].
+    ///
+    /// Panics if the group has no generator set (e.g. a group constructed via
+    /// [`EcGroup::from_components`] before [`EcGroupRef::set_generator`] has
+    /// been called). This method is deprecated in favor of
+    /// [`EcGroupRef::generator_opt`], which lets callers handle that case
+    /// without a panic.
     #[corresponds(EC_GROUP_get0_generator)]
+    #[deprecated(
+        since = "0.10.79",
+        note = "Panics if the group has no generator. Use generator_opt instead."
+    )]
     pub fn generator(&self) -> &EcPointRef {
+        self.generator_opt().expect("EC_GROUP has no generator set")
+    }
+
+    /// Returns the generator for the given curve as an [`EcPoint`], or `None`
+    /// if the group has no generator set.
+    #[corresponds(EC_GROUP_get0_generator)]
+    pub fn generator_opt(&self) -> Option<&EcPointRef> {
         unsafe {
             let ptr = ffi::EC_GROUP_get0_generator(self.as_ptr());
-            EcPointRef::from_const_ptr(ptr)
+            EcPointRef::from_const_ptr_opt(ptr)
         }
     }
 
@@ -1398,12 +1415,77 @@ mod test {
     #[test]
     fn generator() {
         let group = EcGroup::from_curve_name(Nid::X9_62_PRIME256V1).unwrap();
-        let gen = group.generator();
+        let gen = group.generator_opt().unwrap();
         let one = BigNum::from_u32(1).unwrap();
         let mut ctx = BigNumContext::new().unwrap();
         let mut ecp = EcPoint::new(&group).unwrap();
         ecp.mul_generator2(&group, &one, &mut ctx).unwrap();
         assert!(ecp.eq(&group, gen, &mut ctx).unwrap());
+    }
+
+    #[test]
+    fn generator_opt_none_on_custom_group() {
+        // parameters are from secp256r1
+        let p = BigNum::from_hex_str(
+            "FFFFFFFF00000001000000000000000000000000FFFFFFFFFFFFFFFFFFFFFFFF",
+        )
+        .unwrap();
+        let a = BigNum::from_hex_str(
+            "FFFFFFFF00000001000000000000000000000000FFFFFFFFFFFFFFFFFFFFFFFC",
+        )
+        .unwrap();
+        let b = BigNum::from_hex_str(
+            "5AC635D8AA3A93E7B3EBBD55769886BC651D06B0CC53B0F63BCE3C3E27D2604B",
+        )
+        .unwrap();
+        let mut ctx = BigNumContext::new().unwrap();
+
+        let mut group = EcGroup::from_components(p, a, b, &mut ctx).unwrap();
+        assert!(group.generator_opt().is_none());
+
+        let mut gen_point = EcPoint::new(&group).unwrap();
+        let gen_x = BigNum::from_hex_str(
+            "6B17D1F2E12C4247F8BCE6E563A440F277037D812DEB33A0F4A13945D898C296",
+        )
+        .unwrap();
+        let gen_y = BigNum::from_hex_str(
+            "4FE342E2FE1A7F9B8EE7EB4A7C0F9E162BCE33576B315ECECBB6406837BF51F5",
+        )
+        .unwrap();
+        gen_point
+            .set_affine_coordinates_gfp(&group, &gen_x, &gen_y, &mut ctx)
+            .unwrap();
+        let order = BigNum::from_hex_str(
+            "FFFFFFFF00000000FFFFFFFFFFFFFFFFBCE6FAADA7179E84F3B9CAC2FC632551",
+        )
+        .unwrap();
+        let cofactor = BigNum::from_hex_str("01").unwrap();
+        group.set_generator(gen_point, order, cofactor).unwrap();
+
+        assert!(group.generator_opt().is_some());
+    }
+
+    #[test]
+    #[should_panic(expected = "EC_GROUP has no generator set")]
+    #[allow(deprecated)]
+    fn generator_panics_on_custom_group() {
+        // parameters are from secp256r1
+        let p = BigNum::from_hex_str(
+            "FFFFFFFF00000001000000000000000000000000FFFFFFFFFFFFFFFFFFFFFFFF",
+        )
+        .unwrap();
+        let a = BigNum::from_hex_str(
+            "FFFFFFFF00000001000000000000000000000000FFFFFFFFFFFFFFFFFFFFFFFC",
+        )
+        .unwrap();
+        let b = BigNum::from_hex_str(
+            "5AC635D8AA3A93E7B3EBBD55769886BC651D06B0CC53B0F63BCE3C3E27D2604B",
+        )
+        .unwrap();
+        let mut ctx = BigNumContext::new().unwrap();
+
+        let group = EcGroup::from_components(p, a, b, &mut ctx).unwrap();
+        let _ = group.generator();
     }
 
     #[test]
@@ -1502,7 +1584,7 @@ mod test {
     fn is_infinity() {
         let group = EcGroup::from_curve_name(Nid::X9_62_PRIME256V1).unwrap();
         let mut ctx = BigNumContext::new().unwrap();
-        let g = group.generator();
+        let g = group.generator_opt().unwrap();
         assert!(!g.is_infinity(&group));
 
         let mut order = BigNum::new().unwrap();
@@ -1517,7 +1599,7 @@ mod test {
     fn is_on_curve() {
         let group = EcGroup::from_curve_name(Nid::X9_62_PRIME256V1).unwrap();
         let mut ctx = BigNumContext::new().unwrap();
-        let g = group.generator();
+        let g = group.generator_opt().unwrap();
         assert!(g.is_on_curve(&group, &mut ctx).unwrap());
 
         let group2 = EcGroup::from_curve_name(Nid::X9_62_PRIME239V3).unwrap();
