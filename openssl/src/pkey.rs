@@ -163,6 +163,7 @@ impl KeyType {
     }
 
     /// Returns the algorithm name as a C string.
+    #[cfg(ossl300)]
     pub(crate) fn as_cstr(&self) -> &'static CStr {
         self.0
     }
