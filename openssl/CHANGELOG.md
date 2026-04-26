@@ -6,6 +6,7 @@
 
 * Added `EcGroupRef::generator_opt`, which returns `Option<&EcPointRef>`.
 * Added `PKeyRef::is_a` and the `KeyType` algorithm-name newtype, for identifying provider-supplied keys (such as ML-DSA) where `EVP_PKEY_id` returns `-1`.
+* Added `PKey::public_key_from_raw_bytes_ex` and `PKey::private_key_from_raw_bytes_ex`, which take a `KeyType` and accept an optional library context and property query string. Required for provider-supplied algorithms with no associated `Id`, such as ML-DSA.
 
 ### Fixed
 

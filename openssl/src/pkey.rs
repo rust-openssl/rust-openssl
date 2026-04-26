@@ -47,6 +47,8 @@ use crate::dh::Dh;
 use crate::dsa::Dsa;
 use crate::ec::EcKey;
 use crate::error::ErrorStack;
+#[cfg(ossl300)]
+use crate::lib_ctx::LibCtxRef;
 #[cfg(any(ossl110, boringssl, libressl370, awslc))]
 use crate::pkey_ctx::PkeyCtx;
 use crate::rsa::Rsa;
@@ -845,6 +847,34 @@ impl PKey<Private> {
             .map(|p| PKey::from_ptr(p))
         }
     }
+
+    /// Creates a private key from its raw byte representation, identifying
+    /// the algorithm by name and optionally taking a library context and
+    /// property query string.
+    ///
+    /// This is required for algorithms that are only available via OpenSSL
+    /// 3.0+ providers and have no associated `Id`, such as ML-DSA.
+    #[corresponds(EVP_PKEY_new_raw_private_key_ex)]
+    #[cfg(ossl300)]
+    pub fn private_key_from_raw_bytes_ex(
+        ctx: Option<&LibCtxRef>,
+        key_type: KeyType,
+        properties: Option<&str>,
+        bytes: &[u8],
+    ) -> Result<PKey<Private>, ErrorStack> {
+        let properties = properties.map(|s| CString::new(s).unwrap());
+        unsafe {
+            ffi::init();
+            cvt_p(ffi::EVP_PKEY_new_raw_private_key_ex(
+                ctx.map_or(ptr::null_mut(), ForeignTypeRef::as_ptr),
+                key_type.as_cstr().as_ptr(),
+                properties.as_ref().map_or(ptr::null(), |s| s.as_ptr()),
+                bytes.as_ptr(),
+                bytes.len(),
+            ))
+            .map(|p| PKey::from_ptr(p))
+        }
+    }
 }
 
 impl PKey<Public> {
@@ -890,6 +920,34 @@ impl PKey<Public> {
             cvt_p(ffi::EVP_PKEY_new_raw_public_key(
                 key_type.as_raw(),
                 ptr::null_mut(),
+                bytes.as_ptr(),
+                bytes.len(),
+            ))
+            .map(|p| PKey::from_ptr(p))
+        }
+    }
+
+    /// Creates a public key from its raw byte representation, identifying
+    /// the algorithm by name and optionally taking a library context and
+    /// property query string.
+    ///
+    /// This is required for algorithms that are only available via OpenSSL
+    /// 3.0+ providers and have no associated `Id`, such as ML-DSA.
+    #[corresponds(EVP_PKEY_new_raw_public_key_ex)]
+    #[cfg(ossl300)]
+    pub fn public_key_from_raw_bytes_ex(
+        ctx: Option<&LibCtxRef>,
+        key_type: KeyType,
+        properties: Option<&str>,
+        bytes: &[u8],
+    ) -> Result<PKey<Public>, ErrorStack> {
+        let properties = properties.map(|s| CString::new(s).unwrap());
+        unsafe {
+            ffi::init();
+            cvt_p(ffi::EVP_PKEY_new_raw_public_key_ex(
+                ctx.map_or(ptr::null_mut(), ForeignTypeRef::as_ptr),
+                key_type.as_cstr().as_ptr(),
+                properties.as_ref().map_or(ptr::null(), |s| s.as_ptr()),
                 bytes.as_ptr(),
                 bytes.len(),
             ))
@@ -1263,6 +1321,36 @@ mod tests {
         let ed = PKey::generate_ed25519().unwrap();
         assert!(ed.is_a(KeyType::ED25519));
         assert!(!ed.is_a(KeyType::X25519));
+    }
+
+    #[cfg(ossl300)]
+    #[test]
+    fn test_raw_public_key_from_bytes_ex() {
+        let key = PKey::generate_ed25519().unwrap();
+        let raw = key.raw_public_key().unwrap();
+        let from_raw =
+            PKey::public_key_from_raw_bytes_ex(None, KeyType::ED25519, None, &raw).unwrap();
+        assert_eq!(
+            key.public_key_to_der().unwrap(),
+            from_raw.public_key_to_der().unwrap()
+        );
+        assert!(from_raw.is_a(KeyType::ED25519));
+
+        // Wrong key length should fail.
+        assert!(PKey::public_key_from_raw_bytes_ex(None, KeyType::ED25519, None, &[]).is_err());
+    }
+
+    #[cfg(ossl300)]
+    #[test]
+    fn test_raw_private_key_from_bytes_ex() {
+        let key = PKey::generate_ed25519().unwrap();
+        let raw = key.raw_private_key().unwrap();
+        let from_raw =
+            PKey::private_key_from_raw_bytes_ex(None, KeyType::ED25519, None, &raw).unwrap();
+        assert_eq!(
+            key.private_key_to_pkcs8().unwrap(),
+            from_raw.private_key_to_pkcs8().unwrap()
+        );
     }
 
     #[cfg(ossl300)]
