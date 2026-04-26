@@ -5,6 +5,7 @@
 ### Added
 
 * Added `EcGroupRef::generator_opt`, which returns `Option<&EcPointRef>`.
+* Added `PKeyRef::is_a` and the `KeyType` algorithm-name newtype, for identifying provider-supplied keys (such as ML-DSA) where `EVP_PKEY_id` returns `-1`.
 
 ### Fixed
 
