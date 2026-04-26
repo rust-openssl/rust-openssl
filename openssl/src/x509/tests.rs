@@ -1251,3 +1251,10 @@ fn test_store_all_certificates() {
 
     assert_eq!(store.all_certificates().len(), 1);
 }
+
+#[test]
+fn test_ocsp_responders_invalid_utf8() {
+    let cert = include_bytes!("../../test/aia_bad_utf8_cert.pem");
+    let cert = X509::from_pem(cert).unwrap();
+    assert!(cert.ocsp_responders().is_err());
+}
