@@ -124,10 +124,6 @@ impl Id {
 /// id (`EVP_PKEY_id` returns `-1`), so identifying them requires a name-based
 /// check via `EVP_PKEY_is_a`. `KeyType` wraps the algorithm name as a static
 /// C string and exposes constants for common algorithms.
-///
-/// Use [`KeyType::from_static`] to construct a `KeyType` for an algorithm
-/// not covered by the provided constants (for example, names exposed by a
-/// third-party provider).
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub struct KeyType(&'static CStr);
 
@@ -157,26 +153,17 @@ impl KeyType {
     ///
     /// `bytes` must be NUL-terminated and contain no interior NULs.
     ///
-    /// Once MSRV is >= 1.72 this whole helper can become a safe `const fn`
-    /// using `CStr::from_bytes_with_nul(bytes).unwrap()`; once MSRV is >= 1.77
-    /// the helper goes away entirely in favor of `c"..."` literals.
+    // Once MSRV is >= 1.72 this whole helper can become a safe `const fn`
+    // using `CStr::from_bytes_with_nul(bytes).unwrap()`; once MSRV is >= 1.77
+    // the helper goes away entirely in favor of `c"..."` literals.
     const unsafe fn from_bytes_with_nul(bytes: &'static [u8]) -> KeyType {
         // SAFETY: the caller has promised `bytes` meets the contract of
         // `CStr::from_bytes_with_nul_unchecked`.
         KeyType(CStr::from_bytes_with_nul_unchecked(bytes))
     }
 
-    /// Constructs a `KeyType` from a NUL-terminated static C string.
-    ///
-    /// This is the escape hatch for naming algorithms that do not have a
-    /// pre-defined constant on `KeyType` — for example, algorithms exposed
-    /// by a third-party OpenSSL provider.
-    pub const fn from_static(name: &'static CStr) -> KeyType {
-        KeyType(name)
-    }
-
     /// Returns the algorithm name as a C string.
-    pub fn as_cstr(&self) -> &'static CStr {
+    pub(crate) fn as_cstr(&self) -> &'static CStr {
         self.0
     }
 }
@@ -1275,11 +1262,6 @@ mod tests {
         let ed = PKey::generate_ed25519().unwrap();
         assert!(ed.is_a(KeyType::ED25519));
         assert!(!ed.is_a(KeyType::X25519));
-
-        // Escape hatch: an unknown name should yield false rather than panic.
-        let custom =
-            KeyType::from_static(CStr::from_bytes_with_nul(b"NOT-A-REAL-ALGORITHM\0").unwrap());
-        assert!(!ed.is_a(custom));
     }
 
     #[cfg(ossl300)]
