@@ -130,39 +130,23 @@ impl Id {
 pub struct KeyType(&'static CStr);
 
 impl KeyType {
-    // SAFETY for the const initializers below: each byte literal is
-    // NUL-terminated and contains no interior NULs, which satisfies the
-    // unsafe contract on `KeyType::from_bytes_with_nul`.
-    pub const RSA: KeyType = unsafe { KeyType::from_bytes_with_nul(b"RSA\0") };
-    pub const RSA_PSS: KeyType = unsafe { KeyType::from_bytes_with_nul(b"RSA-PSS\0") };
-    pub const DSA: KeyType = unsafe { KeyType::from_bytes_with_nul(b"DSA\0") };
-    pub const DH: KeyType = unsafe { KeyType::from_bytes_with_nul(b"DH\0") };
-    pub const EC: KeyType = unsafe { KeyType::from_bytes_with_nul(b"EC\0") };
-    pub const ED25519: KeyType = unsafe { KeyType::from_bytes_with_nul(b"ED25519\0") };
-    pub const ED448: KeyType = unsafe { KeyType::from_bytes_with_nul(b"ED448\0") };
-    pub const X25519: KeyType = unsafe { KeyType::from_bytes_with_nul(b"X25519\0") };
-    pub const X448: KeyType = unsafe { KeyType::from_bytes_with_nul(b"X448\0") };
-    pub const HMAC: KeyType = unsafe { KeyType::from_bytes_with_nul(b"HMAC\0") };
-    pub const CMAC: KeyType = unsafe { KeyType::from_bytes_with_nul(b"CMAC\0") };
-    pub const ML_DSA_44: KeyType = unsafe { KeyType::from_bytes_with_nul(b"ML-DSA-44\0") };
-    pub const ML_DSA_65: KeyType = unsafe { KeyType::from_bytes_with_nul(b"ML-DSA-65\0") };
-    pub const ML_DSA_87: KeyType = unsafe { KeyType::from_bytes_with_nul(b"ML-DSA-87\0") };
-    pub const ML_KEM_512: KeyType = unsafe { KeyType::from_bytes_with_nul(b"ML-KEM-512\0") };
-    pub const ML_KEM_768: KeyType = unsafe { KeyType::from_bytes_with_nul(b"ML-KEM-768\0") };
-    pub const ML_KEM_1024: KeyType = unsafe { KeyType::from_bytes_with_nul(b"ML-KEM-1024\0") };
-
-    /// # Safety
-    ///
-    /// `bytes` must be NUL-terminated and contain no interior NULs.
-    ///
-    // Once MSRV is >= 1.72 this whole helper can become a safe `const fn`
-    // using `CStr::from_bytes_with_nul(bytes).unwrap()`; once MSRV is >= 1.77
-    // the helper goes away entirely in favor of `c"..."` literals.
-    const unsafe fn from_bytes_with_nul(bytes: &'static [u8]) -> KeyType {
-        // SAFETY: the caller has promised `bytes` meets the contract of
-        // `CStr::from_bytes_with_nul_unchecked`.
-        KeyType(CStr::from_bytes_with_nul_unchecked(bytes))
-    }
+    pub const RSA: KeyType = KeyType(c"RSA");
+    pub const RSA_PSS: KeyType = KeyType(c"RSA-PSS");
+    pub const DSA: KeyType = KeyType(c"DSA");
+    pub const DH: KeyType = KeyType(c"DH");
+    pub const EC: KeyType = KeyType(c"EC");
+    pub const ED25519: KeyType = KeyType(c"ED25519");
+    pub const ED448: KeyType = KeyType(c"ED448");
+    pub const X25519: KeyType = KeyType(c"X25519");
+    pub const X448: KeyType = KeyType(c"X448");
+    pub const HMAC: KeyType = KeyType(c"HMAC");
+    pub const CMAC: KeyType = KeyType(c"CMAC");
+    pub const ML_DSA_44: KeyType = KeyType(c"ML-DSA-44");
+    pub const ML_DSA_65: KeyType = KeyType(c"ML-DSA-65");
+    pub const ML_DSA_87: KeyType = KeyType(c"ML-DSA-87");
+    pub const ML_KEM_512: KeyType = KeyType(c"ML-KEM-512");
+    pub const ML_KEM_768: KeyType = KeyType(c"ML-KEM-768");
+    pub const ML_KEM_1024: KeyType = KeyType(c"ML-KEM-1024");
 
     /// Returns the algorithm name as a C string.
     #[cfg(ossl300)]
