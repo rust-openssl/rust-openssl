@@ -21,12 +21,7 @@ cfg_if! {
 }
 #[cfg(ossl300)]
 pub unsafe fn EVP_EC_gen(curve: *const c_char) -> *mut EVP_PKEY {
-    EVP_PKEY_Q_keygen(
-        ptr::null_mut(),
-        ptr::null_mut(),
-        "EC\0".as_ptr().cast(),
-        curve,
-    )
+    EVP_PKEY_Q_keygen(ptr::null_mut(), ptr::null_mut(), c"EC".as_ptr(), curve)
 }
 
 pub const EVP_PKEY_CTRL_EC_PARAMGEN_CURVE_NID: c_int = EVP_PKEY_ALG_CTRL + 1;

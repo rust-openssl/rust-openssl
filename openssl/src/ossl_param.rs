@@ -186,9 +186,6 @@ mod tests {
         let params = builder.to_param().unwrap();
 
         assert!(params.locate_octet_string(c"invalid").is_err());
-        assert_eq!(
-            params.locate_octet_string(c"key1").unwrap(),
-            b"value1"
-        );
+        assert_eq!(params.locate_octet_string(c"key1").unwrap(), b"value1");
     }
 }
