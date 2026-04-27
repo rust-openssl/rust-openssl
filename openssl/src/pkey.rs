@@ -859,16 +859,15 @@ impl PKey<Private> {
     pub fn private_key_from_raw_bytes_ex(
         ctx: Option<&LibCtxRef>,
         key_type: KeyType,
-        properties: Option<&str>,
+        properties: Option<&CStr>,
         bytes: &[u8],
     ) -> Result<PKey<Private>, ErrorStack> {
-        let properties = properties.map(|s| CString::new(s).unwrap());
         unsafe {
             ffi::init();
             cvt_p(ffi::EVP_PKEY_new_raw_private_key_ex(
                 ctx.map_or(ptr::null_mut(), ForeignTypeRef::as_ptr),
                 key_type.as_cstr().as_ptr(),
-                properties.as_ref().map_or(ptr::null(), |s| s.as_ptr()),
+                properties.map_or(ptr::null(), |s| s.as_ptr()),
                 bytes.as_ptr(),
                 bytes.len(),
             ))
@@ -938,16 +937,15 @@ impl PKey<Public> {
     pub fn public_key_from_raw_bytes_ex(
         ctx: Option<&LibCtxRef>,
         key_type: KeyType,
-        properties: Option<&str>,
+        properties: Option<&CStr>,
         bytes: &[u8],
     ) -> Result<PKey<Public>, ErrorStack> {
-        let properties = properties.map(|s| CString::new(s).unwrap());
         unsafe {
             ffi::init();
             cvt_p(ffi::EVP_PKEY_new_raw_public_key_ex(
                 ctx.map_or(ptr::null_mut(), ForeignTypeRef::as_ptr),
                 key_type.as_cstr().as_ptr(),
-                properties.as_ref().map_or(ptr::null(), |s| s.as_ptr()),
+                properties.map_or(ptr::null(), |s| s.as_ptr()),
                 bytes.as_ptr(),
                 bytes.len(),
             ))
