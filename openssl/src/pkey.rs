@@ -858,6 +858,48 @@ impl PKey<Private> {
             .map(|p| PKey::from_ptr(p))
         }
     }
+
+    /// Constructs a private keypair from an algorithm-defined `seed`.
+    ///
+    /// Only ML-DSA (32-byte seed) and ML-KEM (64-byte seed) are supported at
+    /// this time, and require OpenSSL 3.5 or newer at runtime. The seed
+    /// length is algorithm-defined and a wrong-sized seed is rejected by the
+    /// provider.
+    ///
+    /// Internally this calls `EVP_PKEY_CTX_new_from_name` followed by
+    /// `EVP_PKEY_fromdata` with a single `seed` octet-string `OSSL_PARAM` and
+    /// `EVP_PKEY_KEYPAIR` selection.
+    #[corresponds(EVP_PKEY_fromdata)]
+    #[cfg(ossl350)]
+    pub fn private_key_from_seed(
+        ctx: Option<&LibCtxRef>,
+        key_type: KeyType,
+        properties: Option<&CStr>,
+        seed: &[u8],
+    ) -> Result<PKey<Private>, ErrorStack> {
+        let mut builder = crate::ossl_param::OsslParamBuilder::new()?;
+        builder.add_octet_string(c"seed", seed)?;
+        let params = builder.to_param()?;
+        unsafe {
+            ffi::init();
+            let pkey_ctx = cvt_p(ffi::EVP_PKEY_CTX_new_from_name(
+                ctx.map_or(ptr::null_mut(), ForeignTypeRef::as_ptr),
+                key_type.as_cstr().as_ptr(),
+                properties.map_or(ptr::null(), |s| s.as_ptr()),
+            ))?;
+            // Take ownership immediately so the context is freed on early return.
+            let pkey_ctx = PkeyCtx::<Private>::from_ptr(pkey_ctx);
+            cvt(ffi::EVP_PKEY_fromdata_init(pkey_ctx.as_ptr()))?;
+            let mut pkey: *mut ffi::EVP_PKEY = ptr::null_mut();
+            cvt(ffi::EVP_PKEY_fromdata(
+                pkey_ctx.as_ptr(),
+                &mut pkey,
+                ffi::EVP_PKEY_KEYPAIR,
+                params.as_ptr(),
+            ))?;
+            Ok(PKey::from_ptr(pkey))
+        }
+    }
 }
 
 impl PKey<Public> {
@@ -1340,6 +1382,54 @@ mod tests {
     fn test_ec_gen() {
         let key = PKey::ec_gen("prime256v1").unwrap();
         assert!(key.ec_key().is_ok());
+    }
+
+    #[cfg(ossl350)]
+    #[test]
+    fn test_private_key_from_seed_mldsa() {
+        // ML-DSA-65 KAT vector 0 from
+        // https://github.com/post-quantum-cryptography/KAT/blob/main/MLDSA/kat_MLDSA_65_det_pure.rsp
+        // (xi is the 32-byte ML-DSA key generation seed per FIPS 204).
+        let xi = hex::decode("f696484048ec21f96cf50a56d0759c448f3779752f0383d37449690694cf7a68")
+            .unwrap();
+        let key = PKey::private_key_from_seed(None, KeyType::ML_DSA_65, None, &xi).unwrap();
+        assert!(key.is_a(KeyType::ML_DSA_65));
+        let expected_pk = "e50d03fff3b3a70961abbb92a390008dec1283f603f50cdbaaa3d00bd659bc767c3f24ec864ceb07b865aa148647698df8e63f244c4de08affc0210f1560f64822961972463e403bbe97ce7a539fc013527558ad824202a90b1e9a045d89a51c3a31d0330f2099d0f5e0b9e8de8d1e340c91d6a0f61cb8a6548e2614a1b6a2ad80f4e567f0f134700b1563ccaab71f28e7bf509858d85218166dd9a0e1dfad4bee180b4cdaf6e37623558f64fd124d3d7543aade0b28fb8f193159cea7dfb172174b6c25375c9c1903636bfaa41791b1f2f16158020806a1d95979f678a46a209a8780345d2d092c52b576b5e263e870570cc1084058676fbddb2c93bc87fd81a90f7081c04fb299415f761966614aedeea40386f0dbe97512956c3f16c3e210a364de926e37374637d95d0420de7f2f72365392a6d4392018762cd6aa4d6ec629f6d0605ab86862a34c3f1fb55695ae35e736404044aad617d192e8ff07a16f5c6291c2edb0bf1d601a6b08f1c9b444e31570113124cd20eeb299d30a4546243a9f20ed36fa963edab2f494cd92f766633b97237ccc3485387f4344839f4656fbf1eb7f4f24712f432f3b74df325747405bc9ee39f42f87653322f1d23c92c981953fc107570053ce46b6741410a99cdb1888d33943e191c0a395085b9d14a3fbdc58a3ea16706c937ea44aebc9764df142010eab022c40b28e63da853ae03843bfe02eed35331571ec89895c1ea2256cb7591e63c7a5870455663ef9804b84d524470a08cda9bbbfd07ba6537473163cf030849c5f31679c610d56d5e31c0e73f23098d3a19dd39afe507e25d053e7d5b0d9b18c53b153c2d5b162558939a6e24e7ba02d1d736b6a4c93a4f3bc50d4ab16ef350b411e6f4a734be03242fd67ee47eb4ec3d453d1a9254c4e02f68a366702ef2875932b72125ee81da1c10a336b4a4990a5e36f0b59b00e3471c56314d6e92bcb7bacd6219fd99c1ca50c3342ce62cd98be9458a17cf243c60c09b106e86fab345a997f7b46d4ac1c790c37dbdb93d29c532a5cb097a30f92d47c460ec8345b17ba5db77c1a6533a9448a353663f187517a399583b2f98cb0a8dc3f64d049716a5c8aee6ede0bb6958fc70f2fce706f20622d35e9ff2a1c30dd5e71bebe4a33fd74ab768cd34a2d9ec59845a8f38b5dd6c0008b678876e493c9afc2396a16721142803f1f38c579036858a25a1a1abfae94c7dc1ecb26c1d3b4d96209be238360fc8554e33f5fba2b92abf207b677d433b58275366b836be7081d7b50f9d29652c836ffb11596317cb3aaaf4ed41441298fb386fbd9237227bb7529bf5eeb7711bc6936cd4fba98b8404dd1e8650a3a1bf29869835797b9537db1afc0f4339ad3b296401100520dd43d2cd453534f1df776c0aa184f2e5cb658fee5b54bb44d9ee13b3486c37b1fea4284327ce15400ecd93a0c01852d045c3c7af348d4786845984fde0d086c115d4fcbcfee73688ef61601ce3560d6db6f0a6be4dc05640c575a2d24a6a5b5d697ecc3a6844bf7405f68c5450b1d67b5dfcfcc8f878d787f7f57d3875fdf345f1730f9e7493e9a4acacb7b8832b0141a1bdb082a95d8be8f5280035f42f05f9ecf663fa5d03b056c43bc39ba1a6f7375961c4e94830c51e276cc4bc826518f84f51e8ea6f59a3d12ad9d5ef2ca6db70155cabd655713641a885551ab65a358d2e7baf68a39567ba2278d9493562aa4e903ad6f304d2752064d8dbc8a2bf53e24d2f77e47da1d0519212148daf2cb99453b44c7337db46390a6d67d0bbdfa980bfca35d68df1e904168f64fd6b22710eac8bab8757a9e3bb43c5f907949cddecf0321d728a2bbb74e6cc4959c1516c9b2981150f054ec05bd3844e99a7788d5d018c2dc4642969059601a6928963500f085c84cda6454dfc4be63ba82182104499d778e0e998e1cf9086d7990ed03704753f10cb4df6076341f1d556aae9a15ade459e74817fa1d9cb8d0a816afc5947c81368bda9c3a587565b3c39199bf3e24254c601c43002c37b83e43116f25ebfb206d081d81c34618e53aba8ef65af1c5dff402839d71c0319cb7696922088cb9ab3f2eee8ea79228ae12dc9aa1db9acd1309d7171b47a7043fe73cfb4e6b11a3da910f5e5e734c26b41a93452848e735d1679963a413d69a0d275ba10693fb922d8f8c32310dee718125b29d1366201399eb253ba5a1fed099f9df91e3c59c16dfe8f7074045760527327e1e5852537ae96962553b69d85da962a5a6789d19fe585e257012132a7c91feaf4c58a4fa7c126fe68406f34ebf1f371adb4b30514b18dd6e7e659df07776238e48cb7fabd08b5f6a9fc05a7ffbf019a2632c257bf79636994c807fa2f513f60940800e290c2e684d9162858bca138a8634e23b1bb4b49f77af7eb717a79b2f293f814849a8d7e0aae2a734259395c4bf6a3a8deb37a0638121a9dcf83dfecd0c6c58a8eb05c4706e395a869c3ce01d42e31466fba05a45e4181dddb177fa20fef50a770d9da14cffb55ac3e829bd932eff759eeaeebd37d3ecb38f2046528affc969b008d2f9fad5acb4682f119011cbb4ffb11dae5d91dfe9ec7ba5142086e5c09eb398e3685413a394b385a5e377c4996848d862ed7f70b3bb75cff88cf89db9146ea82b5611569a8bb67dc95ab4135c2a427f12ba1c9b50cf86d1a238ba0c99c3d82dbc90dd0f7b281494df1a25848ecadfe915a95a43247bc5a55e1e2d90ed05f70be8b2e5fc9d5b";
+        assert_eq!(hex::encode(key.raw_public_key().unwrap()), expected_pk);
+
+        // Wrong seed length is rejected by the provider.
+        assert!(PKey::private_key_from_seed(None, KeyType::ML_DSA_65, None, &[]).is_err());
+    }
+
+    #[cfg(ossl350)]
+    #[test]
+    fn test_private_key_from_seed_mlkem() {
+        // ML-KEM-768 KAT vector 0 from
+        // https://github.com/post-quantum-cryptography/KAT/blob/main/MLKEM/kat_MLKEM_768.rsp
+        // (per FIPS 203 the OpenSSL "seed" param is d || z, 64 bytes total).
+        let d = hex::decode("6dbbc4375136df3b07f7c70e639e223e177e7fd53b161b3f4d57791794f12624")
+            .unwrap();
+        let z = hex::decode("f696484048ec21f96cf50a56d0759c448f3779752f0383d37449690694cf7a68")
+            .unwrap();
+        let mut seed = d;
+        seed.extend_from_slice(&z);
+        let key = PKey::private_key_from_seed(None, KeyType::ML_KEM_768, None, &seed).unwrap();
+        assert!(key.is_a(KeyType::ML_KEM_768));
+        let expected_pk = "01f60af1dc8e6360ae78b59d4a5042eb9145a269046d6236b8304f305c2d9dcb189fe5a62df89b2f5a7bce3bbc753c1e78f730a99869f809aba856b676b707b26601d1d909bab32451494eb7d0a2153a6350b79789a9b115f83ea12037256562f06a1d5aba378da77039d3bdecaca8e6a22a49050a76300a0267cdb38b7ac77903c50ca53b99283cac6b95fba651b11a4d1a692e4072965060587669f253b1bb182e661446168ac60221894660020e9bb5f5b7124a0303e2543ea3ea6ce97a2482b255ca346fb27a847b33b93f3ab2d33064c6e6632d1a23f1144e907b246b479f4a5c928929a1e24150f5241258a5b67766a66f6a33846495907828ebe44ecc5b73124071ba479073910410a16d5d5696b48b194752979795772a91c348f502b37aa650983ebb89bf3c081ff273544129c9137a6e1834c8f2e7ce14c7870c53c05b9b94ecd38e6645911b0912336863ec168831f811881075cf38a59de4b5c738aa6ef03d779b295588cfb62491cc7b3e08b48473354f9ac8061c152a9e205997499b970b69bce66fe42bca2924ccdf0103d0a4c39193c2df25118d72b17aab26b0c60d4cd2c306ca4696c185de05035f4a09cf970aecc8cc93436f83b1aeaf452c41929a2eabc151938f74c93b858546df2264eeeab602e04a85c522f8fb1a5214afd8d4cae57a47b6f381a23126bd9917173128af917f1d483691c450d1151cfe9a1492d473ed862e27da92500c86a20019e9f975e4f54ad319ba2c5630c4014219d7ba235456fe530140193d662445e6a941d1e238567ba8d4d95ab1c7447d690821876d017270cfb169f2d792f03c800720697b410ab41c66f2b24585125655eb10aa1087ffcb7750cb887ad4467377500a6a7d3a82976b415a54469577b4138d919b03f4c9a4d3390bdcb6f1717a5fa4ab25a34f4ba5039bb22c7f3c234ea4427347aa7251464e631904d7cac4784f78b49d5f4a104a301809a779f6466131f9c62bb67147f4cd4973a6aa1c29ae6a8647b6268be089fe048ce990cd638743d285c889a707f581b63af41731f0246b054bc4b47aab01b6842a2709d02e8158ab90f48b69d136082b34cb0673b74aa3f54508ed029fb8f5045ee0639e150ee3b3c85f68a310ec0441980100b42abf2bad10d4a9e0c7b2bc5bbcaf73cbcdc49dc2c949111936779b178974a0392947745a47189bc3fa8a679c80af964a9f9b1b56577274a2a669d2da6704aa496af407fa1aa964cc3dc3140f5f959a7ea974bdb1b83e48a99c0a3e2d75b0669b5c1278962540609166266da18886fc237af30cefd569dbe399e6652e45f06a5dfc9a758a4987088ff8e38a3cf36b9d988f0e070b68d0b88f7bcc41306080d889780c7e238895ccaa4f3577225cca4c8a9330ce613e717798c9670924b271ac402b51538b8b5967ac490dcab5300e6c54d6a3632f3b973e4186ee1a7e2e85649185b26370c387235c4df28a9937a49d4078bf883f4e6346cb3251d9e13f1bda087b285afaa80e262641c5527b0a184b8bc84a62e577314658e2029d850064f7a7b81f253e7cc124a9c5b039dc9b179a80c2f6aee6ea0815172537331a57b505baa76ff5b4c1f0da754b6194f4b39a9b18730d3cdab925d691ed77a8db9927ea233ac2a12744fdc27e5d221b9369adb325d8";
+        assert_eq!(hex::encode(key.raw_public_key().unwrap()), expected_pk);
+
+        // Wrong seed length is rejected by the provider.
+        assert!(PKey::private_key_from_seed(None, KeyType::ML_KEM_768, None, &[]).is_err());
+    }
+
+    #[cfg(ossl350)]
+    #[test]
+    fn test_private_key_from_seed_invalid_algorithm() {
+        let seed = [0u8; 64];
+        assert!(
+            PKey::private_key_from_seed(None, KeyType::RSA, None, &seed).is_err(),
+            "Unexpectedly accepted a seed-only fromdata import",
+        );
     }
 
     #[test]
