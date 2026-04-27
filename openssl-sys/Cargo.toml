@@ -13,7 +13,7 @@ categories = ["cryptography", "external-ffi-bindings"]
 links = "openssl"
 build = "build/main.rs"
 edition = "2021"
-rust-version = "1.70.0"
+rust-version = "1.80.0"
 
 [features]
 vendored = ['openssl-src']

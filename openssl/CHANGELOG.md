@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+* Bumped MSRV to 1.80.
+
 ### Added
 
 * Added `EcGroupRef::generator_opt`, which returns `Option<&EcPointRef>`.

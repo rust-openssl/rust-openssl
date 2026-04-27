@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+* Bumped MSRV to 1.80.
+
 ## [v0.9.114] - 2026-04-19
 
 ### Added

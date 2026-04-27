@@ -9,7 +9,7 @@ readme = "README.md"
 keywords = ["crypto", "tls", "ssl", "dtls"]
 categories = ["cryptography", "api-bindings"]
 edition = "2021"
-rust-version = "1.70.0"
+rust-version = "1.80.0"
 
 # these are deprecated and don't do anything anymore
 [features]
