@@ -86,7 +86,6 @@ use bitflags::bitflags;
 use cfg_if::cfg_if;
 use foreign_types::{ForeignType, ForeignTypeRef, Opaque};
 use libc::{c_char, c_int, c_long, c_uchar, c_uint, c_void};
-use once_cell::sync::{Lazy, OnceCell};
 use openssl_macros::corresponds;
 use std::any::TypeId;
 use std::collections::HashMap;
@@ -101,7 +100,7 @@ use std::panic::resume_unwind;
 use std::path::Path;
 use std::ptr;
 use std::str;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, LazyLock, Mutex, OnceLock};
 
 pub use crate::ssl::connector::{
     ConnectConfiguration, SslAcceptor, SslAcceptorBuilder, SslConnector, SslConnectorBuilder,
@@ -563,12 +562,20 @@ impl NameType {
     }
 }
 
-static INDEXES: Lazy<Mutex<HashMap<TypeId, c_int>>> = Lazy::new(|| Mutex::new(HashMap::new()));
-static SSL_INDEXES: Lazy<Mutex<HashMap<TypeId, c_int>>> = Lazy::new(|| Mutex::new(HashMap::new()));
-static SESSION_CTX_INDEX: OnceCell<Index<Ssl, SslContext>> = OnceCell::new();
+static INDEXES: LazyLock<Mutex<HashMap<TypeId, c_int>>> =
+    LazyLock::new(|| Mutex::new(HashMap::new()));
+static SSL_INDEXES: LazyLock<Mutex<HashMap<TypeId, c_int>>> =
+    LazyLock::new(|| Mutex::new(HashMap::new()));
+static SESSION_CTX_INDEX: OnceLock<Index<Ssl, SslContext>> = OnceLock::new();
 
 fn try_get_session_ctx_index() -> Result<&'static Index<Ssl, SslContext>, ErrorStack> {
-    SESSION_CTX_INDEX.get_or_try_init(Ssl::new_ex_index)
+    // Once `OnceLock::get_or_try_init` (rust-lang/rust#109737) is stable, this
+    // can collapse to `SESSION_CTX_INDEX.get_or_try_init(Ssl::new_ex_index)`.
+    if let Some(idx) = SESSION_CTX_INDEX.get() {
+        return Ok(idx);
+    }
+    let new = Ssl::new_ex_index::<SslContext>()?;
+    Ok(SESSION_CTX_INDEX.get_or_init(|| new))
 }
 
 unsafe extern "C" fn free_data_box<T>(

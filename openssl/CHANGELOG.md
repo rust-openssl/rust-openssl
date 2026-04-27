@@ -5,6 +5,7 @@
 ### Changed
 
 * Bumped MSRV to 1.80.
+* Removed the `once_cell` dependency in favor of `std::sync::{LazyLock, OnceLock}`.
 
 ### Added
 
