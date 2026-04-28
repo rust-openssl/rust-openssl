@@ -342,17 +342,17 @@ jobs:
             case "${{ matrix.library.name }}" in
             "openssl")
               ./Configure --prefix=$OPENSSL_DIR --libdir=lib $OS_COMPILER -fPIC -g $OS_FLAGS no-shared
-              make
+              make -j "$(nproc)"
               make install_sw
               ;;
             "openssl-no-deprecated")
               ./Configure --prefix=$OPENSSL_DIR --libdir=lib $OS_COMPILER -fPIC -g $OS_FLAGS --api=3.0 no-deprecated no-shared
-              make
+              make -j "$(nproc)"
               make install_sw
               ;;
             "libressl")
               ./configure --prefix=$OPENSSL_DIR --disable-shared --with-pic
-              make
+              make -j "$(nproc)"
               make install_sw
               ;;
             "boringssl")
