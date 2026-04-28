@@ -1394,7 +1394,7 @@ impl SslContextBuilder {
     /// These functions cannot be used for TLSv1.2 and below PSKs.
     /// The callback will be called with the SSL context. A message digest and session will not be provided to this callback on the first call.
     /// Subsequent calls will provide a message digest that should be checked.
-    /// 
+    ///
     /// if the PSK handshake should continue:
     ///     The callback should set the session parameter to Some(session).
     ///     Set the master key and ciphersuite on the session
@@ -1407,14 +1407,21 @@ impl SslContextBuilder {
     #[cfg(not(osslconf = "OPENSSL_NO_PSK"))]
     pub fn set_psk_use_session_callback<F>(&mut self, callback: F)
     where
-        F: Fn(&mut SslRef, Option<MessageDigest>, &mut Option<SslSession>) -> Result<Option<Vec<u8>>, ErrorStack>
+        F: Fn(
+                &mut SslRef,
+                Option<MessageDigest>,
+                &mut Option<SslSession>,
+            ) -> Result<Option<Vec<u8>>, ErrorStack>
             + 'static
             + Sync
             + Send,
     {
         unsafe {
             self.set_ex_data(SslContext::cached_ex_index::<F>(), callback);
-            ffi::SSL_CTX_set_psk_use_session_callback(self.as_ptr(), Some(raw_psk_use_session::<F>));
+            ffi::SSL_CTX_set_psk_use_session_callback(
+                self.as_ptr(),
+                Some(raw_psk_use_session::<F>),
+            );
         }
     }
 
@@ -1423,7 +1430,7 @@ impl SslContextBuilder {
     ///
     /// These functions cannot be used for TLSv1.2 and below PSKs.
     /// The callback will be called with the SSL context and the identity the client is proposing and a session.
-    /// 
+    ///
     /// if the PSK handshake should continue:
     ///     The callback should set the session parameter to Some(session).
     ///     Set the master key and ciphersuite on the session
@@ -1432,6 +1439,24 @@ impl SslContextBuilder {
     ///     return Ok(false)
     /// if the handshake must be aborted altogether, the call must
     ///     return Err(_)
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use openssl::ssl::{SslContext, SslSession, SslMethod};
+    ///
+    /// let mut server_ctx = SslContext::builder(SslMethod::tls()).unwrap();
+    /// server_ctx.set_psk_find_session_callback(move |_ssl, identity, session| {
+    ///     
+    ///     Ok(
+    ///         if identity == Some("super-secret".as_bytes()) {
+    ///             let session = session.get_or_insert(SslSession::new());
+    ///
+    ///             session.set_master_key("1234".as_bytes());
+    ///         },
+    ///     )
+    /// });
+    /// ```
     #[corresponds(SSL_CTX_set_psk_use_session_callback)]
     #[cfg(not(osslconf = "OPENSSL_NO_PSK"))]
     pub fn set_psk_find_session_callback<F>(&mut self, callback: F)
@@ -1443,7 +1468,10 @@ impl SslContextBuilder {
     {
         unsafe {
             self.set_ex_data(SslContext::cached_ex_index::<F>(), callback);
-            ffi::SSL_CTX_set_psk_find_session_callback(self.as_ptr(), Some(raw_psk_find_session::<F>));
+            ffi::SSL_CTX_set_psk_find_session_callback(
+                self.as_ptr(),
+                Some(raw_psk_find_session::<F>),
+            );
         }
     }
 
@@ -2228,9 +2256,7 @@ impl SslSession {
     }
 
     pub fn new() -> SslSession {
-        unsafe {
-            SslSession::from_ptr(ffi::SSL_SESSION_new())
-        }
+        unsafe { SslSession::from_ptr(ffi::SSL_SESSION_new()) }
     }
 }
 
@@ -2243,11 +2269,9 @@ impl ToOwned for SslSessionRef {
             SslSession(self.as_ptr())
         }
     }
-
 }
 
 impl SslSessionRef {
-
     pub fn new<'a>() -> &'a mut SslSessionRef {
         unsafe {
             let p = ffi::SSL_SESSION_new();

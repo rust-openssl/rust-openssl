@@ -149,10 +149,14 @@ pub extern "C" fn raw_psk_use_session<F>(
     msg_digest: *const EVP_MD,
     identity: *mut *const c_uchar,
     identity_len: *mut c_uint,
-    session: *mut *mut SSL_SESSION
+    session: *mut *mut SSL_SESSION,
 ) -> c_int
 where
-    F: Fn(&mut SslRef, Option<MessageDigest>, &mut Option<SslSession>) -> Result<Option<Vec<u8>>, ErrorStack>
+    F: Fn(
+            &mut SslRef,
+            Option<MessageDigest>,
+            &mut Option<SslSession>,
+        ) -> Result<Option<Vec<u8>>, ErrorStack>
         + 'static
         + Sync
         + Send,
@@ -165,29 +169,25 @@ where
             .ssl_context()
             .ex_data(callback_idx)
             .expect("BUG: psk callback missing") as *const F;
-        
+
         let msg_digest = if msg_digest.is_null() {
             None
         } else {
             Some(MessageDigest::from_ptr(msg_digest))
         };
-        
+
         let mut cb_session = SslSession::from_ptr_opt(*session);
 
         let result = match (*callback)(ssl, msg_digest, &mut cb_session) {
             Ok(result) => {
-                match result {
-                    Some(cb_identity) => {
-                        // tell OpenSSL we're going ahead with PSK by supplying the session parameter
-                        *identity_len = cb_identity.len() as u32;
-                        *identity = std::ffi::CString::new(cb_identity).unwrap().into_raw() as *const u8;
-                    },
-                    None => {
-                        *session = null_mut::<SSL_SESSION>();
-                    }
+                if let Some(cb_identity) = result {
+                    // tell OpenSSL we're going ahead with PSK by supplying the session parameter
+                    *identity_len = cb_identity.len() as u32;
+                    *identity =
+                        std::ffi::CString::new(cb_identity).unwrap().into_raw() as *const u8;
                 };
                 1
-            },
+            }
             Err(e) => {
                 e.put();
                 0
@@ -196,10 +196,14 @@ where
 
         // pass the chosen session back to openssl
         *session = match cb_session {
-            Some(cb_session) => SslSessionRef::from_ptr(
-                    cb_session.as_ptr()
-                ).as_ptr(),
-            None => null_mut::<SSL_SESSION>()
+            Some(cb_session) => {
+                // The session will be held by openssl, without forgetting it,
+                // rust will drop the session.
+                let cb_ptr = cb_session.as_ptr();
+                std::mem::forget(cb_session);
+                SslSessionRef::from_ptr(cb_ptr).as_ptr()
+            }
+            None => null_mut::<SSL_SESSION>(),
         };
 
         result
@@ -211,7 +215,7 @@ pub extern "C" fn raw_psk_find_session<F>(
     ssl: *mut ffi::SSL,
     identity: *const c_uchar,
     identity_len: c_uint,
-    session: *mut *mut SSL_SESSION
+    session: *mut *mut SSL_SESSION,
 ) -> c_int
 where
     F: Fn(&mut SslRef, Option<&[u8]>, &mut Option<SslSession>) -> Result<(), ErrorStack>
@@ -227,7 +231,7 @@ where
             .ssl_context()
             .ex_data(callback_idx)
             .expect("BUG: psk callback missing") as *const F;
-        
+
         let identity = if identity.is_null() {
             None
         } else {
@@ -246,10 +250,14 @@ where
 
         // pass the chosen session back to openssl
         *session = match cb_session {
-            Some(cb_session) => SslSessionRef::from_ptr(
-                    cb_session.as_ptr()
-                ).as_ptr(),
-            None => null_mut::<SSL_SESSION>()
+            Some(cb_session) => {
+                // The session will be held by openssl, without forgetting it,
+                // rust will drop the session.
+                let sess_ptr = cb_session.as_ptr();
+                std::mem::forget(cb_session);
+                SslSessionRef::from_ptr(sess_ptr).as_ptr()
+            }
+            None => null_mut::<SSL_SESSION>(),
         };
 
         result
