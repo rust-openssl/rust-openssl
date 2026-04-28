@@ -1614,6 +1614,38 @@ fn sni_callback_swapped_ctx() {
     assert!(CALLED_BACK.load(Ordering::SeqCst));
 }
 
+// Regression test: the verify_callback function pointer is per-SSL (copied from the SSL_CTX into
+// the SSL at SSL_new time) and is *not* updated when SSL_set_SSL_CTX swaps the context. Before the
+// fix, the trampoline still invoked the original raw_verify::<F_a> after a swap, but it looked up
+// the closure on the *current* (swapped) ctx, which doesn't have an F_a entry — the .expect() then
+// aborted the process via a panic across an extern "C" boundary.
+#[test]
+fn verify_callback_after_swapped_ctx() {
+    static CALLED_BACK: AtomicBool = AtomicBool::new(false);
+
+    let server = Server::builder().build();
+
+    let mut client = server.client();
+    client
+        .ctx()
+        .set_verify_callback(SslVerifyMode::PEER, |_, _| {
+            CALLED_BACK.store(true, Ordering::SeqCst);
+            true
+        });
+
+    let mut client = client.build().builder();
+
+    // Swap to a fresh ctx that has no verify callback registered. The per-SSL verify function
+    // pointer raw_verify::<F> is unaffected by the swap and will still fire during the handshake;
+    // it must still find the original closure and not abort.
+    let other_ctx = SslContextBuilder::new(SslMethod::tls()).unwrap().build();
+    client.ssl().set_ssl_context(&other_ctx).unwrap();
+
+    client.connect();
+
+    assert!(CALLED_BACK.load(Ordering::SeqCst));
+}
+
 #[test]
 #[cfg(ossl111)]
 fn client_hello() {

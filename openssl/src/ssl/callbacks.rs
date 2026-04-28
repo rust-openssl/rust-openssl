@@ -37,14 +37,23 @@ where
     unsafe {
         let ctx = X509StoreContextRef::from_ptr_mut(x509_ctx);
         let ssl_idx = X509StoreContext::ssl_idx().expect("BUG: store context ssl index missing");
+        let session_ctx_index =
+            try_get_session_ctx_index().expect("BUG: session context index initialization failed");
         let verify_idx = SslContext::cached_ex_index::<F>();
 
+        // The verify-callback function pointer is copied from the SSL_CTX into the SSL at SSL_new
+        // time and is *not* updated by SSL_set_SSL_CTX (e.g. an SNI swap). So this trampoline can
+        // fire even after the SSL's current SSL_CTX has been replaced. Look up the closure on the
+        // original SSL_CTX (stashed at SESSION_CTX_INDEX in Ssl::new) rather than on the current
+        // one, otherwise the lookup would miss and the .expect() would abort the process.
+        //
         // raw pointer shenanigans to break the borrow of ctx
         // the callback can't mess with its own ex_data slot so this is safe
         let verify = ctx
             .ex_data(ssl_idx)
             .expect("BUG: store context missing ssl")
-            .ssl_context()
+            .ex_data(*session_ctx_index)
+            .expect("BUG: session context missing")
             .ex_data(verify_idx)
             .expect("BUG: verify callback missing") as *const F;
 
@@ -69,10 +78,16 @@ where
 {
     unsafe {
         let ssl = SslRef::from_ptr_mut(ssl);
+        let session_ctx_index =
+            try_get_session_ctx_index().expect("BUG: session context index initialization failed");
         let callback_idx = SslContext::cached_ex_index::<F>();
 
+        // See raw_verify for the rationale: psk_client_callback is copied from the SSL_CTX into
+        // the SSL at SSL_new time and is not updated by SSL_set_SSL_CTX, so we must look up the
+        // closure on the original SSL_CTX rather than the current (potentially swapped) one.
         let callback = ssl
-            .ssl_context()
+            .ex_data(*session_ctx_index)
+            .expect("BUG: session context missing")
             .ex_data(callback_idx)
             .expect("BUG: psk callback missing") as *const F;
         let hint = if !hint.is_null() {
@@ -111,10 +126,16 @@ where
 {
     unsafe {
         let ssl = SslRef::from_ptr_mut(ssl);
+        let session_ctx_index =
+            try_get_session_ctx_index().expect("BUG: session context index initialization failed");
         let callback_idx = SslContext::cached_ex_index::<F>();
 
+        // See raw_verify for the rationale: psk_server_callback is copied from the SSL_CTX into
+        // the SSL at SSL_new time and is not updated by SSL_set_SSL_CTX, so we must look up the
+        // closure on the original SSL_CTX rather than the current (potentially swapped) one.
         let callback = ssl
-            .ssl_context()
+            .ex_data(*session_ctx_index)
+            .expect("BUG: session context missing")
             .ex_data(callback_idx)
             .expect("BUG: psk callback missing") as *const F;
         let identity = if identity.is_null() {
