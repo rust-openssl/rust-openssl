@@ -1,4 +1,4 @@
-use libc::*;
+use std::ffi::c_uint;
 
 pub const CMS_TEXT: c_uint = 0x1;
 pub const CMS_NOCERTS: c_uint = 0x2;

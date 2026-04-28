@@ -1,5 +1,5 @@
 use super::*;
-use libc::*;
+use std::ffi::{c_char, c_int, c_long, c_ulong, c_void};
 
 extern "C" {
     #[deprecated(note = "use CRYPTO_set_locking_callback__fixed_rust instead")]

@@ -1,4 +1,4 @@
-use libc::*;
+use std::ffi::c_int;
 
 pub const SSL3_VERSION: c_int = 0x300;
 

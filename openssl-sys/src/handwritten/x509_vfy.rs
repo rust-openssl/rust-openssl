@@ -1,5 +1,6 @@
 use super::super::*;
-use libc::*;
+use libc::{size_t, time_t};
+use std::ffi::{c_char, c_int, c_long, c_uchar, c_uint, c_ulong, c_void};
 
 #[cfg(all(libressl, not(libressl430)))]
 pub enum X509_VERIFY_PARAM_ID {}

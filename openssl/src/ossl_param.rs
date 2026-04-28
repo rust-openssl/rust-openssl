@@ -182,19 +182,10 @@ mod tests {
     #[test]
     fn test_builder_locate_octet_string() {
         let mut builder = OsslParamBuilder::new().unwrap();
-        builder
-            .add_octet_string(CStr::from_bytes_with_nul(b"key1\0").unwrap(), b"value1")
-            .unwrap();
+        builder.add_octet_string(c"key1", b"value1").unwrap();
         let params = builder.to_param().unwrap();
 
-        assert!(params
-            .locate_octet_string(CStr::from_bytes_with_nul(b"invalid\0").unwrap())
-            .is_err());
-        assert_eq!(
-            params
-                .locate_octet_string(CStr::from_bytes_with_nul(b"key1\0").unwrap())
-                .unwrap(),
-            b"value1"
-        );
+        assert!(params.locate_octet_string(c"invalid").is_err());
+        assert_eq!(params.locate_octet_string(c"key1").unwrap(), b"value1");
     }
 }

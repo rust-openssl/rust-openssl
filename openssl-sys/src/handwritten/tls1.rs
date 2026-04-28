@@ -1,5 +1,6 @@
 use super::super::*;
-use libc::*;
+use libc::size_t;
+use std::ffi::{c_char, c_int, c_uchar};
 
 extern "C" {
     pub fn SSL_get_servername(ssl: *const SSL, name_type: c_int) -> *const c_char;

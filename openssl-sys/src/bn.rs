@@ -1,4 +1,4 @@
-use libc::*;
+use std::ffi::{c_int, c_uint, c_ulonglong};
 
 #[cfg(target_pointer_width = "64")]
 pub type BN_ULONG = c_ulonglong;

@@ -1,4 +1,5 @@
-use libc::*;
+use libc::size_t;
+use std::ffi::{c_char, c_int, c_uint, c_void};
 
 #[allow(unused_imports)]
 use super::super::*;
@@ -129,7 +130,7 @@ cfg_if! {
         pub struct SSL_CONN_CLOSE_INFO {
             pub error_code: u64,
             pub frame_type: u64,
-            pub reason: *const ::libc::c_char,
+            pub reason: *const c_char,
             pub reason_len: usize,
             pub flags: u32,
         }

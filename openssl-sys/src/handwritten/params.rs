@@ -1,5 +1,6 @@
 use super::super::*;
-use libc::*;
+use libc::size_t;
+use std::ffi::{c_char, c_int, c_uint, c_void};
 
 extern "C" {
     pub fn OSSL_PARAM_free(p: *mut OSSL_PARAM);

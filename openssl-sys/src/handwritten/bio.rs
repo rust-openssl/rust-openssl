@@ -1,5 +1,6 @@
 use super::super::*;
-use libc::*;
+use libc::FILE;
+use std::ffi::{c_char, c_int, c_long, c_uint, c_void};
 
 extern "C" {
     pub fn BIO_set_flags(b: *mut BIO, flags: c_int);

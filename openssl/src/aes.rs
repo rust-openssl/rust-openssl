@@ -243,7 +243,7 @@ pub fn unwrap_key(
     in_: &[u8],
 ) -> Result<usize, KeyError> {
     unsafe {
-        assert!(out.len() + 8 <= in_.len());
+        assert!(out.len() + 8 >= in_.len());
 
         let written = ffi::AES_unwrap_key(
             &key.0 as *const _ as *mut _, // this is safe, the implementation only uses the key as a const pointer.
@@ -294,6 +294,74 @@ mod test {
         let mut pt_actual = vec![0; pt.len()];
         aes_ige(&ct, &mut pt_actual, &key, &mut iv, Mode::Decrypt);
         assert_eq!(pt_actual, pt);
+    }
+
+    // out is larger than in_.len() - 8 but still valid; should succeed.
+    #[test]
+    fn test_unwrap_key_out_oversized() {
+        let raw_key = Vec::from_hex("000102030405060708090A0B0C0D0E0F").unwrap();
+        let key_data = Vec::from_hex("00112233445566778899AABBCCDDEEFF").unwrap();
+        let wrapped = Vec::from_hex("1FA68B0A8112B447AEF34BD8FB5A7B829D3E862371D2CFE5").unwrap();
+        let dec_key = AesKey::new_decrypt(&raw_key).unwrap();
+
+        let mut out = vec![0u8; 32]; // larger than the 16 bytes that will be written
+        let n = unwrap_key(&dec_key, None, &mut out, &wrapped).unwrap();
+        assert_eq!(n, 16);
+        assert_eq!(&out[..16], &key_data[..]);
+    }
+
+    // out is smaller than in_.len() - 8; must panic.
+    #[test]
+    #[should_panic]
+    fn test_unwrap_key_out_too_small_panics() {
+        let raw_key = Vec::from_hex("000102030405060708090A0B0C0D0E0F").unwrap();
+        let wrapped = Vec::from_hex("1FA68B0A8112B447AEF34BD8FB5A7B829D3E862371D2CFE5").unwrap();
+        let dec_key = AesKey::new_decrypt(&raw_key).unwrap();
+
+        let mut out = vec![0u8; 8]; // too small: needs 16 bytes
+        let _ = unwrap_key(&dec_key, None, &mut out, &wrapped);
+    }
+
+    // Verify that unwrap_key returns Err when the ciphertext has been tampered with.
+    #[test]
+    fn test_unwrap_key_tampered_ciphertext() {
+        let raw_key = Vec::from_hex("000102030405060708090A0B0C0D0E0F").unwrap();
+        let mut wrapped =
+            Vec::from_hex("1FA68B0A8112B447AEF34BD8FB5A7B829D3E862371D2CFE5").unwrap();
+        // Flip a byte so the integrity check fails
+        wrapped[0] ^= 0xFF;
+
+        let dec_key = AesKey::new_decrypt(&raw_key).unwrap();
+        let mut out = [0u8; 16];
+        assert!(
+            unwrap_key(&dec_key, None, &mut out, &wrapped).is_err(),
+            "expected Err for tampered ciphertext"
+        );
+    }
+
+    // Verify that wrap/unwrap round-trips correctly with an explicit IV.
+    #[test]
+    fn test_wrap_unwrap_with_iv() {
+        let raw_key = Vec::from_hex("000102030405060708090A0B0C0D0E0F").unwrap();
+        let key_data = Vec::from_hex("00112233445566778899AABBCCDDEEFF").unwrap();
+        let iv: [u8; 8] = [0xA6, 0xA6, 0xA6, 0xA6, 0xA6, 0xA6, 0xA6, 0xA6];
+
+        let enc_key = AesKey::new_encrypt(&raw_key).unwrap();
+        let mut wrapped = [0u8; 24];
+        wrap_key(&enc_key, Some(iv), &mut wrapped, &key_data).unwrap();
+
+        let dec_key = AesKey::new_decrypt(&raw_key).unwrap();
+        let mut unwrapped = [0u8; 16];
+        unwrap_key(&dec_key, Some(iv), &mut unwrapped, &wrapped).unwrap();
+        assert_eq!(&unwrapped[..], &key_data[..]);
+
+        // Using a different IV must fail
+        let wrong_iv: [u8; 8] = [0x00; 8];
+        let mut unwrapped2 = [0u8; 16];
+        assert!(
+            unwrap_key(&dec_key, Some(wrong_iv), &mut unwrapped2, &wrapped).is_err(),
+            "expected Err when IV does not match"
+        );
     }
 
     // from the RFC https://tools.ietf.org/html/rfc3394#section-2.2.3

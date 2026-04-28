@@ -1,4 +1,4 @@
-use libc::*;
+use std::ffi::{c_double, c_int, c_void};
 
 extern "C" {
     pub fn RAND_bytes(buf: *mut u8, num: c_int) -> c_int;

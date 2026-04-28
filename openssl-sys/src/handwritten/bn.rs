@@ -1,5 +1,5 @@
 use super::super::*;
-use libc::*;
+use std::ffi::{c_char, c_int};
 
 extern "C" {
     pub fn BN_CTX_new() -> *mut BN_CTX;

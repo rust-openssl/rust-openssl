@@ -1,5 +1,6 @@
 use super::super::*;
-use libc::*;
+use libc::size_t;
+use std::ffi::{c_char, c_int};
 
 cfg_if! {
     if #[cfg(ossl300)] {

@@ -723,15 +723,30 @@ impl fmt::Display for Asn1ObjectRef {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         unsafe {
             let mut buf = [0; 80];
-            let len = ffi::OBJ_obj2txt(
+            let mut clamped = false;
+            let mut len = ffi::OBJ_obj2txt(
                 buf.as_mut_ptr() as *mut _,
                 buf.len() as c_int,
                 self.as_ptr(),
                 0,
             );
+            if len <= 0 {
+                return fmt.write_str("OBJ_obj2txt error");
+            }
+            if len > buf.len() as i32 {
+                // omit trailing NUL
+                len = (buf.len() - 1) as i32;
+                clamped = true;
+            }
             match str::from_utf8(&buf[..len as usize]) {
                 Err(_) => fmt.write_str("error"),
-                Ok(s) => fmt.write_str(s),
+                Ok(s) => {
+                    if clamped {
+                        fmt.write_str(&(s.to_owned() + "..."))
+                    } else {
+                        fmt.write_str(s)
+                    }
+                }
             }
         }
     }
@@ -891,6 +906,13 @@ mod tests {
         Asn1Object::from_str("NOT AN OID")
             .map(|object| object.to_string())
             .expect_err("parsing invalid OID should fail");
+    }
+
+    #[test]
+    fn very_long_object() {
+        let fifty_ones = "1.".repeat(49) + "1";
+        let object = Asn1Object::from_str(&fifty_ones).unwrap();
+        assert_eq!(object.as_ref().to_string(), "1.".repeat(40) + "..");
     }
 
     #[test]

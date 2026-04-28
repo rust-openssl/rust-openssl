@@ -1,4 +1,5 @@
 use super::super::*;
+use std::ffi::{c_int, c_long, c_uchar, c_void};
 
 #[cfg(ossl300)]
 extern "C" {

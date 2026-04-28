@@ -1,4 +1,4 @@
-use libc::*;
+use std::ffi::{c_int, c_ulong};
 
 pub const ERR_TXT_MALLOCED: c_int = 0x01;
 pub const ERR_TXT_STRING: c_int = 0x02;

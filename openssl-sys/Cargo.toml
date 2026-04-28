@@ -1,6 +1,6 @@
 [package]
 name = "openssl-sys"
-version = "0.9.113"
+version = "0.9.114"
 authors = [
     "Alex Crichton <alex@alexcrichton.com>",
     "Steven Fackler <sfackler@gmail.com>",
@@ -13,7 +13,7 @@ categories = ["cryptography", "external-ffi-bindings"]
 links = "openssl"
 build = "build/main.rs"
 edition = "2021"
-rust-version = "1.70.0"
+rust-version = "1.80.0"
 
 [features]
 vendored = ['openssl-src']

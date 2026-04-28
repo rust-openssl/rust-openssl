@@ -251,11 +251,28 @@ impl EcGroupRef {
     }
 
     /// Returns the generator for the given curve as an [`EcPoint`].
+    ///
+    /// Panics if the group has no generator set (e.g. a group constructed via
+    /// [`EcGroup::from_components`] before [`EcGroupRef::set_generator`] has
+    /// been called). This method is deprecated in favor of
+    /// [`EcGroupRef::generator_opt`], which lets callers handle that case
+    /// without a panic.
     #[corresponds(EC_GROUP_get0_generator)]
+    #[deprecated(
+        since = "0.10.79",
+        note = "Panics if the group has no generator. Use generator_opt instead."
+    )]
     pub fn generator(&self) -> &EcPointRef {
+        self.generator_opt().expect("EC_GROUP has no generator set")
+    }
+
+    /// Returns the generator for the given curve as an [`EcPoint`], or `None`
+    /// if the group has no generator set.
+    #[corresponds(EC_GROUP_get0_generator)]
+    pub fn generator_opt(&self) -> Option<&EcPointRef> {
         unsafe {
             let ptr = ffi::EC_GROUP_get0_generator(self.as_ptr());
-            EcPointRef::from_const_ptr(ptr)
+            EcPointRef::from_const_ptr_opt(ptr)
         }
     }
 
@@ -398,13 +415,21 @@ impl EcPointRef {
     }
 
     /// Computes `q * m`, storing the result in `self`.
+    ///
+    /// This method is deprecated because it takes a shared reference to the
+    /// `BigNumContext`, which is unsound: `EC_POINT_mul` mutates the context's
+    /// internal stack of temporaries, so sharing it across threads can race.
+    /// Use [`EcPointRef::mul2`] instead.
     #[corresponds(EC_POINT_mul)]
+    #[deprecated(
+        since = "0.10.79",
+        note = "Unsound: ctx is mutated internally. Use mul2 instead."
+    )]
     pub fn mul(
         &mut self,
         group: &EcGroupRef,
         q: &EcPointRef,
         m: &BigNumRef,
-        // FIXME should be &mut
         ctx: &BigNumContextRef,
     ) -> Result<(), ErrorStack> {
         unsafe {
@@ -420,14 +445,65 @@ impl EcPointRef {
         }
     }
 
-    /// Computes `generator * n`, storing the result in `self`.
+    /// Computes `q * m`, storing the result in `self`.
     #[corresponds(EC_POINT_mul)]
+    pub fn mul2(
+        &mut self,
+        group: &EcGroupRef,
+        q: &EcPointRef,
+        m: &BigNumRef,
+        ctx: &mut BigNumContextRef,
+    ) -> Result<(), ErrorStack> {
+        unsafe {
+            cvt(ffi::EC_POINT_mul(
+                group.as_ptr(),
+                self.as_ptr(),
+                ptr::null(),
+                q.as_ptr(),
+                m.as_ptr(),
+                ctx.as_ptr(),
+            ))
+            .map(|_| ())
+        }
+    }
+
+    /// Computes `generator * n`, storing the result in `self`.
+    ///
+    /// This method is deprecated because it takes a shared reference to the
+    /// `BigNumContext`, which is unsound: `EC_POINT_mul` mutates the context's
+    /// internal stack of temporaries, so sharing it across threads can race.
+    /// Use [`EcPointRef::mul_generator2`] instead.
+    #[corresponds(EC_POINT_mul)]
+    #[deprecated(
+        since = "0.10.79",
+        note = "Unsound: ctx is mutated internally. Use mul_generator2 instead."
+    )]
     pub fn mul_generator(
         &mut self,
         group: &EcGroupRef,
         n: &BigNumRef,
-        // FIXME should be &mut
         ctx: &BigNumContextRef,
+    ) -> Result<(), ErrorStack> {
+        unsafe {
+            cvt(ffi::EC_POINT_mul(
+                group.as_ptr(),
+                self.as_ptr(),
+                n.as_ptr(),
+                ptr::null(),
+                ptr::null(),
+                ctx.as_ptr(),
+            ))
+            .map(|_| ())
+        }
+    }
+
+    /// Computes `generator * n`, storing the result in `self`.
+    #[corresponds(EC_POINT_mul)]
+    pub fn mul_generator2(
+        &mut self,
+        group: &EcGroupRef,
+        n: &BigNumRef,
+        ctx: &mut BigNumContextRef,
     ) -> Result<(), ErrorStack> {
         unsafe {
             cvt(ffi::EC_POINT_mul(
@@ -466,9 +542,34 @@ impl EcPointRef {
     }
 
     /// Inverts `self`.
+    ///
+    /// This method is deprecated because it takes a shared reference to the
+    /// `BigNumContext`, which is unsound: `EC_POINT_invert` mutates the
+    /// context's internal stack of temporaries, so sharing it across threads
+    /// can race. Use [`EcPointRef::invert2`] instead.
     #[corresponds(EC_POINT_invert)]
-    // FIXME should be mutable
+    #[deprecated(
+        since = "0.10.79",
+        note = "Unsound: ctx is mutated internally. Use invert2 instead."
+    )]
     pub fn invert(&mut self, group: &EcGroupRef, ctx: &BigNumContextRef) -> Result<(), ErrorStack> {
+        unsafe {
+            cvt(ffi::EC_POINT_invert(
+                group.as_ptr(),
+                self.as_ptr(),
+                ctx.as_ptr(),
+            ))
+            .map(|_| ())
+        }
+    }
+
+    /// Inverts `self`.
+    #[corresponds(EC_POINT_invert)]
+    pub fn invert2(
+        &mut self,
+        group: &EcGroupRef,
+        ctx: &mut BigNumContextRef,
+    ) -> Result<(), ErrorStack> {
         unsafe {
             cvt(ffi::EC_POINT_invert(
                 group.as_ptr(),
@@ -1098,6 +1199,7 @@ mod test {
     use super::*;
     use crate::bn::{BigNum, BigNumContext};
     use crate::nid::Nid;
+    use crate::symm::Cipher;
 
     #[test]
     fn key_new_by_curve_name() {
@@ -1108,6 +1210,25 @@ mod test {
     fn generate() {
         let group = EcGroup::from_curve_name(Nid::X9_62_PRIME256V1).unwrap();
         EcKey::generate(&group).unwrap();
+    }
+
+    #[test]
+    fn test_password_callback_oversize_return_is_rejected() {
+        // The password callback trampoline must reject a user-returned
+        // length that exceeds the size of the buffer it handed out.
+        // Otherwise some versions of OpenSSL read past the buffer when
+        // deriving the decryption key.
+        let group = EcGroup::from_curve_name(Nid::X9_62_PRIME256V1).unwrap();
+        let key = EcKey::generate(&group).unwrap();
+        let encrypted = key
+            .private_key_to_pem_passphrase(Cipher::aes_128_cbc(), b"correct-pw")
+            .unwrap();
+
+        let result = EcKey::private_key_from_pem_callback(&encrypted, |buf| {
+            buf[..10].copy_from_slice(b"correct-pw");
+            Ok(buf.len() * 10)
+        });
+        assert!(result.is_err());
     }
 
     #[test]
@@ -1286,7 +1407,7 @@ mod test {
         let mut ctx = BigNumContext::new().unwrap();
         let mut public_key = EcPoint::new(&group).unwrap();
         public_key
-            .mul_generator(&group, key.private_key(), &ctx)
+            .mul_generator2(&group, key.private_key(), &mut ctx)
             .unwrap();
         assert!(public_key.eq(&group, key.public_key(), &mut ctx).unwrap());
     }
@@ -1294,12 +1415,77 @@ mod test {
     #[test]
     fn generator() {
         let group = EcGroup::from_curve_name(Nid::X9_62_PRIME256V1).unwrap();
-        let gen = group.generator();
+        let gen = group.generator_opt().unwrap();
         let one = BigNum::from_u32(1).unwrap();
         let mut ctx = BigNumContext::new().unwrap();
         let mut ecp = EcPoint::new(&group).unwrap();
-        ecp.mul_generator(&group, &one, &ctx).unwrap();
+        ecp.mul_generator2(&group, &one, &mut ctx).unwrap();
         assert!(ecp.eq(&group, gen, &mut ctx).unwrap());
+    }
+
+    #[test]
+    fn generator_opt_none_on_custom_group() {
+        // parameters are from secp256r1
+        let p = BigNum::from_hex_str(
+            "FFFFFFFF00000001000000000000000000000000FFFFFFFFFFFFFFFFFFFFFFFF",
+        )
+        .unwrap();
+        let a = BigNum::from_hex_str(
+            "FFFFFFFF00000001000000000000000000000000FFFFFFFFFFFFFFFFFFFFFFFC",
+        )
+        .unwrap();
+        let b = BigNum::from_hex_str(
+            "5AC635D8AA3A93E7B3EBBD55769886BC651D06B0CC53B0F63BCE3C3E27D2604B",
+        )
+        .unwrap();
+        let mut ctx = BigNumContext::new().unwrap();
+
+        let mut group = EcGroup::from_components(p, a, b, &mut ctx).unwrap();
+        assert!(group.generator_opt().is_none());
+
+        let mut gen_point = EcPoint::new(&group).unwrap();
+        let gen_x = BigNum::from_hex_str(
+            "6B17D1F2E12C4247F8BCE6E563A440F277037D812DEB33A0F4A13945D898C296",
+        )
+        .unwrap();
+        let gen_y = BigNum::from_hex_str(
+            "4FE342E2FE1A7F9B8EE7EB4A7C0F9E162BCE33576B315ECECBB6406837BF51F5",
+        )
+        .unwrap();
+        gen_point
+            .set_affine_coordinates_gfp(&group, &gen_x, &gen_y, &mut ctx)
+            .unwrap();
+        let order = BigNum::from_hex_str(
+            "FFFFFFFF00000000FFFFFFFFFFFFFFFFBCE6FAADA7179E84F3B9CAC2FC632551",
+        )
+        .unwrap();
+        let cofactor = BigNum::from_hex_str("01").unwrap();
+        group.set_generator(gen_point, order, cofactor).unwrap();
+
+        assert!(group.generator_opt().is_some());
+    }
+
+    #[test]
+    #[should_panic(expected = "EC_GROUP has no generator set")]
+    #[allow(deprecated)]
+    fn generator_panics_on_custom_group() {
+        // parameters are from secp256r1
+        let p = BigNum::from_hex_str(
+            "FFFFFFFF00000001000000000000000000000000FFFFFFFFFFFFFFFFFFFFFFFF",
+        )
+        .unwrap();
+        let a = BigNum::from_hex_str(
+            "FFFFFFFF00000001000000000000000000000000FFFFFFFFFFFFFFFFFFFFFFFC",
+        )
+        .unwrap();
+        let b = BigNum::from_hex_str(
+            "5AC635D8AA3A93E7B3EBBD55769886BC651D06B0CC53B0F63BCE3C3E27D2604B",
+        )
+        .unwrap();
+        let mut ctx = BigNumContext::new().unwrap();
+
+        let group = EcGroup::from_components(p, a, b, &mut ctx).unwrap();
+        let _ = group.generator();
     }
 
     #[test]
@@ -1398,13 +1584,13 @@ mod test {
     fn is_infinity() {
         let group = EcGroup::from_curve_name(Nid::X9_62_PRIME256V1).unwrap();
         let mut ctx = BigNumContext::new().unwrap();
-        let g = group.generator();
+        let g = group.generator_opt().unwrap();
         assert!(!g.is_infinity(&group));
 
         let mut order = BigNum::new().unwrap();
         group.order(&mut order, &mut ctx).unwrap();
         let mut inf = EcPoint::new(&group).unwrap();
-        inf.mul_generator(&group, &order, &ctx).unwrap();
+        inf.mul_generator2(&group, &order, &mut ctx).unwrap();
         assert!(inf.is_infinity(&group));
     }
 
@@ -1413,7 +1599,7 @@ mod test {
     fn is_on_curve() {
         let group = EcGroup::from_curve_name(Nid::X9_62_PRIME256V1).unwrap();
         let mut ctx = BigNumContext::new().unwrap();
-        let g = group.generator();
+        let g = group.generator_opt().unwrap();
         assert!(g.is_on_curve(&group, &mut ctx).unwrap());
 
         let group2 = EcGroup::from_curve_name(Nid::X9_62_PRIME239V3).unwrap();

@@ -1,5 +1,5 @@
 use super::super::*;
-use libc::*;
+use std::ffi::c_int;
 
 extern "C" {
     pub fn OSSL_set_max_threads(ctx: *mut OSSL_LIB_CTX, max_threads: u64) -> c_int;

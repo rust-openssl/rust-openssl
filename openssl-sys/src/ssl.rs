@@ -1,4 +1,4 @@
-use libc::*;
+use std::ffi::{c_char, c_int, c_long, c_uchar, c_uint, c_ulong, c_void};
 use std::ptr;
 
 use super::*;
@@ -82,8 +82,13 @@ cfg_if! {
 }
 #[cfg(ossl110)]
 pub const SSL_OP_SAFARI_ECDHE_ECDSA_BUG: ssl_op_type!() = 0x00000040;
+#[cfg(ossl300)]
+pub const SSL_OP_IGNORE_UNEXPECTED_EOF: ssl_op_type!() = 0x00000080;
 
+#[cfg(not(libressl430))]
 pub const SSL_OP_DONT_INSERT_EMPTY_FRAGMENTS: ssl_op_type!() = 0x00000800;
+#[cfg(libressl430)]
+pub const SSL_OP_DONT_INSERT_EMPTY_FRAGMENTS: ssl_op_type!() = 0x00000000;
 
 pub const SSL_OP_NO_QUERY_MTU: ssl_op_type!() = 0x00001000;
 pub const SSL_OP_COOKIE_EXCHANGE: ssl_op_type!() = 0x00002000;

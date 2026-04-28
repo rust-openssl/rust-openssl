@@ -10,7 +10,7 @@
 #![recursion_limit = "128"] // configure fixed limit across all rust versions
 
 extern crate libc;
-pub use libc::c_int;
+pub use std::ffi::c_int;
 
 #[cfg(feature = "unstable_boringssl")]
 extern crate bssl_sys;
@@ -45,7 +45,7 @@ mod aws_lc {
     #[cfg(not(any(feature = "aws-lc", feature = "aws-lc-fips")))]
     include!(concat!(env!("OUT_DIR"), "/bindgen.rs"));
 
-    use libc::{c_char, c_long, c_void};
+    use std::ffi::{c_char, c_int, c_long, c_uint, c_void};
 
     pub fn init() {
         unsafe { CRYPTO_library_init() }
@@ -66,19 +66,19 @@ mod aws_lc {
     // (wrap_static_fns), they're in the generated output.
     #[cfg(awslc_pregenerated)]
     #[allow(non_snake_case, clippy::cast_possible_wrap)]
-    pub fn ERR_GET_LIB(packed_error: ::libc::c_uint) -> ::libc::c_int {
-        ((packed_error >> 24) & 0xFF) as ::libc::c_int
+    pub fn ERR_GET_LIB(packed_error: c_uint) -> c_int {
+        ((packed_error >> 24) & 0xFF) as c_int
     }
 
     #[cfg(awslc_pregenerated)]
     #[allow(non_snake_case, clippy::cast_possible_wrap)]
-    pub fn ERR_GET_REASON(packed_error: ::libc::c_uint) -> ::libc::c_int {
-        (packed_error & 0xFFF) as ::libc::c_int
+    pub fn ERR_GET_REASON(packed_error: c_uint) -> c_int {
+        (packed_error & 0xFFF) as c_int
     }
 
     #[cfg(awslc_pregenerated)]
     #[allow(non_snake_case)]
-    pub fn ERR_GET_FUNC(_packed_error: ::libc::c_uint) -> ::libc::c_int {
+    pub fn ERR_GET_FUNC(_packed_error: c_uint) -> c_int {
         0
     }
 }
@@ -88,7 +88,7 @@ pub use aws_lc::*;
 #[cfg(openssl)]
 #[path = "."]
 mod openssl {
-    use libc::*;
+    use std::ffi::{c_char, c_int, c_void};
 
     #[cfg(feature = "bindgen")]
     include!(concat!(env!("OUT_DIR"), "/bindgen.rs"));

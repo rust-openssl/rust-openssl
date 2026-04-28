@@ -1,4 +1,4 @@
-use libc::*;
+use std::ffi::{c_char, c_int, c_void};
 
 cfg_if! {
     if #[cfg(ossl110)] {

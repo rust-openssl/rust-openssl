@@ -1,5 +1,5 @@
 use super::super::*;
-use libc::*;
+use std::ffi::{c_char, c_int, c_ulong};
 
 #[repr(C)]
 pub struct ERR_STRING_DATA {

@@ -1,5 +1,6 @@
 use super::super::*;
-use libc::*;
+use libc::size_t;
+use std::ffi::{c_int, c_uchar, c_uint, c_void};
 
 cfg_if! {
     if #[cfg(not(osslconf = "OPENSSL_NO_DEPRECATED_3_0"))] {

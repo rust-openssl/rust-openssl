@@ -242,6 +242,10 @@ impl MdCtxRef {
     pub fn digest_final(&mut self, out: &mut [u8]) -> Result<usize, ErrorStack> {
         let mut len = u32::try_from(out.len()).unwrap_or(u32::MAX);
 
+        if self.size() > len as usize {
+            return Err(ErrorStack::get());
+        }
+
         unsafe {
             cvt(ffi::EVP_DigestFinal(
                 self.as_ptr(),
@@ -548,5 +552,14 @@ mod test {
         assert_eq!(result_len, reset_result.len());
         // Validate result of digest of "World"
         assert_eq!(reset_result, world_expected);
+    }
+
+    #[test]
+    fn digest_final_checks_length() {
+        let mut ctx = MdCtx::new().unwrap();
+        ctx.digest_init(Md::sha256()).unwrap();
+        ctx.digest_update(b"Some Crypto Text").unwrap();
+        let mut digest = [0; 16];
+        assert!(ctx.digest_final(&mut digest).is_err());
     }
 }

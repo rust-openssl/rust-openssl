@@ -86,7 +86,6 @@ use bitflags::bitflags;
 use cfg_if::cfg_if;
 use foreign_types::{ForeignType, ForeignTypeRef, Opaque};
 use libc::{c_char, c_int, c_long, c_uchar, c_uint, c_void};
-use once_cell::sync::{Lazy, OnceCell};
 use openssl_macros::corresponds;
 use std::any::TypeId;
 use std::collections::HashMap;
@@ -101,7 +100,7 @@ use std::panic::resume_unwind;
 use std::path::Path;
 use std::ptr;
 use std::str;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, LazyLock, Mutex, OnceLock};
 
 pub use crate::ssl::connector::{
     ConnectConfiguration, SslAcceptor, SslAcceptorBuilder, SslConnector, SslConnectorBuilder,
@@ -149,6 +148,11 @@ bitflags! {
     pub struct SslOptions: SslOptionsRepr {
         /// Disables a countermeasure against an SSLv3/TLSv1.0 vulnerability affecting CBC ciphers.
         const DONT_INSERT_EMPTY_FRAGMENTS = ffi::SSL_OP_DONT_INSERT_EMPTY_FRAGMENTS as SslOptionsRepr;
+
+        /// If set, a peer closing the connection without sending a close_notify alert is
+        /// treated as a normal EOF rather than an error.
+        #[cfg(ossl300)]
+        const IGNORE_UNEXPECTED_EOF = ffi::SSL_OP_IGNORE_UNEXPECTED_EOF as SslOptionsRepr;
 
         /// A "reasonable default" set of options which enables compatibility flags.
         #[cfg(not(any(boringssl, awslc)))]
@@ -558,12 +562,20 @@ impl NameType {
     }
 }
 
-static INDEXES: Lazy<Mutex<HashMap<TypeId, c_int>>> = Lazy::new(|| Mutex::new(HashMap::new()));
-static SSL_INDEXES: Lazy<Mutex<HashMap<TypeId, c_int>>> = Lazy::new(|| Mutex::new(HashMap::new()));
-static SESSION_CTX_INDEX: OnceCell<Index<Ssl, SslContext>> = OnceCell::new();
+static INDEXES: LazyLock<Mutex<HashMap<TypeId, c_int>>> =
+    LazyLock::new(|| Mutex::new(HashMap::new()));
+static SSL_INDEXES: LazyLock<Mutex<HashMap<TypeId, c_int>>> =
+    LazyLock::new(|| Mutex::new(HashMap::new()));
+static SESSION_CTX_INDEX: OnceLock<Index<Ssl, SslContext>> = OnceLock::new();
 
 fn try_get_session_ctx_index() -> Result<&'static Index<Ssl, SslContext>, ErrorStack> {
-    SESSION_CTX_INDEX.get_or_try_init(Ssl::new_ex_index)
+    // Once `OnceLock::get_or_try_init` (rust-lang/rust#109737) is stable, this
+    // can collapse to `SESSION_CTX_INDEX.get_or_try_init(Ssl::new_ex_index)`.
+    if let Some(idx) = SESSION_CTX_INDEX.get() {
+        return Ok(idx);
+    }
+    let new = Ssl::new_ex_index::<SslContext>()?;
+    Ok(SESSION_CTX_INDEX.get_or_init(|| new))
 }
 
 unsafe extern "C" fn free_data_box<T>(
@@ -3061,9 +3073,8 @@ impl SslRef {
                 response.len() as c_long,
             ) as c_int)
             .map(|_| ())
-            .map_err(|e| {
+            .inspect_err(|_| {
                 ffi::OPENSSL_free(p);
-                e
             })
         }
     }
@@ -3854,9 +3865,7 @@ impl<S: Read + Write> SslStream<S> {
                 }
                 Err(ref e) if e.code() == ErrorCode::WANT_READ && e.io_error().is_none() => {}
                 Err(e) => {
-                    return Err(e
-                        .into_io_error()
-                        .unwrap_or_else(|e| io::Error::new(io::ErrorKind::Other, e)));
+                    return Err(e.into_io_error().unwrap_or_else(io::Error::other));
                 }
             }
         }
@@ -3885,6 +3894,10 @@ impl<S: Read + Write> SslStream<S> {
     /// then the first `n` bytes of `buf` are guaranteed to be initialized.
     #[corresponds(SSL_read_ex)]
     pub fn ssl_read_uninit(&mut self, buf: &mut [MaybeUninit<u8>]) -> Result<usize, Error> {
+        if buf.is_empty() {
+            return Ok(0);
+        }
+
         cfg_if! {
             if #[cfg(any(ossl111, libressl))] {
                 let mut readbytes = 0;
@@ -3903,10 +3916,6 @@ impl<S: Read + Write> SslStream<S> {
                     Err(self.make_error(ret))
                 }
             } else {
-                if buf.is_empty() {
-                    return Ok(0);
-                }
-
                 let len = usize::min(c_int::MAX as usize, buf.len()) as c_int;
                 let ret = unsafe {
                     ffi::SSL_read(self.ssl().as_ptr(), buf.as_mut_ptr().cast(), len)
@@ -3926,6 +3935,10 @@ impl<S: Read + Write> SslStream<S> {
     /// OpenSSL is waiting on read or write readiness.
     #[corresponds(SSL_write_ex)]
     pub fn ssl_write(&mut self, buf: &[u8]) -> Result<usize, Error> {
+        if buf.is_empty() {
+            return Ok(0);
+        }
+
         cfg_if! {
             if #[cfg(any(ossl111, libressl))] {
                 let mut written = 0;
@@ -3944,10 +3957,6 @@ impl<S: Read + Write> SslStream<S> {
                     Err(self.make_error(ret))
                 }
             } else {
-                if buf.is_empty() {
-                    return Ok(0);
-                }
-
                 let len = usize::min(c_int::MAX as usize, buf.len()) as c_int;
                 let ret = unsafe {
                     ffi::SSL_write(self.ssl().as_ptr(), buf.as_ptr().cast(), len)
@@ -4118,9 +4127,7 @@ impl<S: Read + Write> Write for SslStream<S> {
                 Ok(n) => return Ok(n),
                 Err(ref e) if e.code() == ErrorCode::WANT_READ && e.io_error().is_none() => {}
                 Err(e) => {
-                    return Err(e
-                        .into_io_error()
-                        .unwrap_or_else(|e| io::Error::new(io::ErrorKind::Other, e)));
+                    return Err(e.into_io_error().unwrap_or_else(io::Error::other));
                 }
             }
         }

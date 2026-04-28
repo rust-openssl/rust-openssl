@@ -1,4 +1,4 @@
-use libc::*;
+use std::ffi::c_int;
 
 pub const X509_FILETYPE_PEM: c_int = 1;
 pub const X509_FILETYPE_ASN1: c_int = 2;

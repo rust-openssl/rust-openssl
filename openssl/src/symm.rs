@@ -620,6 +620,10 @@ impl Crypter {
         key: &[u8],
         iv: Option<&[u8]>,
     ) -> Result<Crypter, ErrorStack> {
+        assert!(
+            iv.is_some() || t.iv_len().is_none(),
+            "an IV is required for this cipher"
+        );
         let mut ctx = CipherCtx::new()?;
 
         let f = match mode {
@@ -1753,5 +1757,29 @@ mod tests {
             mem::swap(&mut r, &mut r1);
         }
         assert_eq!(ct1, &r[..count]);
+    }
+
+    #[test]
+    #[should_panic(expected = "an IV is required for this cipher")]
+    fn test_crypter_panics_for_missing_iv_cbc() {
+        let key = [0u8; 16];
+        let _ = Crypter::new(
+            super::Cipher::aes_128_cbc(),
+            super::Mode::Encrypt,
+            &key,
+            None,
+        );
+    }
+
+    #[test]
+    #[should_panic(expected = "an IV is required for this cipher")]
+    fn test_crypter_panics_for_missing_iv_gcm() {
+        let key = [0u8; 16];
+        let _ = Crypter::new(
+            super::Cipher::aes_128_gcm(),
+            super::Mode::Encrypt,
+            &key,
+            None,
+        );
     }
 }
