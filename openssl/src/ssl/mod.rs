@@ -2196,7 +2196,7 @@ impl SslCipherRef {
     }
 
     /// Returns a cipher matching the name
-    /// 
+    ///
     /// Requires OpenSSL 1.1.1 or newer.
     #[corresponds(SSL_CIPHER_find)]
     #[cfg(ossl111)]
@@ -2307,7 +2307,7 @@ impl SslSessionRef {
         unsafe {
             let p = match cipher {
                 Some(cipher) => cipher.as_ptr(),
-                None => ptr::null()
+                None => ptr::null(),
             };
             cvt(ffi::SSL_SESSION_set_cipher(self.as_ptr(), p) as c_int).map(|_| ())
         }
@@ -2372,15 +2372,13 @@ impl SslSessionRef {
         }
     }
 
-    /// Returns the session's TLS protocol version.
+    /// Sets the session's TLS protocol version.
     ///
     /// Requires LibreSSL or OpenSSL 1.1.0 or newer.
     #[corresponds(SSL_SESSION_set_protocol_version)]
     #[cfg(any(ossl110, libressl))]
     pub fn set_protocol_version(&self, version: SslVersion) -> i32 {
-        unsafe {
-            ffi::SSL_SESSION_set_protocol_version(self.as_ptr(), version.0)
-        }
+        unsafe { ffi::SSL_SESSION_set_protocol_version(self.as_ptr(), version.0) }
     }
 
     to_der! {
@@ -4341,7 +4339,10 @@ bitflags! {
     }
 }
 
-use ffi::{SSL_CTX_up_ref, SSL_SESSION_get_master_key, SSL_SESSION_set1_master_key, SSL_SESSION_up_ref, SSL_is_server};
+use ffi::{
+    SSL_CTX_up_ref, SSL_SESSION_get_master_key, SSL_SESSION_set1_master_key, SSL_SESSION_up_ref,
+    SSL_is_server,
+};
 cfg_if! {
     if #[cfg(ossl300)] {
         use ffi::SSL_get1_peer_certificate;
