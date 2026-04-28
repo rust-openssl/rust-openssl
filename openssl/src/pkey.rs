@@ -388,6 +388,42 @@ where
         }
     }
 
+    /// Writes the algorithm-defined seed for an ML-DSA or ML-KEM private key
+    /// into `buf`, returning the number of bytes written.
+    ///
+    /// `buf` must be at least 32 bytes long for ML-DSA and 64 bytes long for
+    /// ML-KEM. The inverse of [`PKey::private_key_from_seed`].
+    ///
+    /// Errors when called on a key whose algorithm has no `"seed"`
+    /// `OSSL_PARAM` (e.g. RSA, EC, Ed25519), when `buf` is too small for
+    /// the algorithm's seed, or when the underlying key was imported from
+    /// an encoded form that retains only the expanded private key with no
+    /// seed.
+    #[corresponds(EVP_PKEY_get_params)]
+    #[cfg(ossl350)]
+    pub fn seed_into(&self, buf: &mut [u8]) -> Result<usize, ErrorStack> {
+        unsafe {
+            let mut params = [
+                ffi::OSSL_PARAM_construct_octet_string(
+                    c"seed".as_ptr(),
+                    buf.as_mut_ptr() as *mut libc::c_void,
+                    buf.len(),
+                ),
+                ffi::OSSL_PARAM_construct_end(),
+            ];
+            cvt(ffi::EVP_PKEY_get_params(self.as_ptr(), params.as_mut_ptr()))?;
+            // OpenSSL silently ignores OSSL_PARAMs the keymgmt doesn't
+            // recognise and returns success, leaving the param's
+            // `return_size` at OSSL_PARAM_UNMODIFIED. Treat that as an
+            // error.
+            let written = params[0].return_size;
+            if written == ffi::OSSL_PARAM_UNMODIFIED {
+                return Err(ErrorStack::get());
+            }
+            Ok(written)
+        }
+    }
+
     /// Serializes a private key into an unencrypted DER-formatted PKCS#8
     #[corresponds(i2d_PKCS8PrivateKey_bio)]
     pub fn private_key_to_pkcs8(&self) -> Result<Vec<u8>, ErrorStack> {
@@ -1430,6 +1466,60 @@ mod tests {
             PKey::private_key_from_seed(None, KeyType::RSA, None, &seed).is_err(),
             "Unexpectedly accepted a seed-only fromdata import",
         );
+    }
+
+    #[cfg(ossl350)]
+    #[test]
+    fn test_seed_into_mldsa_roundtrip() {
+        let xi = hex::decode("f696484048ec21f96cf50a56d0759c448f3779752f0383d37449690694cf7a68")
+            .unwrap();
+        let key = PKey::private_key_from_seed(None, KeyType::ML_DSA_65, None, &xi).unwrap();
+
+        // Exact-sized buffer succeeds.
+        let mut exact = [0u8; 32];
+        let n = key.seed_into(&mut exact).unwrap();
+        assert_eq!(n, 32);
+        assert_eq!(&exact[..], &xi[..]);
+
+        // Buffer too small is rejected by OpenSSL.
+        let mut small = [0u8; 16];
+        assert!(key.seed_into(&mut small).is_err());
+
+        // Buffer larger than required succeeds; the trailing bytes are
+        // left untouched.
+        let mut large = [0xaau8; 64];
+        let n = key.seed_into(&mut large).unwrap();
+        assert_eq!(n, 32);
+        assert_eq!(&large[..32], &xi[..]);
+        assert!(large[32..].iter().all(|&b| b == 0xaa));
+    }
+
+    #[cfg(ossl350)]
+    #[test]
+    fn test_seed_into_mlkem_roundtrip() {
+        let d = hex::decode("6dbbc4375136df3b07f7c70e639e223e177e7fd53b161b3f4d57791794f12624")
+            .unwrap();
+        let z = hex::decode("f696484048ec21f96cf50a56d0759c448f3779752f0383d37449690694cf7a68")
+            .unwrap();
+        let mut seed = d;
+        seed.extend_from_slice(&z);
+        let key = PKey::private_key_from_seed(None, KeyType::ML_KEM_768, None, &seed).unwrap();
+        let mut buf = [0u8; 64];
+        let n = key.seed_into(&mut buf).unwrap();
+        assert_eq!(n, 64);
+        assert_eq!(&buf[..], &seed[..]);
+    }
+
+    /// `seed_into()` must error on key types that don't have a "seed" OSSL_PARAM.
+    #[cfg(ossl350)]
+    #[test]
+    fn test_seed_into_rejects_non_pq_algorithms() {
+        let mut buf = [0u8; 64];
+        let rsa = PKey::from_rsa(Rsa::generate(2048).unwrap()).unwrap();
+        assert!(rsa.seed_into(&mut buf).is_err());
+
+        let ed = PKey::generate_ed25519().unwrap();
+        assert!(ed.seed_into(&mut buf).is_err());
     }
 
     #[test]
