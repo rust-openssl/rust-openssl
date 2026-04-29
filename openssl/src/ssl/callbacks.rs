@@ -152,7 +152,7 @@ pub extern "C" fn raw_psk_use_session<F>(
     ssl: *mut ffi::SSL,
     msg_digest: *const EVP_MD,
     identity: *mut *const c_uchar,
-    identity_len: *mut c_uint,
+    identity_len: *mut size_t,
     session: *mut *mut SSL_SESSION,
 ) -> c_int
 where
@@ -186,7 +186,7 @@ where
             Ok(result) => {
                 if let Some(cb_identity) = result {
                     // tell OpenSSL we're going ahead with PSK by supplying the session parameter
-                    *identity_len = cb_identity.len() as u32;
+                    *identity_len = cb_identity.len();
                     *identity =
                         std::ffi::CString::new(cb_identity).unwrap().into_raw() as *const u8;
                 };
@@ -218,7 +218,7 @@ where
 pub extern "C" fn raw_psk_find_session<F>(
     ssl: *mut ffi::SSL,
     identity: *const c_uchar,
-    identity_len: c_uint,
+    identity_len: size_t,
     session: *mut *mut SSL_SESSION,
 ) -> c_int
 where
@@ -239,7 +239,7 @@ where
         let identity = if identity.is_null() {
             None
         } else {
-            Some(util::from_raw_parts(identity, identity_len as usize))
+            Some(util::from_raw_parts(identity, identity_len))
         };
         // Create the session, it has to be done and simplifies the callback signature
         let mut cb_session = SslSession::from_ptr_opt(*session);

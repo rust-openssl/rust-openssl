@@ -236,7 +236,7 @@ extern "C" {
                 *mut SSL,
                 *const EVP_MD,
                 *mut *const c_uchar,
-                *mut c_uint,
+                *mut size_t,
                 *mut *mut SSL_SESSION,
             ) -> c_int,
         >,
@@ -244,7 +244,7 @@ extern "C" {
     pub fn SSL_CTX_set_psk_find_session_callback(
         ssl: *mut SSL_CTX,
         psk_find_session_cb: Option<
-            extern "C" fn(*mut SSL, *const c_uchar, c_uint, *mut *mut SSL_SESSION) -> c_int,
+            extern "C" fn(*mut SSL, *const c_uchar, size_t, *mut *mut SSL_SESSION) -> c_int,
         >,
     );
     pub fn SSL_get_psk_identity_hint(ssl: *const SSL) -> *const c_char;
