@@ -1449,7 +1449,7 @@ fn psk_ciphers() {
     assert!(CLIENT_CALLED.load(Ordering::SeqCst));
 }
 
-#[cfg(ossl111)]
+#[cfg(ossl300)]
 #[cfg(not(osslconf = "OPENSSL_NO_PSK"))]
 #[test]
 fn psk_1_3_ciphers() {

@@ -2401,9 +2401,9 @@ impl SslSessionRef {
 
     /// Sets the session's TLS protocol version.
     ///
-    /// Requires LibreSSL or OpenSSL 1.1.1 or newer.
+    /// Requires OpenSSL 1.1.1 or newer.
     #[corresponds(SSL_SESSION_set_protocol_version)]
-    #[cfg(any(ossl111, libressl))]
+    #[cfg(ossl111)]
     pub fn set_protocol_version(&self, version: SslVersion) -> i32 {
         unsafe { ffi::SSL_SESSION_set_protocol_version(self.as_ptr(), version.0) }
     }
