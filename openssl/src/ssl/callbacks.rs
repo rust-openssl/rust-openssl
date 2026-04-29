@@ -1,4 +1,5 @@
 #[cfg(not(osslconf = "OPENSSL_NO_PSK"))]
+#[cfg(ossl111)]
 use ffi::EVP_MD;
 #[cfg(not(osslconf = "OPENSSL_NO_PSK"))]
 #[cfg(ossl110)]
@@ -15,6 +16,7 @@ use std::ffi::CStr;
 use std::mem;
 use std::ptr;
 #[cfg(not(osslconf = "OPENSSL_NO_PSK"))]
+#[cfg(ossl111)]
 use std::ptr::null_mut;
 #[cfg(any(ossl111, boringssl, awslc))]
 use std::str;
@@ -23,6 +25,7 @@ use std::sync::Arc;
 use crate::dh::Dh;
 use crate::error::ErrorStack;
 #[cfg(not(osslconf = "OPENSSL_NO_PSK"))]
+#[cfg(ossl111)]
 use crate::hash::MessageDigest;
 use crate::pkey::Params;
 use crate::ssl::AlpnError;
@@ -34,6 +37,7 @@ use crate::ssl::{
 use crate::ssl::{ClientHelloResponse, ExtensionContext};
 use crate::util;
 #[cfg(not(osslconf = "OPENSSL_NO_PSK"))]
+#[cfg(ossl111)]
 use crate::util::ForeignTypeExt;
 #[cfg(any(ossl111, boringssl, awslc))]
 use crate::util::ForeignTypeRefExt;

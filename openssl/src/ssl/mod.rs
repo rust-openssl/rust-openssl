@@ -4361,10 +4361,9 @@ bitflags! {
     }
 }
 
-use ffi::{
-    SSL_CTX_up_ref, SSL_SESSION_get_master_key, SSL_SESSION_set1_master_key, SSL_SESSION_up_ref,
-    SSL_is_server,
-};
+#[cfg(ossl111)]
+use ffi::SSL_SESSION_set1_master_key;
+use ffi::{SSL_CTX_up_ref, SSL_SESSION_get_master_key, SSL_SESSION_up_ref, SSL_is_server};
 cfg_if! {
     if #[cfg(ossl300)] {
         use ffi::SSL_get1_peer_certificate;
