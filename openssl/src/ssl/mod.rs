@@ -80,7 +80,7 @@ use crate::util;
 use crate::util::{ForeignTypeExt, ForeignTypeRefExt};
 use crate::x509::store::{X509Store, X509StoreBuilderRef, X509StoreRef};
 use crate::x509::verify::X509VerifyParamRef;
-use crate::x509::{X509Name, X509Ref, X509StoreContextRef, X509VerifyResult, X509};
+use crate::x509::{X509, X509Name, X509Ref, X509StoreContextRef, X509VerifyResult};
 use crate::{cvt, cvt_n, cvt_p, init};
 use bitflags::bitflags;
 use cfg_if::cfg_if;
@@ -1183,11 +1183,7 @@ impl SslContextBuilder {
     pub fn min_proto_version(&mut self) -> Option<SslVersion> {
         unsafe {
             let r = ffi::SSL_CTX_get_min_proto_version(self.as_ptr());
-            if r == 0 {
-                None
-            } else {
-                Some(SslVersion(r))
-            }
+            if r == 0 { None } else { Some(SslVersion(r)) }
         }
     }
 
@@ -1202,11 +1198,7 @@ impl SslContextBuilder {
     pub fn max_proto_version(&mut self) -> Option<SslVersion> {
         unsafe {
             let r = ffi::SSL_CTX_get_max_proto_version(self.as_ptr());
-            if r == 0 {
-                None
-            } else {
-                Some(SslVersion(r))
-            }
+            if r == 0 { None } else { Some(SslVersion(r)) }
         }
     }
 
@@ -2190,11 +2182,7 @@ impl SslCipherRef {
     #[cfg(any(ossl110, libressl))]
     pub fn cipher_nid(&self) -> Option<Nid> {
         let n = unsafe { ffi::SSL_CIPHER_get_cipher_nid(self.as_ptr()) };
-        if n == 0 {
-            None
-        } else {
-            Some(Nid::from_raw(n))
-        }
+        if n == 0 { None } else { Some(Nid::from_raw(n)) }
     }
 
     /// Returns the two-byte ID of the cipher
@@ -2760,11 +2748,7 @@ impl SslRef {
     pub fn version2(&self) -> Option<SslVersion> {
         unsafe {
             let r = ffi::SSL_version(self.as_ptr());
-            if r == 0 {
-                None
-            } else {
-                Some(SslVersion(r))
-            }
+            if r == 0 { None } else { Some(SslVersion(r)) }
         }
     }
 
@@ -4361,9 +4345,11 @@ bitflags! {
     }
 }
 
+#[cfg(ossl110)]
+use ffi::SSL_SESSION_get_master_key;
 #[cfg(ossl111)]
 use ffi::SSL_SESSION_set1_master_key;
-use ffi::{SSL_CTX_up_ref, SSL_SESSION_get_master_key, SSL_SESSION_up_ref, SSL_is_server};
+use ffi::{SSL_CTX_up_ref, SSL_SESSION_up_ref, SSL_is_server};
 cfg_if! {
     if #[cfg(ossl300)] {
         use ffi::SSL_get1_peer_certificate;
