@@ -229,6 +229,7 @@ extern "C" {
             extern "C" fn(*mut SSL, *const c_char, *mut c_uchar, c_uint) -> c_uint,
         >,
     );
+    #[cfg(ossl111)]
     pub fn SSL_CTX_set_psk_use_session_callback(
         ssl: *mut SSL_CTX,
         psk_use_session_cb: Option<
@@ -241,6 +242,7 @@ extern "C" {
             ) -> c_int,
         >,
     );
+    #[cfg(ossl111)]
     pub fn SSL_CTX_set_psk_find_session_callback(
         ssl: *mut SSL_CTX,
         psk_find_session_cb: Option<
@@ -389,6 +391,7 @@ extern "C" {
     pub fn SSL_SESSION_get_time(s: *const SSL_SESSION) -> c_long;
     pub fn SSL_SESSION_get_timeout(s: *const SSL_SESSION) -> c_long;
     pub fn SSL_SESSION_get_protocol_version(s: *const SSL_SESSION) -> c_int;
+    #[cfg(ossl111)]
     pub fn SSL_SESSION_set_protocol_version(s: *const SSL_SESSION, v: c_int) -> c_int;
 
     #[cfg(any(ossl111, libressl))]
@@ -400,7 +403,9 @@ extern "C" {
     pub fn SSL_SESSION_up_ref(ses: *mut SSL_SESSION) -> c_int;
     pub fn SSL_SESSION_free(s: *mut SSL_SESSION);
 
+    #[cfg(ossl110)]
     pub fn SSL_SESSION_get0_cipher(s: *const SSL_SESSION) -> *const SSL_CIPHER;
+    #[cfg(ossl111)]
     pub fn SSL_SESSION_set_cipher(s: *const SSL_SESSION, cipher: *const SSL_CIPHER) -> i32;
 }
 const_ptr_api! {
@@ -620,12 +625,15 @@ extern "C" {
     pub fn SSL_get_client_random(ssl: *const SSL, out: *mut c_uchar, len: size_t) -> size_t;
     pub fn SSL_get_server_random(ssl: *const SSL, out: *mut c_uchar, len: size_t) -> size_t;
 
+    #[cfg(ossl110)]
     pub fn SSL_SESSION_new() -> *mut SSL_SESSION;
+    #[cfg(ossl110)]
     pub fn SSL_SESSION_get_master_key(
         session: *const SSL_SESSION,
         out: *mut c_uchar,
         outlen: size_t,
     ) -> size_t;
+    #[cfg(ossl111)]
     pub fn SSL_SESSION_set1_master_key(
         session: *const SSL_SESSION,
         in_buf: *const c_uchar,

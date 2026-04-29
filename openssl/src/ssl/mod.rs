@@ -1417,6 +1417,7 @@ impl SslContextBuilder {
     ///     return Err(_)
     #[corresponds(SSL_CTX_set_psk_use_session_callback)]
     #[cfg(not(osslconf = "OPENSSL_NO_PSK"))]
+    #[cfg(ossl111)]
     pub fn set_psk_use_session_callback<F>(&mut self, callback: F)
     where
         F: Fn(
@@ -1471,6 +1472,7 @@ impl SslContextBuilder {
     /// ```
     #[corresponds(SSL_CTX_set_psk_find_session_callback)]
     #[cfg(not(osslconf = "OPENSSL_NO_PSK"))]
+    #[cfg(ossl111)]
     pub fn set_psk_find_session_callback<F>(&mut self, callback: F)
     where
         F: Fn(&mut SslRef, Option<&[u8]>, &mut Option<SslSession>) -> Result<(), ErrorStack>
@@ -2267,11 +2269,13 @@ impl SslSession {
         ffi::d2i_SSL_SESSION
     }
 
+    #[cfg(ossl110)]
     pub fn new() -> SslSession {
         unsafe { SslSession::from_ptr(ffi::SSL_SESSION_new()) }
     }
 }
 
+#[cfg(ossl110)]
 impl Default for SslSession {
     fn default() -> Self {
         Self::new()
@@ -2290,6 +2294,8 @@ impl ToOwned for SslSessionRef {
 }
 
 impl SslSessionRef {
+    #[cfg(ossl110)]
+    #[corresponds(SSL_SESSION_new)]
     pub fn new<'a>() -> &'a mut SslSessionRef {
         unsafe {
             let p = ffi::SSL_SESSION_new();
@@ -2308,7 +2314,8 @@ impl SslSessionRef {
         }
     }
 
-    #[corresponds(SSL_SESSION_cipher)]
+    #[corresponds(SSL_SESSION_get0_cipher)]
+    #[cfg(ossl110)]
     pub fn cipher(&self) -> Option<&SslCipherRef> {
         unsafe {
             let p = ffi::SSL_SESSION_get0_cipher(self.as_ptr());
@@ -2321,6 +2328,7 @@ impl SslSessionRef {
     }
 
     #[corresponds(SSL_SESSION_set_cipher)]
+    #[cfg(ossl111)]
     pub fn set_cipher(&self, cipher: Option<&SslCipherRef>) -> Result<(), ErrorStack> {
         unsafe {
             let p = match cipher {
@@ -2349,6 +2357,7 @@ impl SslSessionRef {
     ///
     /// Returns sucess or failure.
     #[corresponds(SSL_SESSION_set1_master_key)]
+    #[cfg(ossl111)]
     pub fn set_master_key(&self, buf: &[u8]) -> i32 {
         unsafe { SSL_SESSION_set1_master_key(self.as_ptr(), buf.as_ptr(), buf.len()) }
     }
@@ -2392,9 +2401,9 @@ impl SslSessionRef {
 
     /// Sets the session's TLS protocol version.
     ///
-    /// Requires LibreSSL or OpenSSL 1.1.0 or newer.
+    /// Requires LibreSSL or OpenSSL 1.1.1 or newer.
     #[corresponds(SSL_SESSION_set_protocol_version)]
-    #[cfg(any(ossl110, libressl))]
+    #[cfg(any(ossl111, libressl))]
     pub fn set_protocol_version(&self, version: SslVersion) -> i32 {
         unsafe { ffi::SSL_SESSION_set_protocol_version(self.as_ptr(), version.0) }
     }

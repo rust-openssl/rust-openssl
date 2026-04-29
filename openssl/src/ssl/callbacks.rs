@@ -1,6 +1,7 @@
 #[cfg(not(osslconf = "OPENSSL_NO_PSK"))]
 use ffi::EVP_MD;
 #[cfg(not(osslconf = "OPENSSL_NO_PSK"))]
+#[cfg(ossl110)]
 use ffi::SSL_SESSION;
 use foreign_types::ForeignType;
 use foreign_types::ForeignTypeRef;
@@ -148,6 +149,7 @@ where
 }
 
 #[cfg(not(osslconf = "OPENSSL_NO_PSK"))]
+#[cfg(ossl111)]
 pub extern "C" fn raw_psk_use_session<F>(
     ssl: *mut ffi::SSL,
     msg_digest: *const EVP_MD,
@@ -215,6 +217,7 @@ where
 }
 
 #[cfg(not(osslconf = "OPENSSL_NO_PSK"))]
+#[cfg(ossl111)]
 pub extern "C" fn raw_psk_find_session<F>(
     ssl: *mut ffi::SSL,
     identity: *const c_uchar,
