@@ -2,7 +2,7 @@
 #[cfg(ossl111)]
 use ffi::EVP_MD;
 #[cfg(not(osslconf = "OPENSSL_NO_PSK"))]
-#[cfg(ossl110)]
+#[cfg(ossl111)]
 use ffi::SSL_SESSION;
 use foreign_types::ForeignType;
 use foreign_types::ForeignTypeRef;

@@ -1479,8 +1479,6 @@ fn psk_1_3_ciphers() {
     let server = server.build();
 
     let mut client = server.client();
-    // This test relies on TLS 1.2 suites
-    #[cfg(any(boringssl, ossl111, awslc))]
     client.ctx().set_options(super::SslOptions::NO_TLSV1_2);
     client.ctx().set_ciphersuites(CIPHER).unwrap();
     client
