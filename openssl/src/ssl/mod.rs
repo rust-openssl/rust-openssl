@@ -1469,7 +1469,7 @@ impl SslContextBuilder {
     ///     )
     /// });
     /// ```
-    #[corresponds(SSL_CTX_set_psk_use_session_callback)]
+    #[corresponds(SSL_CTX_set_psk_find_session_callback)]
     #[cfg(not(osslconf = "OPENSSL_NO_PSK"))]
     pub fn set_psk_find_session_callback<F>(&mut self, callback: F)
     where
@@ -2269,6 +2269,12 @@ impl SslSession {
 
     pub fn new() -> SslSession {
         unsafe { SslSession::from_ptr(ffi::SSL_SESSION_new()) }
+    }
+}
+
+impl Default for SslSession {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

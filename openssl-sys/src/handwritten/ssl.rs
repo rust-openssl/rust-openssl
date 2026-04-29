@@ -232,7 +232,13 @@ extern "C" {
     pub fn SSL_CTX_set_psk_use_session_callback(
         ssl: *mut SSL_CTX,
         psk_use_session_cb: Option<
-            extern "C" fn(*mut SSL, *const EVP_MD, *mut *const c_uchar, *mut c_uint, *mut *mut SSL_SESSION) -> c_int,
+            extern "C" fn(
+                *mut SSL,
+                *const EVP_MD,
+                *mut *const c_uchar,
+                *mut c_uint,
+                *mut *mut SSL_SESSION,
+            ) -> c_int,
         >,
     );
     pub fn SSL_CTX_set_psk_find_session_callback(
@@ -623,7 +629,7 @@ extern "C" {
     pub fn SSL_SESSION_set1_master_key(
         session: *const SSL_SESSION,
         in_buf: *const c_uchar,
-        in_buf_len: size_t
+        in_buf_len: size_t,
     ) -> c_int;
 }
 
