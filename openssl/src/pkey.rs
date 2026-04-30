@@ -413,14 +413,12 @@ where
             ];
             cvt(ffi::EVP_PKEY_get_params(self.as_ptr(), params.as_mut_ptr()))?;
             // OpenSSL silently ignores OSSL_PARAMs the keymgmt doesn't
-            // recognise and returns success, leaving the param's
-            // `return_size` at OSSL_PARAM_UNMODIFIED. Treat that as an
-            // error.
-            let written = params[0].return_size;
-            if written == ffi::OSSL_PARAM_UNMODIFIED {
+            // recognise and returns success. Detect that case via
+            // OSSL_PARAM_modified before trusting return_size.
+            if ffi::OSSL_PARAM_modified(&params[0]) == 0 {
                 return Err(ErrorStack::get());
             }
-            Ok(written)
+            Ok(params[0].return_size)
         }
     }
 

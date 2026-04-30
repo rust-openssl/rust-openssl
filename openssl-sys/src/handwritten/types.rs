@@ -168,20 +168,11 @@ pub struct OSSL_PARAM {
     pub data_type: c_uint,
     pub data: *mut c_void,
     pub data_size: size_t,
-    /// Possible values:
-    ///
-    /// * The number of bytes the most recent get-params operation wrote
-    ///   into this parameter's data buffer.
-    /// * [`crate::OSSL_PARAM_UNMODIFIED`] — the value that all of the
-    ///   `OSSL_PARAM_construct_*` typed constructors initialise this
-    ///   field to. Indicates the parameter has not been touched by any
-    ///   get-params call (typically because the keymgmt did not
-    ///   recognise the parameter name).
-    /// * `0` — the value on the array-terminator entry produced by
-    ///   `OSSL_PARAM_construct_end()`, since the terminator is fully
-    ///   zero-initialised. Reading `return_size` on the terminator entry
-    ///   of an `OSSL_PARAM` array is almost certainly a bug; this value
-    ///   does *not* mean "0 bytes written".
+    /// Number of bytes the most recent get-params call wrote into this
+    /// parameter's data buffer. Only meaningful once
+    /// [`crate::OSSL_PARAM_modified`] has confirmed the parameter was
+    /// touched -- before that, this field still holds the sentinel set
+    /// by the `OSSL_PARAM_construct_*` typed constructors.
     pub return_size: size_t,
 }
 
