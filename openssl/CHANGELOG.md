@@ -10,6 +10,7 @@
 ### Added
 
 * Added `EcGroupRef::generator_opt`, which returns `Option<&EcPointRef>`.
+* Added `PKeyRef::seed_into`, which writes the algorithm-defined seed of an ML-DSA or ML-KEM private key into a caller-supplied buffer. The inverse of `PKey::private_key_from_seed`.
 * Added `PKey::private_key_from_seed`, which constructs ML-DSA and ML-KEM private keypairs from a `seed` `OSSL_PARAM` via `EVP_PKEY_fromdata`. Requires OpenSSL 3.5 or newer at runtime.
 * Added `PKeyRef::is_a` and the `KeyType` algorithm-name newtype, for identifying provider-supplied keys (such as ML-DSA) where `EVP_PKEY_id` returns `-1`.
 * Added `PKey::public_key_from_raw_bytes_ex` and `PKey::private_key_from_raw_bytes_ex`, which take a `KeyType` and accept an optional library context and property query string. Required for provider-supplied algorithms with no associated `Id`, such as ML-DSA.

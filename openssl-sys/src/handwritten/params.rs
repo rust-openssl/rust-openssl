@@ -17,6 +17,8 @@ extern "C" {
         bsize: size_t,
     ) -> OSSL_PARAM;
 
+    pub fn OSSL_PARAM_modified(p: *const OSSL_PARAM) -> c_int;
+
     pub fn OSSL_PARAM_locate(p: *mut OSSL_PARAM, key: *const c_char) -> *mut OSSL_PARAM;
     pub fn OSSL_PARAM_locate_const(
         params: *const OSSL_PARAM,

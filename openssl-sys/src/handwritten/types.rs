@@ -164,11 +164,16 @@ pub enum OSSL_LIB_CTX {}
 #[cfg(ossl300)]
 #[repr(C)]
 pub struct OSSL_PARAM {
-    key: *const c_char,
-    data_type: c_uint,
-    data: *mut c_void,
-    data_size: size_t,
-    return_size: size_t,
+    pub key: *const c_char,
+    pub data_type: c_uint,
+    pub data: *mut c_void,
+    pub data_size: size_t,
+    /// Number of bytes the most recent get-params call wrote into this
+    /// parameter's data buffer. Only meaningful once
+    /// [`crate::OSSL_PARAM_modified`] has confirmed the parameter was
+    /// touched -- before that, this field still holds the sentinel set
+    /// by the `OSSL_PARAM_construct_*` typed constructors.
+    pub return_size: size_t,
 }
 
 #[cfg(ossl300)]

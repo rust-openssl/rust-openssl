@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+* Added `OSSL_PARAM_modified` and exposed the `OSSL_PARAM` struct fields, so callers can detect whether a get-params call wrote into a parameter and read its `return_size`.
+
 ### Changed
 
 * Bumped MSRV to 1.80.
