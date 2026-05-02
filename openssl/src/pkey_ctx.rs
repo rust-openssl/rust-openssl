@@ -986,8 +986,10 @@ mod test {
     use crate::ec::{EcGroup, EcKey};
     use crate::hash::{hash, MessageDigest};
     use crate::md::Md;
+    #[cfg(ossl350)]
     use crate::md_ctx::MdCtx;
     use crate::nid::Nid;
+    #[cfg(ossl350)]
     use crate::pkey::KeyType;
     use crate::pkey::PKey;
     use crate::rsa::Rsa;
