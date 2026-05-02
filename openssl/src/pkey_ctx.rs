@@ -1403,5 +1403,4 @@ mxJ7imIrEg9nIQ==
         md_ctx.digest_sign_to_vec(b"hello", &mut sig).unwrap();
         assert!(!sig.is_empty());
     }
-
 }
