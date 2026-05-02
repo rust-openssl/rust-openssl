@@ -959,6 +959,22 @@ impl<T> PkeyCtxRef<T> {
         }
         Ok(NonceType(nonce_type))
     }
+
+    /// Sets the context string for an ML-DSA signing or verification
+    /// operation, as defined in FIPS 204 §5.
+    ///
+    /// Requires OpenSSL 3.5.0 or newer.
+    #[cfg(ossl350)]
+    #[corresponds(EVP_PKEY_CTX_set_params)]
+    pub fn set_context_string(&mut self, context: &[u8]) -> Result<(), ErrorStack> {
+        let mut builder = crate::ossl_param::OsslParamBuilder::new()?;
+        builder.add_octet_string(c"context-string", context)?;
+        let params = builder.to_param()?;
+        unsafe {
+            cvt(ffi::EVP_PKEY_CTX_set_params(self.as_ptr(), params.as_ptr()))?;
+        }
+        Ok(())
+    }
 }
 
 #[cfg(test)]
@@ -1368,4 +1384,24 @@ mxJ7imIrEg9nIQ==
         assert_eq!(output, expected_output);
         assert!(ErrorStack::get().errors().is_empty());
     }
+
+    #[test]
+    #[cfg(ossl350)]
+    fn set_context_string_mldsa() {
+        use crate::md_ctx::MdCtx;
+        use crate::pkey::KeyType;
+
+        let seed = [0u8; 32];
+        let key = PKey::private_key_from_seed(None, KeyType::ML_DSA_65, None, &seed).unwrap();
+
+        let mut md_ctx = MdCtx::new().unwrap();
+        let pkey_ctx = md_ctx.digest_sign_init(None, &key).unwrap();
+        pkey_ctx.set_context_string(b"my-context").unwrap();
+        assert!(ErrorStack::get().errors().is_empty());
+
+        let mut sig = vec![];
+        md_ctx.digest_sign_to_vec(b"hello", &mut sig).unwrap();
+        assert!(!sig.is_empty());
+    }
+
 }
