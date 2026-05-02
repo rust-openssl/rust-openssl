@@ -986,7 +986,9 @@ mod test {
     use crate::ec::{EcGroup, EcKey};
     use crate::hash::{hash, MessageDigest};
     use crate::md::Md;
+    use crate::md_ctx::MdCtx;
     use crate::nid::Nid;
+    use crate::pkey::KeyType;
     use crate::pkey::PKey;
     use crate::rsa::Rsa;
     use crate::sign::Verifier;
@@ -1388,9 +1390,6 @@ mxJ7imIrEg9nIQ==
     #[test]
     #[cfg(ossl350)]
     fn set_context_string_mldsa() {
-        use crate::md_ctx::MdCtx;
-        use crate::pkey::KeyType;
-
         let seed = [0u8; 32];
         let key = PKey::private_key_from_seed(None, KeyType::ML_DSA_65, None, &seed).unwrap();
 
