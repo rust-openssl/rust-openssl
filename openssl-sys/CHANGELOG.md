@@ -2,9 +2,12 @@
 
 ## [Unreleased]
 
+## [v0.9.115] - 2026-05-03
+
 ### Added
 
 * Added `OSSL_PARAM_modified` and exposed the `OSSL_PARAM` struct fields, so callers can detect whether a get-params call wrote into a parameter and read its `return_size`.
+* Added `EVP_CIPHER_flags` / `EVP_CIPHER_get_flags`, the `EVP_CIPH_MODE` mask, and the `EVP_CIPH_WRAP_MODE` constant.
 
 ### Changed
 
