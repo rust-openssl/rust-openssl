@@ -32,7 +32,7 @@ pub fn get_openssl(target: &str) -> (Vec<PathBuf>, PathBuf) {
 }
 
 fn resolve_with_wellknown_homebrew_location(dir: &str) -> Option<PathBuf> {
-    let versions = ["openssl@3", "openssl@3.0", "openssl@1.1"];
+    let versions = ["openssl@4", "openssl@3", "openssl@3.0"];
 
     // Check up default aarch 64 Homebrew installation location first
     // for quick resolution if possible.
