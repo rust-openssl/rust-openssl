@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+* On macOS, the Homebrew auto-detection now prefers `openssl@4`, falls back to `openssl@3`/`openssl@3.0`, and no longer looks for `openssl@1.1`.
+
 ## [v0.9.115] - 2026-05-03
 
 ### Added
