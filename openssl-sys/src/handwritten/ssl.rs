@@ -308,6 +308,9 @@ extern "C" {
     pub fn SSL_get_current_cipher(ssl: *const SSL) -> *const SSL_CIPHER;
     pub fn SSL_CIPHER_get_bits(cipher: *const SSL_CIPHER, alg_bits: *mut c_int) -> c_int;
     pub fn SSL_CIPHER_get_version(cipher: *const SSL_CIPHER) -> *const c_char;
+    pub fn SSL_CIPHER_get_kx_nid(cipher: *const SSL_CIPHER) -> c_int;
+    pub fn SSL_CIPHER_get_auth_nid(cipher: *const SSL_CIPHER) -> c_int;
+    pub fn SSL_CIPHER_is_aead(cipher: *const SSL_CIPHER) -> c_int;
 }
 extern "C" {
     #[cfg(ossl111)]

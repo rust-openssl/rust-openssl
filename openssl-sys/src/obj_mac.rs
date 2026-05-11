@@ -1047,3 +1047,25 @@ cfg_if! {
         pub const NID_ac_auditEntity: c_int = 287;
     }
 }
+
+pub const NID_kx_rsa: c_int = 1037;
+pub const NID_kx_ecdhe: c_int = 1038;
+pub const NID_kx_dhe: c_int = 1039;
+pub const NID_kx_ecdhe_psk: c_int = 1040;
+pub const NID_kx_dhe_psk: c_int = 1041;
+pub const NID_kx_rsa_psk: c_int = 1042;
+pub const NID_kx_psk: c_int = 1043;
+pub const NID_kx_srp: c_int = 1044;
+pub const NID_kx_gost: c_int = 1045;
+pub const NID_kx_gost18: c_int = 1218;
+pub const NID_kx_any: c_int = 1063;
+
+pub const NID_auth_rsa: c_int = 1046;
+pub const NID_auth_ecdsa: c_int = 1047;
+pub const NID_auth_psk: c_int = 1048;
+pub const NID_auth_dss: c_int = 1049;
+pub const NID_auth_gost01: c_int = 1050;
+pub const NID_auth_gost12: c_int = 1051;
+pub const NID_auth_srp: c_int = 1052;
+pub const NID_auth_null: c_int = 1053;
+pub const NID_auth_any: c_int = 1064;
