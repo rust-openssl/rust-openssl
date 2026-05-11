@@ -1749,6 +1749,13 @@ fn set_ssl_certificate_key_related_api() {
 }
 
 #[test]
+fn test_ssl_ctx_get_ciphers() {
+    let ctx = SslContext::builder(SslMethod::tls()).unwrap().build();
+    let ciphers = ctx.ciphers().unwrap().collect::<Vec<_>>();
+    assert!(!ciphers.is_empty());
+}
+
+#[test]
 #[cfg(ossl110)]
 fn test_ssl_set_cert_chain_file() {
     let ctx = SslContext::builder(SslMethod::tls()).unwrap().build();
