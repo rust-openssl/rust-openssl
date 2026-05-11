@@ -1449,6 +1449,81 @@ fn psk_ciphers() {
     assert!(CLIENT_CALLED.load(Ordering::SeqCst));
 }
 
+#[cfg(ossl300)]
+#[cfg(not(osslconf = "OPENSSL_NO_PSK"))]
+#[test]
+fn psk_1_3_ciphers() {
+    const CIPHER: &str = "TLS_AES_256_GCM_SHA384";
+    static PSK: &[u8] = b"thisisaverysecurekeythatis32byte";
+    static CLIENT_IDENT: &[u8] = b"thisisaclient";
+    static CLIENT_CALLED: AtomicBool = AtomicBool::new(false);
+    static SERVER_CALLED: AtomicBool = AtomicBool::new(false);
+    static TLS13_AES128GCMSHA256_ID: &[u8] = &[0x13, 0x01];
+
+    let mut server = Server::builder();
+    server.ctx().set_ciphersuites(CIPHER).unwrap();
+    server
+        .ctx()
+        .set_psk_find_session_callback(|ssl, identity, session| {
+            use crate::ssl::{SslCipherRef, SslSession};
+
+            assert!(identity.unwrap_or(&[]) == CLIENT_IDENT);
+
+            let session = session.get_or_insert(SslSession::new());
+            session.set_cipher(SslCipherRef::find(ssl, TLS13_AES128GCMSHA256_ID))?;
+            session.set_master_key(PSK);
+            SERVER_CALLED.store(true, Ordering::SeqCst);
+            Ok(())
+        });
+
+    let server = server.build();
+
+    let mut client = server.client();
+    client.ctx().set_options(super::SslOptions::NO_TLSV1_2);
+    client.ctx().set_ciphersuites(CIPHER).unwrap();
+    client
+        .ctx()
+        .set_psk_use_session_callback(move |ssl, msg_digest, session| {
+            let result = match msg_digest {
+                None => {
+                    // This is the first call
+
+                    use crate::ssl::{SslCipherRef, SslSession};
+                    let session = session.get_or_insert(SslSession::new());
+                    session.set_cipher(SslCipherRef::find(ssl, TLS13_AES128GCMSHA256_ID))?;
+                    session.set_master_key(PSK);
+                    session.set_protocol_version(SslVersion::TLS1_3);
+                    Some(CLIENT_IDENT.to_owned())
+                }
+                Some(msg_digest) => {
+                    if let Some(cipher) = session.as_ref().unwrap().cipher() {
+                        if let Some(hs_digest) = cipher.handshake_digest() {
+                            if hs_digest == msg_digest {
+                                Some(CLIENT_IDENT.to_owned())
+                            } else {
+                                None
+                            }
+                        } else {
+                            // cant do PSK but its not an error
+                            None
+                        }
+                    } else {
+                        None
+                    }
+                }
+            };
+
+            CLIENT_CALLED.store(true, Ordering::SeqCst);
+
+            Ok(result)
+        });
+
+    client.connect();
+
+    assert!(SERVER_CALLED.load(Ordering::SeqCst));
+    assert!(CLIENT_CALLED.load(Ordering::SeqCst));
+}
+
 // Regression tests: the PSK/cookie trampolines used to forward the callback's
 // returned `usize` to OpenSSL without checking it against the slice length.
 
