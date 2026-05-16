@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## [v0.10.80] - 2026-05-16
+
+### Fixed
+
+* Fixed a buffer overflow in `CipherCtxRef::cipher_update_inplace` when used with AES key-wrap-with-padding ciphers.
+
 ## [v0.10.79] - 2026-05-03
 
 ### Changed
@@ -1094,7 +1100,9 @@
 
 Look at the [release tags] for information about older releases.
 
-[Unreleased]: https://github.com/rust-openssl/rust-openssl/compare/openssl-v0.10.78...master
+[Unreleased]: https://github.com/rust-openssl/rust-openssl/compare/openssl-v0.10.80...master
+[v0.10.80]: https://github.com/rust-openssl/rust-openssl/compare/openssl-v0.10.79...openssl-v0.10.80
+[v0.10.79]: https://github.com/rust-openssl/rust-openssl/compare/openssl-v0.10.78...openssl-v0.10.79
 [v0.10.78]: https://github.com/rust-openssl/rust-openssl/compare/openssl-v0.10.77...openssl-v0.10.78
 [v0.10.77]: https://github.com/rust-openssl/rust-openssl/compare/openssl-v0.10.76...openssl-v0.10.77
 [v0.10.76]: https://github.com/rust-openssl/rust-openssl/compare/openssl-v0.10.75...openssl-v0.10.76
