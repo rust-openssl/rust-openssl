@@ -667,14 +667,12 @@ impl CipherCtxRef {
         inlen: usize,
     ) -> Result<usize, ErrorStack> {
         assert!(inlen <= data.len(), "Input size may not exceed buffer size");
-        let block_size = self.block_size();
-        if block_size != 1 {
-            assert!(
-                data.len() >= inlen + block_size,
-                "Output buffer size must be at least {} bytes.",
-                inlen + block_size
-            );
-        }
+        let min_output_size = self.cipher_update_output_size(inlen);
+        assert!(
+            data.len() >= min_output_size,
+            "Output buffer size must be at least {} bytes.",
+            min_output_size
+        );
 
         let inlen = c_int::try_from(inlen).unwrap();
         let mut outlen = 0;
@@ -1315,5 +1313,25 @@ mod test {
         // The vec must be large enough to fit the amount of data we wrote.
         assert!(out.capacity() >= len);
         assert_eq!(len, 24);
+    }
+
+    #[test]
+    #[cfg(ossl110)]
+    #[should_panic(expected = "Output buffer size must be at least 24 bytes.")]
+    fn test_aes_wrap_pad_cipher_update_inplace_buffer_size() {
+        let cipher = Cipher::aes_256_wrap_pad();
+        let key = [0u8; 32];
+        let iv = [0u8; 4];
+
+        let mut ctx = CipherCtx::new().unwrap();
+        ctx.set_flags(CipherCtxFlags::FLAG_WRAP_ALLOW);
+        ctx.encrypt_init(Some(cipher), Some(&key), Some(&iv))
+            .unwrap();
+
+        // 9 bytes of input would produce 24 bytes of wrap-pad output, but the
+        // previous bound (inlen + block_size = 17) would have let this through
+        // and let OpenSSL write past the end of the slice.
+        let mut buf = [0u8; 17];
+        let _ = ctx.cipher_update_inplace(&mut buf, 9);
     }
 }
