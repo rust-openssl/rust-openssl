@@ -18,10 +18,17 @@ extern crate bssl_sys;
 #[cfg(boringssl)]
 #[path = "."]
 mod boringssl {
+    use super::*;
+    use libc::*;
+
     #[cfg(feature = "unstable_boringssl")]
     pub use bssl_sys::*;
     #[cfg(not(feature = "unstable_boringssl"))]
     include!(concat!(env!("OUT_DIR"), "/bindgen.rs"));
+
+    // BoringSSL-specific PQC bindings
+    pub mod mldsa;
+    pub mod mlkem;
 
     // BoringSSL does not require initialization.
     pub fn init() {}
