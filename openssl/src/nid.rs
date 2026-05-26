@@ -215,6 +215,8 @@ impl Nid {
     pub const SECT571K1: Nid = Nid(ffi::NID_sect571k1);
     pub const SECT571R1: Nid = Nid(ffi::NID_sect571r1);
     #[cfg(any(ossl110, libressl))]
+    pub const BRAINPOOL_P224R1: Nid = Nid(ffi::NID_brainpoolP224r1);
+    #[cfg(any(ossl110, libressl))]
     pub const BRAINPOOL_P256R1: Nid = Nid(ffi::NID_brainpoolP256r1);
     #[cfg(any(ossl110, libressl))]
     pub const BRAINPOOL_P320R1: Nid = Nid(ffi::NID_brainpoolP320r1);
@@ -222,6 +224,8 @@ impl Nid {
     pub const BRAINPOOL_P384R1: Nid = Nid(ffi::NID_brainpoolP384r1);
     #[cfg(any(ossl110, libressl))]
     pub const BRAINPOOL_P512R1: Nid = Nid(ffi::NID_brainpoolP512r1);
+    #[cfg(any(ossl110, libressl))]
+    pub const BRAINPOOL_P224T1: Nid = Nid(ffi::NID_brainpoolP224t1);
     #[cfg(any(ossl110, libressl))]
     pub const BRAINPOOL_P256T1: Nid = Nid(ffi::NID_brainpoolP256t1);
     #[cfg(any(ossl110, libressl))]

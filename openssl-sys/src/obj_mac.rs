@@ -96,6 +96,11 @@ pub const NID_sect571k1: c_int = 733;
 pub const NID_sect571r1: c_int = 734;
 
 #[cfg(ossl110)]
+pub const NID_brainpoolP224r1: c_int = 925;
+#[cfg(libressl)]
+pub const NID_brainpoolP224r1: c_int = 926;
+
+#[cfg(ossl110)]
 pub const NID_brainpoolP256r1: c_int = 927;
 #[cfg(libressl)]
 pub const NID_brainpoolP256r1: c_int = 928;
@@ -114,6 +119,11 @@ pub const NID_brainpoolP384r1: c_int = 932;
 pub const NID_brainpoolP512r1: c_int = 933;
 #[cfg(libressl)]
 pub const NID_brainpoolP512r1: c_int = 934;
+
+#[cfg(ossl110)]
+pub const NID_brainpoolP224t1: c_int = 926;
+#[cfg(libressl)]
+pub const NID_brainpoolP224t1: c_int = 927;
 
 #[cfg(ossl110)]
 pub const NID_brainpoolP256t1: c_int = 928;
