@@ -1,6 +1,6 @@
 use super::*;
 use libc::size_t;
-use std::ffi::{c_int, c_uint, c_void};
+use std::ffi::{c_int, c_uint, c_ulong, c_void};
 
 pub const EVP_MAX_MD_SIZE: c_uint = 64;
 
@@ -34,6 +34,9 @@ pub const EVP_PKEY_HKDF: c_int = NID_hkdf;
 
 #[cfg(ossl110)]
 pub const EVP_CIPHER_CTX_FLAG_WRAP_ALLOW: c_int = 0x1;
+
+pub const EVP_CIPH_MODE: c_ulong = 0xF0007;
+pub const EVP_CIPH_WRAP_MODE: c_ulong = 0x10002;
 
 pub const EVP_CTRL_GCM_SET_IVLEN: c_int = 0x9;
 pub const EVP_CTRL_GCM_GET_TAG: c_int = 0x10;
@@ -105,6 +108,11 @@ cfg_if! {
         #[inline]
         pub unsafe fn EVP_CIPHER_nid(cipher: *const EVP_CIPHER) -> c_int {
             EVP_CIPHER_get_nid(cipher)
+        }
+
+        #[inline]
+        pub unsafe fn EVP_CIPHER_flags(cipher: *const EVP_CIPHER) -> c_ulong {
+            EVP_CIPHER_get_flags(cipher)
         }
 
         #[inline]

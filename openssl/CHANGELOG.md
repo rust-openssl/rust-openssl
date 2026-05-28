@@ -2,10 +2,19 @@
 
 ## [Unreleased]
 
+## [v0.10.80] - 2026-05-16
+
+### Fixed
+
+* Fixed a buffer overflow in `CipherCtxRef::cipher_update_inplace` when used with AES key-wrap-with-padding ciphers.
+
+## [v0.10.79] - 2026-05-03
+
 ### Changed
 
 * Bumped MSRV to 1.80.
 * Removed the `once_cell` dependency in favor of `std::sync::{LazyLock, OnceLock}`.
+* Deprecated `EcPointRef::mul`, `EcPointRef::mul_generator`, and `EcPointRef::invert` in favor of `mul2`, `mul_generator2`, and `invert2`, which take `&mut BigNumContextRef`. The deprecated methods accepted a shared reference despite mutating the `BN_CTX`, which was unsound under `Send + Sync`.
 
 ### Added
 
@@ -14,10 +23,15 @@
 * Added `PKey::private_key_from_seed`, which constructs ML-DSA and ML-KEM private keypairs from a `seed` `OSSL_PARAM` via `EVP_PKEY_fromdata`. Requires OpenSSL 3.5 or newer at runtime.
 * Added `PKeyRef::is_a` and the `KeyType` algorithm-name newtype, for identifying provider-supplied keys (such as ML-DSA) where `EVP_PKEY_id` returns `-1`.
 * Added `PKey::public_key_from_raw_bytes_ex` and `PKey::private_key_from_raw_bytes_ex`, which take a `KeyType` and accept an optional library context and property query string. Required for provider-supplied algorithms with no associated `Id`, such as ML-DSA.
+* Added `PkeyCtxRef::set_context_string`, which binds a context string to an ML-DSA signing or verification operation. Requires OpenSSL 3.5 or newer.
+* Added `EcPointRef::mul2`, `EcPointRef::mul_generator2`, and `EcPointRef::invert2`, which take `&mut BigNumContextRef`.
 
 ### Fixed
 
 * `EcGroupRef::generator` no longer constructs a reference from a NULL pointer when the group has no generator set (e.g. a group built with `EcGroup::from_components` before `set_generator` is called), which was immediate undefined behavior. It now panics in that case and has been deprecated in favor of `EcGroupRef::generator_opt`.
+* `X509Ref::ocsp_responders` now validates each accessLocation as UTF-8 and returns an `ErrorStack` if any entry is not, rather than constructing a `&str` containing invalid UTF-8 (language-level UB triggerable by a malicious certificate).
+* Fixed a process abort that could occur when the SSL verify, PSK client, or PSK server callback fired after the underlying `SSL_CTX` had been swapped.
+* Fixed an output-buffer overflow in `CipherCtxRef::cipher_update` and `cipher_update_vec` when used with AES key-wrap-with-padding ciphers, which emit up to `input.len() + 15` bytes during the update call rather than the previously assumed `input.len() + block_size`.
 
 ## [v0.10.78] - 2026-04-19
 
@@ -1086,7 +1100,9 @@
 
 Look at the [release tags] for information about older releases.
 
-[Unreleased]: https://github.com/rust-openssl/rust-openssl/compare/openssl-v0.10.78...master
+[Unreleased]: https://github.com/rust-openssl/rust-openssl/compare/openssl-v0.10.80...master
+[v0.10.80]: https://github.com/rust-openssl/rust-openssl/compare/openssl-v0.10.79...openssl-v0.10.80
+[v0.10.79]: https://github.com/rust-openssl/rust-openssl/compare/openssl-v0.10.78...openssl-v0.10.79
 [v0.10.78]: https://github.com/rust-openssl/rust-openssl/compare/openssl-v0.10.77...openssl-v0.10.78
 [v0.10.77]: https://github.com/rust-openssl/rust-openssl/compare/openssl-v0.10.76...openssl-v0.10.77
 [v0.10.76]: https://github.com/rust-openssl/rust-openssl/compare/openssl-v0.10.75...openssl-v0.10.76

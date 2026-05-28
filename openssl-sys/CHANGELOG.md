@@ -2,9 +2,18 @@
 
 ## [Unreleased]
 
+## [v0.9.116] - 2026-05-16
+
+### Changed
+
+* On macOS, the Homebrew auto-detection now prefers `openssl@4`, falls back to `openssl@3`/`openssl@3.0`, and no longer looks for `openssl@1.1`.
+
+## [v0.9.115] - 2026-05-03
+
 ### Added
 
 * Added `OSSL_PARAM_modified` and exposed the `OSSL_PARAM` struct fields, so callers can detect whether a get-params call wrote into a parameter and read its `return_size`.
+* Added `EVP_CIPHER_flags` / `EVP_CIPHER_get_flags`, the `EVP_CIPH_MODE` mask, and the `EVP_CIPH_WRAP_MODE` constant.
 
 ### Changed
 
@@ -739,7 +748,9 @@ Fixed builds against OpenSSL built with `no-cast`.
 * Added `X509_verify` and `X509_REQ_verify`.
 * Added `EVP_MD_type` and `EVP_GROUP_get_curve_name`.
 
-[Unreleased]: https://github.com/rust-openssl/rust-openssl/compare/openssl-sys-v0.9.114..master
+[Unreleased]: https://github.com/rust-openssl/rust-openssl/compare/openssl-sys-v0.9.116...master
+[v0.9.116]: https://github.com/rust-openssl/rust-openssl/compare/openssl-sys-v0.9.115...openssl-sys-v0.9.116
+[v0.9.115]: https://github.com/rust-openssl/rust-openssl/compare/openssl-sys-v0.9.114...openssl-sys-v0.9.115
 [v0.9.114]: https://github.com/rust-openssl/rust-openssl/compare/openssl-sys-v0.9.113...openssl-sys-v0.9.114
 [v0.9.113]: https://github.com/rust-openssl/rust-openssl/compare/openssl-sys-v0.9.112...openssl-sys-v0.9.113
 [v0.9.112]: https://github.com/rust-openssl/rust-openssl/compare/openssl-sys-v0.9.111...openssl-sys-v0.9.112

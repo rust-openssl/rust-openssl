@@ -30,7 +30,7 @@
 //!
 //! ```not_rust
 //! # macOS (Homebrew)
-//! $ brew install openssl@3
+//! $ brew install openssl@4
 //!
 //! # macOS (MacPorts)
 //! $ sudo port install openssl

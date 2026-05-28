@@ -308,7 +308,7 @@ fn postprocess(include_dirs: &[PathBuf]) -> Version {
 /// version string of OpenSSL.
 #[allow(clippy::unusual_byte_groupings)]
 fn validate_headers(include_dirs: &[PathBuf]) -> Version {
-    // This `*-sys` crate only works with OpenSSL 1.1.0, 1.1.1 and 3.x.
+    // This `*-sys` crate only works with OpenSSL 1.1.0, 1.1.1, 3.x, and 4.x.
     // To correctly expose the right API from this crate, take a look at
     // `opensslv.h` to see what version OpenSSL claims to be.
     println!("cargo:rerun-if-changed=build/expando.c");
