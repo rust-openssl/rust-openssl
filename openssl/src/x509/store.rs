@@ -53,7 +53,7 @@ use crate::stack::Stack;
 use crate::stack::StackRef;
 use crate::util::ForeignTypeRefExt;
 use crate::x509::verify::{X509VerifyFlags, X509VerifyParamRef};
-use crate::x509::{X509Object, X509PurposeId, X509};
+use crate::x509::{X509CrlRef, X509Object, X509PurposeId, X509};
 use crate::{cvt, cvt_p};
 use openssl_macros::corresponds;
 #[cfg(not(any(boringssl, awslc)))]
@@ -98,6 +98,12 @@ impl X509StoreBuilderRef {
     #[corresponds(X509_STORE_add_cert)]
     pub fn add_cert(&mut self, cert: X509) -> Result<(), ErrorStack> {
         unsafe { cvt(ffi::X509_STORE_add_cert(self.as_ptr(), cert.as_ptr())).map(|_| ()) }
+    }
+
+    /// Add a CRL to the certificate store.
+    #[corresponds(X509_STORE_add_crl)]
+    pub fn add_crl(&mut self, crl: &X509CrlRef) -> Result<(), ErrorStack> {
+        unsafe { cvt(ffi::X509_STORE_add_crl(self.as_ptr(), crl.as_ptr())).map(|_| ()) }
     }
 
     /// Load certificates from their default locations.
