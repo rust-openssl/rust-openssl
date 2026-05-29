@@ -627,7 +627,6 @@ extern "C" {
 
     #[cfg(ossl110)]
     pub fn SSL_SESSION_new() -> *mut SSL_SESSION;
-    #[cfg(ossl110)]
     pub fn SSL_SESSION_get_master_key(
         session: *const SSL_SESSION,
         out: *mut c_uchar,

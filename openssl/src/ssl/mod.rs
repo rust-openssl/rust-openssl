@@ -2341,7 +2341,6 @@ impl SslSessionRef {
 
     /// Returns the length of the master key.
     #[corresponds(SSL_SESSION_get_master_key)]
-    #[cfg(ossl110)]
     pub fn master_key_len(&self) -> usize {
         unsafe { SSL_SESSION_get_master_key(self.as_ptr(), ptr::null_mut(), 0) }
     }
@@ -2350,7 +2349,6 @@ impl SslSessionRef {
     ///
     /// Returns the number of bytes written, or the size of the master key if the buffer is empty.
     #[corresponds(SSL_SESSION_get_master_key)]
-    #[cfg(ossl110)]
     pub fn master_key(&self, buf: &mut [u8]) -> usize {
         unsafe { SSL_SESSION_get_master_key(self.as_ptr(), buf.as_mut_ptr(), buf.len()) }
     }
@@ -4363,11 +4361,9 @@ bitflags! {
     }
 }
 
-#[cfg(ossl110)]
-use ffi::SSL_SESSION_get_master_key;
 #[cfg(ossl111)]
 use ffi::SSL_SESSION_set1_master_key;
-use ffi::{SSL_CTX_up_ref, SSL_SESSION_up_ref, SSL_is_server};
+use ffi::{SSL_CTX_up_ref, SSL_SESSION_get_master_key, SSL_SESSION_up_ref, SSL_is_server};
 cfg_if! {
     if #[cfg(ossl300)] {
         use ffi::SSL_get1_peer_certificate;
