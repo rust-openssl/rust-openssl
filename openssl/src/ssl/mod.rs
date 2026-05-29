@@ -80,7 +80,7 @@ use crate::util;
 use crate::util::{ForeignTypeExt, ForeignTypeRefExt};
 use crate::x509::store::{X509Store, X509StoreBuilderRef, X509StoreRef};
 use crate::x509::verify::X509VerifyParamRef;
-use crate::x509::{X509, X509Name, X509Ref, X509StoreContextRef, X509VerifyResult};
+use crate::x509::{X509Name, X509Ref, X509StoreContextRef, X509VerifyResult, X509};
 use crate::{cvt, cvt_n, cvt_p, init};
 use bitflags::bitflags;
 use cfg_if::cfg_if;
@@ -1183,7 +1183,11 @@ impl SslContextBuilder {
     pub fn min_proto_version(&mut self) -> Option<SslVersion> {
         unsafe {
             let r = ffi::SSL_CTX_get_min_proto_version(self.as_ptr());
-            if r == 0 { None } else { Some(SslVersion(r)) }
+            if r == 0 {
+                None
+            } else {
+                Some(SslVersion(r))
+            }
         }
     }
 
@@ -1198,7 +1202,11 @@ impl SslContextBuilder {
     pub fn max_proto_version(&mut self) -> Option<SslVersion> {
         unsafe {
             let r = ffi::SSL_CTX_get_max_proto_version(self.as_ptr());
-            if r == 0 { None } else { Some(SslVersion(r)) }
+            if r == 0 {
+                None
+            } else {
+                Some(SslVersion(r))
+            }
         }
     }
 
@@ -2182,7 +2190,11 @@ impl SslCipherRef {
     #[cfg(any(ossl110, libressl))]
     pub fn cipher_nid(&self) -> Option<Nid> {
         let n = unsafe { ffi::SSL_CIPHER_get_cipher_nid(self.as_ptr()) };
-        if n == 0 { None } else { Some(Nid::from_raw(n)) }
+        if n == 0 {
+            None
+        } else {
+            Some(Nid::from_raw(n))
+        }
     }
 
     /// Returns the two-byte ID of the cipher
@@ -2329,6 +2341,7 @@ impl SslSessionRef {
 
     /// Returns the length of the master key.
     #[corresponds(SSL_SESSION_get_master_key)]
+    #[cfg(ossl110)]
     pub fn master_key_len(&self) -> usize {
         unsafe { SSL_SESSION_get_master_key(self.as_ptr(), ptr::null_mut(), 0) }
     }
@@ -2337,6 +2350,7 @@ impl SslSessionRef {
     ///
     /// Returns the number of bytes written, or the size of the master key if the buffer is empty.
     #[corresponds(SSL_SESSION_get_master_key)]
+    #[cfg(ossl110)]
     pub fn master_key(&self, buf: &mut [u8]) -> usize {
         unsafe { SSL_SESSION_get_master_key(self.as_ptr(), buf.as_mut_ptr(), buf.len()) }
     }
@@ -2748,7 +2762,11 @@ impl SslRef {
     pub fn version2(&self) -> Option<SslVersion> {
         unsafe {
             let r = ffi::SSL_version(self.as_ptr());
-            if r == 0 { None } else { Some(SslVersion(r)) }
+            if r == 0 {
+                None
+            } else {
+                Some(SslVersion(r))
+            }
         }
     }
 
