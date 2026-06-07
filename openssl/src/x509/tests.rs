@@ -111,7 +111,7 @@ fn test_nid_values() {
     assert_eq!(email.data().as_slice(), b"test@example.com");
 
     let friendly = subject.entries_by_nid(Nid::FRIENDLYNAME).next().unwrap();
-    assert_eq!(&**friendly.data().as_utf8().unwrap(), "Example");
+    assert_eq!(friendly.data().to_string().unwrap(), "Example");
 }
 
 #[test]
@@ -134,7 +134,7 @@ fn test_nameref_iterator() {
 
     let friendly = all_entries.next().unwrap();
     assert_eq!(friendly.object().nid().as_raw(), Nid::FRIENDLYNAME.as_raw());
-    assert_eq!(&**friendly.data().as_utf8().unwrap(), "Example");
+    assert_eq!(friendly.data().to_string().unwrap(), "Example");
 
     if all_entries.next().is_some() {
         panic!();
@@ -220,10 +220,10 @@ fn test_authority_issuer_and_serial() {
     assert_eq!(1, authority_issuer.len());
     let dn = authority_issuer[0].directory_name().unwrap();
     let mut o = dn.entries_by_nid(Nid::ORGANIZATIONNAME);
-    let o = o.next().unwrap().data().as_utf8().unwrap();
+    let o = o.next().unwrap().data().to_string().unwrap();
     assert_eq!(o.as_bytes(), b"PyCA");
     let mut cn = dn.entries_by_nid(Nid::COMMONNAME);
-    let cn = cn.next().unwrap().data().as_utf8().unwrap();
+    let cn = cn.next().unwrap().data().to_string().unwrap();
     assert_eq!(cn.as_bytes(), b"cryptography.io");
 
     let authority_serial = cert.authority_serial().unwrap();
