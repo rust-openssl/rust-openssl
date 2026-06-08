@@ -698,7 +698,8 @@ fn default_verify_paths() {
 #[test]
 fn verify_mode_round_trip() {
     let mut ctx = SslContext::builder(SslMethod::tls()).unwrap();
-    let mut mode = SslVerifyMode::PEER | SslVerifyMode::FAIL_IF_NO_PEER_CERT;
+    let mut mode = SslVerifyMode::PEER;
+    mode |= SslVerifyMode::FAIL_IF_NO_PEER_CERT;
     #[cfg(not(any(boringssl, awslc)))]
     {
         mode |= SslVerifyMode::CLIENT_ONCE;
