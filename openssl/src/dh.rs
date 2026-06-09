@@ -247,11 +247,12 @@ where
         unsafe {
             let key_len = ffi::DH_size(self.as_ptr());
             let mut key = vec![0u8; key_len as usize];
-            cvt(ffi::DH_compute_key(
+            let len = cvt(ffi::DH_compute_key(
                 key.as_mut_ptr(),
                 public_key.as_ptr(),
                 self.as_ptr(),
             ))?;
+            debug_assert_eq!(len as usize, key.len(), "DH_compute_key returned unexpected size");
             Ok(key)
         }
     }
@@ -276,6 +277,7 @@ mod tests {
     #[cfg(all(not(any(boringssl, awslc)), ossl110))]
     use crate::pkey::PKey;
     use crate::ssl::{SslContext, SslMethod};
+    use foreign_types::ForeignType;
 
     #[test]
     #[cfg(ossl110)]
@@ -404,6 +406,8 @@ mod tests {
         let shared_a = dh1.compute_key(dh2.public_key()).unwrap();
         let shared_b = dh2.compute_key(dh1.public_key()).unwrap();
 
+        assert_eq!(shared_a.len(), unsafe { ffi::DH_size(dh1.as_ptr()) } as usize);
+        assert_eq!(shared_b.len(), unsafe { ffi::DH_size(dh2.as_ptr()) } as usize);
         assert_eq!(shared_a, shared_b);
     }
 
