@@ -2,9 +2,17 @@
 
 ## [Unreleased]
 
+## [v0.9.117] - 2026-06-12
+
 ### Added
 
 * Added `SSL_VERIFY_CLIENT_ONCE` and `SSL_VERIFY_POST_HANDSHAKE`.
+* Added `NID_brainpoolP224r1` and `NID_brainpoolP224t1`.
+* Added ML-DSA bindings on BoringSSL.
+
+### Changed
+
+* Bumped `aws-lc-sys` to 0.41.
 
 ## [v0.9.116] - 2026-05-16
 
@@ -752,7 +760,8 @@ Fixed builds against OpenSSL built with `no-cast`.
 * Added `X509_verify` and `X509_REQ_verify`.
 * Added `EVP_MD_type` and `EVP_GROUP_get_curve_name`.
 
-[Unreleased]: https://github.com/rust-openssl/rust-openssl/compare/openssl-sys-v0.9.116...master
+[Unreleased]: https://github.com/rust-openssl/rust-openssl/compare/openssl-sys-v0.9.117...master
+[v0.9.117]: https://github.com/rust-openssl/rust-openssl/compare/openssl-sys-v0.9.116...openssl-sys-v0.9.117
 [v0.9.116]: https://github.com/rust-openssl/rust-openssl/compare/openssl-sys-v0.9.115...openssl-sys-v0.9.116
 [v0.9.115]: https://github.com/rust-openssl/rust-openssl/compare/openssl-sys-v0.9.114...openssl-sys-v0.9.115
 [v0.9.114]: https://github.com/rust-openssl/rust-openssl/compare/openssl-sys-v0.9.113...openssl-sys-v0.9.114
