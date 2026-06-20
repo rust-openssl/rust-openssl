@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+* Added `KeyType::from_static`, for constructing key type names not exposed by built-in constants.
+
 ## [v0.10.81] - 2026-06-12
 
 ### Fixed

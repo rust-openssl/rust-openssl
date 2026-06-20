@@ -148,6 +148,11 @@ impl KeyType {
     pub const ML_KEM_768: KeyType = KeyType(c"ML-KEM-768");
     pub const ML_KEM_1024: KeyType = KeyType(c"ML-KEM-1024");
 
+    /// Creates a `KeyType` from a static C string.
+    pub const fn from_static(name: &'static CStr) -> KeyType {
+        KeyType(name)
+    }
+
     /// Returns the algorithm name as a C string.
     #[cfg(ossl300)]
     pub(crate) fn as_cstr(&self) -> &'static CStr {
@@ -1365,6 +1370,12 @@ mod tests {
         let pkey = PKey::from_ec_key(ec_key).unwrap();
         assert!(pkey.raw_private_key().is_err());
         assert!(pkey.raw_public_key().is_err());
+    }
+
+    #[test]
+    fn test_key_type_from_static() {
+        const RSA: KeyType = KeyType::from_static(c"RSA");
+        assert_eq!(RSA, KeyType::RSA);
     }
 
     #[cfg(ossl300)]
