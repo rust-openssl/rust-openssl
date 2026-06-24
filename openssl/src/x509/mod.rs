@@ -710,7 +710,8 @@ impl ToOwned for X509Ref {
 
     fn to_owned(&self) -> X509 {
         unsafe {
-            X509_up_ref(self.as_ptr());
+            let r = X509_up_ref(self.as_ptr());
+            assert!(r == 1);
             X509::from_ptr(self.as_ptr())
         }
     }
