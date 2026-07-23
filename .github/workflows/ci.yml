@@ -83,8 +83,9 @@ jobs:
       - run: |
           cargo update -p unicode-ident --precise 1.0.22
           cargo update -p syn --precise 2.0.114
-          cargo update -p wasip2 --precise 1.0.1+wasi-0.2.4
           cargo update -p quote --precise 1.0.44
+          cargo update -p jobserver --precise 0.1.34
+          cargo update -p wasip2 --precise 1.0.1+wasi-0.2.4
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ~/.cargo/registry/cache
