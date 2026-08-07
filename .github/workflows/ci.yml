@@ -405,6 +405,10 @@ jobs:
             restore-keys: |
               index-${{ runner.os }}-
         - run: cargo generate-lockfile
+        # cc 1.4.1 passes -mno-omit-leaf-frame-pointer to arm gcc, which
+        # doesn't support it. Remove once the fix for
+        # https://github.com/rust-lang/cc-rs/issues/1844 is released.
+        - run: cargo update -p cc --precise 1.4.0
         - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
           with:
             path: ~/.cargo/registry/cache
