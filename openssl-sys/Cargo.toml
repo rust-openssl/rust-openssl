@@ -25,7 +25,7 @@ aws-lc-fips = ['dep:aws-lc-fips-sys']
 libc = "0.2"
 bssl-sys = { version = "0.1.0", optional = true }
 aws-lc-sys = { version = "0.41", features = ["ssl"], optional = true }
-aws-lc-fips-sys = { version = "0.13", features = ["ssl", "bindgen"], optional = true }
+aws-lc-fips-sys = { version = "0.14", features = ["ssl", "bindgen"], optional = true }
 
 [build-dependencies]
 bindgen = { version = "0.72.0", optional = true, features = ["experimental"] }

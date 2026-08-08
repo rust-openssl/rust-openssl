@@ -175,7 +175,7 @@ jobs:
             - false
           library:
             - name: aws-lc
-              version: v1.48.2
+              version: v1.52.0
             - name: aws-lc
               version: vendored
             - name: boringssl
