@@ -146,7 +146,7 @@ impl Signer<'_> {
 
     /// Creates a new `Signer` without a digest.
     ///
-    /// This is the only way to create a `Verifier` for Ed25519 or Ed448 keys.
+    /// This is the only way to create a `Signer` for Ed25519 or Ed448 keys.
     /// It can also be used to create a CMAC.
     #[corresponds(EVP_DigestSignInit)]
     pub fn new_without_digest<'a, T>(pkey: &PKeyRef<T>) -> Result<Signer<'a>, ErrorStack>
