@@ -44,7 +44,7 @@ fn test_cert_loading() {
     let cert = X509::from_pem(cert).unwrap();
     let fingerprint = cert.digest(MessageDigest::sha1()).unwrap();
 
-    let hash_str = "59172d9313e84459bcff27f967e79e6e9217e584";
+    let hash_str = "a1d812f2dfc1fdd3830b7dd0dbf50fecb479f471";
     let hash_vec = Vec::from_hex(hash_str).unwrap();
 
     assert_eq!(hash_vec, &*fingerprint);
@@ -63,7 +63,7 @@ fn test_debug() {
     assert!(debugged.contains(r#"countryName = "AU""#));
     assert!(debugged.contains(r#"stateOrProvinceName = "Some-State""#));
     assert!(debugged.contains(r#"not_before: Aug 14 17:00:03 2016 GMT"#));
-    assert!(debugged.contains(r#"not_after: Aug 12 17:00:03 2026 GMT"#));
+    assert!(debugged.contains(r#"not_after: Dec 31 23:59:59 2037 GMT"#));
 }
 
 #[test]
@@ -74,7 +74,7 @@ fn test_cert_issue_validity() {
     let not_after = cert.not_after().to_string();
 
     assert_eq!(not_before, "Aug 14 17:00:03 2016 GMT");
-    assert_eq!(not_after, "Aug 12 17:00:03 2026 GMT");
+    assert_eq!(not_after, "Dec 31 23:59:59 2037 GMT");
 }
 
 #[test]
@@ -475,11 +475,11 @@ fn test_stack_from_pem() {
     assert_eq!(certs.len(), 2);
     assert_eq!(
         hex::encode(certs[0].digest(MessageDigest::sha1()).unwrap()),
-        "59172d9313e84459bcff27f967e79e6e9217e584"
+        "a1d812f2dfc1fdd3830b7dd0dbf50fecb479f471"
     );
     assert_eq!(
         hex::encode(certs[1].digest(MessageDigest::sha1()).unwrap()),
-        "c0cbdf7cdd03c9773e5468e1f6d2da7d5cbb1875"
+        "9826e2edbd5b80acd2a868ffcca95a86e7a4ad72"
     );
 }
 
@@ -501,13 +501,13 @@ fn signature() {
     let signature = cert.signature();
     assert_eq!(
         hex::encode(signature.as_slice()),
-        "4af607b889790b43470442cfa551cdb8b6d0b0340d2958f76b9e3ef6ad4992230cead6842587f0ecad5\
-         78e6e11a221521e940187e3d6652de14e84e82f6671f097cc47932e022add3c0cb54a26bf27fa84c107\
-         4971caa6bee2e42d34a5b066c427f2d452038082b8073993399548088429de034fdd589dcfb0dd33be7\
-         ebdfdf698a28d628a89568881d658151276bde333600969502c4e62e1d3470a683364dfb241f78d310a\
-         89c119297df093eb36b7fd7540224f488806780305d1e79ffc938fe2275441726522ab36d88348e6c51\
-         f13dcc46b5e1cdac23c974fd5ef86aa41e91c9311655090a52333bc79687c748d833595d4c5f987508f\
-         e121997410d37c"
+        "94348146b9873cdef635ed65e9e9ff9ac1fca10b60c8caefadea69fdca7a2a126766f1fb9999bb163c1\
+         835bd759de7fc85940457111b109853e23e8048270d16affe307b5fe7bdbcf5103d69ecfa17ff30f70e\
+         e9b5a658d6cd6b4f3674e8b03d303f1a500e1e2bdd1da36417f1e6583df67d3ec651f20416e8251293b\
+         2a9a694db34da04288c932e2b1cde6b91bea54c9f36c592e129a2ce6051924676ffc931620c4d4da74e\
+         a98f4647ae60d2d0a53b2d190ab0d75aad11be1de4b518ba5a5625f96d8ef039984b40f9ee85371939b\
+         5ae9da84d83d3e52feb72c4d596f67054b08a6a4e4a3fa7fe701b4bb34881c070ea9aa88899b219cc16\
+         4c388863161b6a"
     );
     let algorithm = cert.signature_algorithm();
     assert_eq!(algorithm.object().nid(), Nid::SHA256WITHRSAENCRYPTION);
@@ -848,7 +848,11 @@ fn test_name_to_owned() {
 
 #[test]
 fn test_verify_param_set_time_fails_verification() {
-    const TEST_T_2030: time_t = 1893456000;
+    // The certificate fixtures expire at the end of 2037 so that this clock,
+    // which has to fall after their notAfter for the verification to fail,
+    // still fits in a 32-bit time_t. Such a time_t cannot represent any point
+    // after 2038-01-19.
+    const TEST_T_2038: time_t = 2145916800;
 
     let cert = include_bytes!("../../test/cert.pem");
     let cert = X509::from_pem(cert).unwrap();
@@ -859,7 +863,7 @@ fn test_verify_param_set_time_fails_verification() {
     let mut store_bldr = X509StoreBuilder::new().unwrap();
     store_bldr.add_cert(ca).unwrap();
     let mut verify_params = X509VerifyParam::new().unwrap();
-    verify_params.set_time(TEST_T_2030);
+    verify_params.set_time(TEST_T_2038);
     store_bldr.set_param(&verify_params).unwrap();
     let store = store_bldr.build();
 
