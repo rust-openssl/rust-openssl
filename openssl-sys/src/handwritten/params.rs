@@ -16,6 +16,11 @@ extern "C" {
         buf: *mut c_void,
         bsize: size_t,
     ) -> OSSL_PARAM;
+    pub fn OSSL_PARAM_construct_utf8_ptr(
+        key: *const c_char,
+        buf: *mut *mut c_char,
+        bsize: size_t,
+    ) -> OSSL_PARAM;
 
     pub fn OSSL_PARAM_modified(p: *const OSSL_PARAM) -> c_int;
 
