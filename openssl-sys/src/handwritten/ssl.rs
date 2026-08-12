@@ -298,6 +298,7 @@ cfg_if! {
 }
 
 extern "C" {
+    pub fn SSL_CTX_get_ciphers(ctx: *const SSL_CTX) -> *const stack_st_SSL_CIPHER;
     pub fn SSL_CTX_set_cipher_list(ssl: *mut SSL_CTX, s: *const c_char) -> c_int;
     pub fn SSL_CTX_new(method: *const SSL_METHOD) -> *mut SSL_CTX;
     pub fn SSL_CTX_free(ctx: *mut SSL_CTX);
