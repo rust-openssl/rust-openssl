@@ -16,6 +16,25 @@ impl ErrorCode {
     /// The SSL session has been closed.
     pub const ZERO_RETURN: ErrorCode = ErrorCode(ffi::SSL_ERROR_ZERO_RETURN);
 
+    /// The operation did not complete because an asynchronous engine is still
+    /// processing data.
+    ///
+    /// This will only occur if the mode has been set to SSL_MODE_ASYNC.
+    ///
+    /// Wait for async engine by using async job APIs and retry the operation.
+    #[cfg(ossl110)]
+    pub const WANT_ASYNC: ErrorCode = ErrorCode(ffi::SSL_ERROR_WANT_ASYNC);
+
+    /// The asynchronous job could not be started because there were no async jobs
+    /// available in the pool.
+    ///
+    /// This will only occur if the mode has been set to SSL_MODE_ASYNC.
+    ///
+    /// Retry the operation after a currently executing asynchronous operation
+    /// for the current thread has completed
+    #[cfg(ossl110)]
+    pub const WANT_ASYNC_JOB: ErrorCode = ErrorCode(ffi::SSL_ERROR_WANT_ASYNC_JOB);
+
     /// An attempt to read data from the underlying socket returned `WouldBlock`.
     ///
     /// Wait for read readiness and retry the operation.
