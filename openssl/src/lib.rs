@@ -54,6 +54,17 @@
 //! $ sudo zypper in libopenssl-devel
 //! ```
 //!
+//! For NixOS, try this `shell.nix`.
+//!
+//! ```nix
+//! { pkgs ? import <nixpkgs> {} }:
+//!
+//! pkgs.mkShell {
+//!   nativeBuildInputs = [ pkgs.pkgconfig ];
+//!   buildInputs = [ pkgs.openssl ];
+//! }
+//! ```
+//!
 //! ## Manual
 //!
 //! A set of environment variables can be used to point `openssl-sys` towards an OpenSSL installation. They will
