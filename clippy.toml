@@ -1,0 +1,4 @@
+disallowed-methods = [
+    { path = "std::slice::from_raw_parts", reason = "use util::from_raw_parts instead" },
+    { path = "std::slice::from_raw_parts_mut", reason = "use util::from_raw_parts_mut instead" },
+]

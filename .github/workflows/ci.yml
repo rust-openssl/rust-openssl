@@ -1,0 +1,454 @@
+name: CI
+
+on:
+  pull_request:
+    branches:
+      - master
+  push:
+    branches:
+      - master
+
+env:
+  RUSTFLAGS: -Dwarnings
+  RUST_BACKTRACE: 1
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read #  to fetch code (actions/checkout)
+
+jobs:
+  rustfmt:
+    name: rustfmt
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: sfackler/actions/rustup@55af96fecc6b2ff28431120e3d9b723e5c1bccbf # master
+      - uses: sfackler/actions/rustfmt@55af96fecc6b2ff28431120e3d9b723e5c1bccbf # master
+
+  clippy:
+    name: clippy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: sfackler/actions/rustup@55af96fecc6b2ff28431120e3d9b723e5c1bccbf # master
+      - run: echo "version=$(rustc --version)" >> $GITHUB_OUTPUT
+        id: rust-version
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cargo/registry/index
+          key: index-${{ runner.os }}-${{ github.run_number }}
+          restore-keys: |
+            index-${{ runner.os }}-
+      - run: cargo generate-lockfile
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cargo/registry/cache
+          key: registry-${{ runner.os }}-${{ steps.rust-version.outputs.version }}-${{ hashFiles('Cargo.lock') }}
+      - run: cargo fetch
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: target
+          key: target-${{ github.job }}-${{ steps.rust-version.outputs.version }}-${{ hashFiles('Cargo.lock') }}
+      - run: cargo clippy --all --all-targets
+
+  min-version:
+    name: min-version
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # Remember to also update `--rust-target` in `openssl-sys/build/run_bindgen.rs`
+      - uses: sfackler/actions/rustup@55af96fecc6b2ff28431120e3d9b723e5c1bccbf # master
+        with:
+          version: 1.80.0
+      - run: echo "version=$(rustc --version)" >> $GITHUB_OUTPUT
+        id: rust-version
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cargo/registry/index
+          key: index-${{ runner.os }}-${{ github.run_number }}
+          restore-keys: |
+            index-${{ runner.os }}-
+      # ctest 0.5 uses edition 2024 which Rust 1.80's cargo can't parse
+      - run: sed -i '/"systest",/d' Cargo.toml
+      - run: cargo generate-lockfile
+      - run: |
+          cargo update -p unicode-ident --precise 1.0.22
+          cargo update -p syn --precise 2.0.114
+          cargo update -p quote --precise 1.0.44
+          cargo update -p jobserver --precise 0.1.34
+          cargo update -p wasip2 --precise 1.0.1+wasi-0.2.4
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cargo/registry/cache
+          key: registry-${{ runner.os }}-${{ steps.rust-version.outputs.version }}-${{ hashFiles('Cargo.lock') }}
+      - run: cargo fetch
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: target
+          key: target-${{ github.job }}-${{ steps.rust-version.outputs.version }}-${{ hashFiles('Cargo.lock') }}
+      - run: cargo check -p openssl
+
+  windows-vcpkg:
+    strategy:
+      matrix:
+        os:
+          - runner: windows-latest
+            arch: x64
+          - runner: windows-11-arm
+            arch: arm64
+    name: windows-vcpkg-${{ matrix.os.arch }}
+    runs-on: ${{ matrix.os.runner }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: sfackler/actions/rustup@55af96fecc6b2ff28431120e3d9b723e5c1bccbf # master
+      - run: echo "version=$(rustc --version)" >> $GITHUB_OUTPUT
+        id: rust-version
+      - run: echo "VCPKG_ROOT=$env:VCPKG_INSTALLATION_ROOT" | Out-File -FilePath $env:GITHUB_ENV -Append
+      - run: vcpkg install openssl:${{ matrix.os.arch }}-windows-static-md
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cargo/registry/index
+          key: index-${{ runner.os }}-${{ github.run_number }}
+          restore-keys: |
+            index-${{ runner.os }}-
+      - run: cargo generate-lockfile
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cargo/registry/cache
+          key: registry-${{ runner.os }}-${{ steps.rust-version.outputs.version }}-${{ hashFiles('Cargo.lock') }}
+      - run: cargo fetch
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: target
+          key: target-${{ github.job }}-${{ steps.rust-version.outputs.version }}-${{ hashFiles('Cargo.lock') }}
+      # - run: cargo run -p systest
+      - run: cargo test -p openssl
+      - run: cargo test -p openssl-errors
+
+  macos-homebrew:
+    name: macos-homebrew
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: sfackler/actions/rustup@55af96fecc6b2ff28431120e3d9b723e5c1bccbf # master
+      - run: echo "version=$(rustc --version)" >> $GITHUB_OUTPUT
+        id: rust-version
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cargo/registry/index
+          key: index-${{ runner.os }}-${{ github.run_number }}
+          restore-keys: |
+            index-${{ runner.os }}-
+      - run: cargo generate-lockfile
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cargo/registry/cache
+          key: registry-${{ runner.os }}-${{ steps.rust-version.outputs.version }}-${{ hashFiles('Cargo.lock') }}
+      - run: cargo fetch
+      - run: cargo run -p systest
+      - run: cargo test -p openssl
+      - run: cargo test -p openssl-errors
+
+  linux:
+      strategy:
+        fail-fast: false
+        matrix:
+          target:
+            - x86_64-unknown-linux-gnu
+            - i686-unknown-linux-gnu
+            - arm-unknown-linux-gnueabihf
+          bindgen:
+            - true
+            - false
+          library:
+            - name: aws-lc
+              version: v1.52.0
+            - name: aws-lc
+              version: vendored
+            - name: boringssl
+              version: 338f44af3c92ef665bf740a8127a2d69c872b52a
+            - name: openssl
+              version: vendored
+            - name: openssl
+              version: 4.0.0
+            - name: openssl
+              version: 3.6.0
+            - name: openssl
+              version: 3.5.0
+            - name: openssl
+              version: 3.4.0
+            - name: openssl
+              version: 3.3.0
+            - name: openssl
+              version: 3.2.0
+            - name: openssl
+              old: true
+              version: 1.1.1w
+            - name: openssl
+              version: 1.1.0l
+              old: true
+          include:
+            - target: x86_64-unknown-linux-gnu
+              bindgen: true
+              library:
+                name: libressl
+                version: 3.5.3
+            - target: x86_64-unknown-linux-gnu
+              bindgen: true
+              library:
+                name: libressl
+                version: 4.1.2
+            - target: x86_64-unknown-linux-gnu
+              bindgen: true
+              library:
+                name: libressl
+                version: 4.2.1
+            - target: x86_64-unknown-linux-gnu
+              bindgen: true
+              library:
+                name: libressl
+                version: 4.3.1
+            - target: x86_64-unknown-linux-gnu
+              bindgen: false
+              library:
+                name: libressl
+                version: 3.5.3
+            - target: x86_64-unknown-linux-gnu
+              bindgen: false
+              library:
+                name: libressl
+                version: 4.1.2
+            - target: x86_64-unknown-linux-gnu
+              bindgen: false
+              library:
+                name: libressl
+                version: 4.2.1
+            - target: x86_64-unknown-linux-gnu
+              bindgen: false
+              library:
+                name: libressl
+                version: 4.3.1
+            - target: x86_64-unknown-linux-gnu
+              bindgen: false
+              library:
+                name: openssl-no-deprecated
+                version: 3.5.0
+      name: ${{ matrix.target }}-${{ matrix.library.name }}-${{ matrix.library.version }}-${{ matrix.bindgen }}
+      runs-on: ubuntu-22.04
+      env:
+        OPENSSL_DIR: /opt/openssl
+        CARGO_TARGET_ARM_UNKNOWN_LINUX_GNUEABIHF_LINKER: arm-linux-gnueabihf-gcc
+        CARGO_TARGET_ARM_UNKNOWN_LINUX_GNUEABIHF_AR: arm-linux-gnueabihf-ar
+        CARGO_TARGET_ARM_UNKNOWN_LINUX_GNUEABIHF_RUNNER: qemu-arm -L /usr/arm-linux-gnueabihf
+      steps:
+        - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+          with:
+            persist-credentials: false
+        - uses: sfackler/actions/rustup@55af96fecc6b2ff28431120e3d9b723e5c1bccbf # master
+        - run: echo "version=$(rustc --version)" >> $GITHUB_OUTPUT
+          id: rust-version
+        - run: rustup target add ${{ matrix.target }}
+        - name: Install packages
+          timeout-minutes: 3
+          run: |
+            case "${{ matrix.target }}" in
+            "x86_64-unknown-linux-gnu")
+              exit 0
+              ;;
+            "i686-unknown-linux-gnu")
+              packages="gcc-multilib g++-multilib"
+              ;;
+            "arm-unknown-linux-gnueabihf")
+              packages="gcc-arm-linux-gnueabihf g++-arm-linux-gnueabihf qemu-user"
+              ;;
+            esac
+
+            sudo apt-get update
+            sudo apt-get install -y $packages
+        - run: sudo apt-get remove -y libssl-dev
+        - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+          with:
+            path: /opt/openssl
+            key: openssl-${{ matrix.target }}-${{ matrix.library.name }}-${{ matrix.library.version }}-7
+          if: matrix.library.version != 'vendored'
+          id: openssl-cache
+        - run: |
+            echo "RUST_TEST_THREADS=1" >> $GITHUB_ENV
+            echo BINDGEN_EXTRA_CLANG_ARGS="--sysroot /usr/arm-linux-gnueabihf" >> $GITHUB_ENV
+          if: matrix.target == 'arm-unknown-linux-gnueabihf'
+        - name: Build OpenSSL
+          run: |
+            case "${{ matrix.library.name }}" in
+            "openssl"*)
+              if [[ "${{ matrix.library.old }}" == "true" ]]; then
+                url="https://www.openssl.org/source/openssl-${{ matrix.library.version }}.tar.gz"
+              else
+                url="https://github.com/openssl/openssl/releases/download/openssl-${{ matrix.library.version }}/openssl-${{ matrix.library.version }}.tar.gz"
+              fi
+              tar_flags="--strip-components=1"
+              ;;
+            "libressl")
+              url="https://ftp.openbsd.org/pub/OpenBSD/LibreSSL/libressl-${{ matrix.library.version }}.tar.gz"
+              tar_flags="--strip-components=1"
+              ;;
+            "boringssl")
+              url="https://boringssl.googlesource.com/boringssl/+archive/${{ matrix.library.version }}.tar.gz"
+              tar_flags=""
+              ;;
+            "aws-lc")
+              url="https://github.com/aws/aws-lc/archive/refs/tags/${{ matrix.library.version }}.tar.gz"
+              tar_flags="--strip-components=1"
+              ;;
+            esac
+
+            case "${{ matrix.target}}" in
+            "x86_64-unknown-linux-gnu")
+              CPU=x86_64
+              OS_COMPILER=linux-x86_64
+              OS_FLAGS=""
+              ;;
+            "i686-unknown-linux-gnu")
+              CPU=i686
+              OS_COMPILER=linux-elf
+              OS_FLAGS="-m32 -msse2"
+              ;;
+            "arm-unknown-linux-gnueabihf")
+              CPU=armv4
+              OS_COMPILER=linux-armv4
+              OS_FLAGS=""
+              export AR=arm-linux-gnueabihf-ar
+              export CC=arm-linux-gnueabihf-gcc
+              export CXX=arm-linux-gnueabihf-g++
+              ;;
+            esac
+
+            mkdir /tmp/build
+            cd /tmp/build
+
+            curl -L $url | tar $tar_flags -xzf -
+
+            case "${{ matrix.library.name }}" in
+            "openssl")
+              ./Configure --prefix=$OPENSSL_DIR --libdir=lib $OS_COMPILER -fPIC -g $OS_FLAGS no-shared
+              make -j "$(nproc)"
+              make install_sw
+              ;;
+            "openssl-no-deprecated")
+              ./Configure --prefix=$OPENSSL_DIR --libdir=lib $OS_COMPILER -fPIC -g $OS_FLAGS --api=3.0 no-deprecated no-shared
+              make -j "$(nproc)"
+              make install_sw
+              ;;
+            "libressl")
+              ./configure --prefix=$OPENSSL_DIR --disable-shared --with-pic
+              make -j "$(nproc)"
+              make install_sw
+              ;;
+            "boringssl")
+              mkdir build
+              cd build
+
+              echo "set(CMAKE_SYSTEM_NAME Linux)" > toolchain.cmake
+              echo "set(CMAKE_SYSTEM_PROCESSOR $CPU)" >> toolchain.cmake
+              echo "set(triple ${{ matrix.target }})" >> toolchain.cmake
+              echo 'set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} '$OS_FLAGS '" CACHE STRING "c++ flags")' >> toolchain.cmake
+              echo 'set(CMAKE_C_FLAGS   "${CMAKE_C_FLAGS}   '$OS_FLAGS '" CACHE STRING "c flags")' >> toolchain.cmake
+              echo 'set(CMAKE_ASM_FLAGS "${CMAKE_ASM_FLAGS} '$OS_FLAGS '" CACHE STRING "asm flags")' >> toolchain.cmake
+
+              cmake .. -DCMAKE_POSITION_INDEPENDENT_CODE=ON -DRUST_BINDINGS="${{ matrix.target }}" -DCMAKE_INSTALL_PREFIX="${OPENSSL_DIR}" -DCMAKE_TOOLCHAIN_FILE=toolchain.cmake
+              make -j "$(nproc)"
+              make install
+
+              # Copy stuff around so it's all as the build system expects.
+              cp -r ../rust/ "$OPENSSL_DIR/rust"
+              cp -r ./ "$OPENSSL_DIR/build"
+              ;;
+            "aws-lc")
+              mkdir build
+              cd build
+
+              echo "set(CMAKE_SYSTEM_NAME Linux)" > toolchain.cmake
+              echo "set(CMAKE_SYSTEM_PROCESSOR $CPU)" >> toolchain.cmake
+              echo "set(triple ${{ matrix.target }})" >> toolchain.cmake
+              echo 'set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} '$OS_FLAGS '" CACHE STRING "c++ flags")' >> toolchain.cmake
+              echo 'set(CMAKE_C_FLAGS   "${CMAKE_C_FLAGS}   '$OS_FLAGS '" CACHE STRING "c flags")' >> toolchain.cmake
+              echo 'set(CMAKE_ASM_FLAGS "${CMAKE_ASM_FLAGS} '$OS_FLAGS '" CACHE STRING "asm flags")' >> toolchain.cmake
+
+              cmake .. -DCMAKE_INSTALL_PREFIX="${OPENSSL_DIR}" -DCMAKE_TOOLCHAIN_FILE=toolchain.cmake
+              make -j "$(nproc)"
+              make install
+              ;;
+            esac
+
+          if: matrix.library.version != 'vendored' && !steps.openssl-cache.outputs.cache-hit
+        - run: |
+            mkdir -p .cargo
+            echo '[patch.crates-io]' > .cargo/config.toml
+            echo 'bssl-sys = { path = "'$OPENSSL_DIR'/rust/bssl-sys" }' >> .cargo/config.toml
+          if: matrix.library.name == 'boringssl' && !matrix.bindgen
+        - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+          with:
+            path: ~/.cargo/registry/index
+            key: index-${{ runner.os }}-${{ github.run_number }}
+            restore-keys: |
+              index-${{ runner.os }}-
+        - run: cargo generate-lockfile
+        - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+          with:
+            path: ~/.cargo/registry/cache
+            key: registry-${{ runner.os }}-${{ steps.rust-version.outputs.version }}-${{ hashFiles('Cargo.lock') }}
+        - run: cargo fetch
+        - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+          with:
+            path: target
+            key: target-${{ matrix.target }}-${{ matrix.bindgen }}-${{ matrix.library.name }}-${{ matrix.library.version }}-${{ steps.rust-version.outputs.version }}-${{ hashFiles('Cargo.lock') }}
+        - name: Run systest
+          run: |
+            if [[ "${{ matrix.library.version }}" == "vendored" ]]; then
+              features="--features vendored"
+            fi
+            if [[ "${{ matrix.bindgen }}" == "true" ]]; then
+              features="$features --features bindgen"
+            fi
+            cargo run --manifest-path=systest/Cargo.toml --target ${{ matrix.target }} $features
+          if: ${{ !(matrix.library.name == 'boringssl' || matrix.library.name == 'aws-lc') }}
+        - name: Test openssl
+          if: ${{ ! endsWith(matrix.library.name, 'no-deprecated') }}
+          run: |
+            if [[ "${{ matrix.library.name }}" == "boringssl" && "${{ matrix.bindgen }}" != "true" ]]; then
+              features="--features unstable_boringssl"
+              BORINGSSL_BUILD_DIR="$OPENSSL_DIR/build/"
+            fi
+            if [[ "${{ matrix.library.version }}" == "vendored" ]]; then
+              if [[ "${{ matrix.library.name }}" == "aws-lc" ]]; then
+                features="--features aws-lc"
+              else
+                features="--features vendored"
+              fi
+            fi
+            if [[ "${{ matrix.bindgen }}" == "true" ]]; then
+              features="$features --features bindgen"
+            fi
+            cargo test --manifest-path=openssl/Cargo.toml --target ${{ matrix.target }} $features
+        - name: Test openssl-errors
+          run: |
+            if [[ "${{ matrix.library.version }}" == "vendored" ]]; then
+              features="--features openssl-sys/vendored"
+            fi
+            if [[ "${{ matrix.bindgen }}" == "true" ]]; then
+              features="$features --features openssl-sys/bindgen"
+            fi
+            cargo test --manifest-path=openssl-errors/Cargo.toml --target ${{ matrix.target }} $features
+          if: ${{ !(matrix.library.name == 'boringssl' || matrix.library.name == 'aws-lc' || endsWith(matrix.library.name, 'no-deprecated')) }}

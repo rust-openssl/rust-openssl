@@ -1,0 +1,16 @@
+[package]
+name = "openssl-macros"
+version = "0.1.1"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+description = "Internal macros used by the openssl crate."
+repository = "https://github.com/rust-openssl/rust-openssl"
+rust-version = "1.80.0"
+
+[lib]
+proc-macro = true
+
+[dependencies]
+proc-macro2 = "1"
+quote = "1"
+syn = { version = "2", features = ["full"] }

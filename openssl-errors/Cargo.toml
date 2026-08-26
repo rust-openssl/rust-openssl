@@ -1,0 +1,20 @@
+[package]
+name = "openssl-errors"
+version = "0.2.0"
+authors = ["Steven Fackler <sfackler@gmail.com>"]
+edition = "2021"
+license = "MIT OR Apache-2.0"
+description = "Custom error library support for the openssl crate."
+repository = "https://github.com/rust-openssl/rust-openssl"
+readme = "README.md"
+categories = ["api-bindings"]
+rust-version = "1.80.0"
+
+[dependencies]
+cfg-if = "1.0"
+libc = "0.2"
+
+openssl-sys = { version = "0.9.64", path = "../openssl-sys" }
+
+[dev-dependencies]
+openssl = { version = "0.10.19", path = "../openssl" }
