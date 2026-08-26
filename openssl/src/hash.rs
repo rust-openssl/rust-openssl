@@ -491,7 +491,6 @@ pub fn hash_xof(t: MessageDigest, data: &[u8], buf: &mut [u8]) -> Result<(), Err
 #[cfg(test)]
 mod tests {
     use hex::{self, FromHex};
-    use std::io::prelude::*;
 
     use super::*;
 
