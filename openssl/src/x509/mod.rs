@@ -1888,9 +1888,9 @@ impl X509CrlBuilder {
 
     /// Consumes the builder, returning the CRL.
     ///
-    /// # Panics
+    /// # Errors
     ///
-    /// Panics if any of nextUpdate, revoked, AuthorityKeyIdentifier or CrlNumber is missing
+    /// Returns an error if any of nextUpdate, revoked, AuthorityKeyIdentifier or CrlNumber is missing
     pub fn build(self) -> Result<X509Crl, ErrorStack> {
         unsafe {
             let loc = ffi::X509_CRL_get_ext_by_NID(
@@ -1898,36 +1898,43 @@ impl X509CrlBuilder {
                 Nid::AUTHORITY_KEY_IDENTIFIER.as_raw(),
                 -1,
             );
-            assert!(
-                loc >= 0,
-                "CRL must have an Authority Key Identifier extension"
-            );
+            if loc < 0 {
+                return Err(ErrorStack::internal_error(
+                    "CRL must have an Authority Key Identifier extension",
+                ));
+            }
             let ext = ffi::X509_CRL_get_ext(self.0.as_ptr(), loc);
-            assert_eq!(
-                ffi::X509_EXTENSION_get_critical(ext),
-                0,
-                "Authority Key Identifier extension must not be critical"
-            );
+            if ffi::X509_EXTENSION_get_critical(ext) != 0 {
+                return Err(ErrorStack::internal_error(
+                    "Authority Key Identifier extension must not be critical",
+                ));
+            }
 
             let loc = ffi::X509_CRL_get_ext_by_NID(self.0.as_ptr(), Nid::CRL_NUMBER.as_raw(), -1);
-            assert!(loc >= 0, "CRL must have a Crl Number extension");
+            if loc < 0 {
+                return Err(ErrorStack::internal_error(
+                    "CRL must have a Crl Number extension",
+                ));
+            }
             let ext = ffi::X509_CRL_get_ext(self.0.as_ptr(), loc);
-            assert_eq!(
-                ffi::X509_EXTENSION_get_critical(ext),
-                0,
-                "Crl Number extension must not be critical"
-            );
+            if ffi::X509_EXTENSION_get_critical(ext) != 0 {
+                return Err(ErrorStack::internal_error(
+                    "Crl Number extension must not be critical",
+                ));
+            }
 
-            assert!(
-                !X509_CRL_get0_nextUpdate(self.0.as_ptr()).is_null(),
-                "CRL must have nextUpdate time set"
-            );
+            if X509_CRL_get0_nextUpdate(self.0.as_ptr()).is_null() {
+                return Err(ErrorStack::internal_error(
+                    "CRL must have nextUpdate time set",
+                ));
+            }
             let revoked = self.0.get_revoked();
-            assert!(
-                // XXX - switch to is_none_or() once MSRV is 1.82.
-                revoked.is_none() || revoked.is_some_and(|r| !r.is_empty()),
-                "Revoked must be absent or non-empty"
-            );
+            // XXX - switch to is_none_or() once MSRV is 1.82.
+            if !(revoked.is_none() || revoked.is_some_and(|r| !r.is_empty())) {
+                return Err(ErrorStack::internal_error(
+                    "Revoked must be absent or non-empty",
+                ));
+            }
         }
 
         Ok(self.0)
