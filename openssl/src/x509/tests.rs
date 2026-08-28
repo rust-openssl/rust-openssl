@@ -18,11 +18,13 @@ use crate::x509::extension::{
 use crate::x509::store::X509Lookup;
 use crate::x509::store::X509StoreBuilder;
 use crate::x509::verify::{X509VerifyFlags, X509VerifyParam};
+#[cfg(ossl110)]
+use crate::x509::X509Builder;
 #[cfg(any(ossl110, boringssl, awslc))]
 use crate::x509::X509PurposeId;
-use crate::x509::{CrlNumber, X509CrlBuilder, X509PurposeRef, X509Ref, X509RevokedBuilder};
-#[cfg(ossl110)]
-use crate::x509::{CrlReason, X509Builder};
+use crate::x509::{
+    CrlNumber, CrlReason, X509CrlBuilder, X509PurposeRef, X509Ref, X509RevokedBuilder,
+};
 use crate::x509::{
     CrlStatus, X509Crl, X509Extension, X509Name, X509Req, X509StoreContext, X509VerifyResult, X509,
 };
@@ -1337,6 +1339,8 @@ fn build_crl(
 
     builder.set_serial_number(&*bn.to_asn1_integer()?)?;
     builder.set_revocation_date(&d)?;
+    let reason = ReasonCode::new(CrlReason::KEY_COMPROMISE)?.build()?;
+    builder.append_extension(reason)?;
     let revoked = builder.build();
     let revokeds = vec![revoked];
 
@@ -1385,4 +1389,17 @@ fn test_x509_crl_builder() {
         .expect("Crl Number extension should be present");
     assert!(!critical, "Crl Number extension is not critical");
     assert_eq!(n.to_bn().unwrap().to_string(), "42");
+
+    let entry = &crl.get_revoked().unwrap()[0];
+    #[cfg_attr(not(ossl110), allow(unused_variables))]
+    let (critical, reason) = entry
+        .extension::<ReasonCode>()
+        .unwrap()
+        .expect("Reason code extension should be present");
+    assert!(!critical, "Reason code extension is not critical");
+    #[cfg(ossl110)]
+    assert_eq!(
+        CrlReason::KEY_COMPROMISE,
+        CrlReason::from_raw(reason.get_i64().unwrap() as ffi::c_int)
+    );
 }

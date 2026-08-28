@@ -40,6 +40,7 @@ use crate::{cvt, cvt_n, cvt_p, cvt_p_const};
 use openssl_macros::corresponds;
 
 pub use crate::x509::extension::CrlNumber;
+pub use crate::x509::extension::ReasonCode;
 
 pub mod verify;
 
@@ -1652,6 +1653,26 @@ impl X509RevokedBuilder {
         }
     }
 
+    /// Add an X509 extension value to the `X509Revoked`.
+    ///
+    /// This works just as `append_extension` except it takes ownership of the `X509Extension`.
+    pub fn append_extension(&mut self, extension: X509Extension) -> Result<(), ErrorStack> {
+        self.append_extension2(&extension)
+    }
+
+    /// Add an X509 extension value to the `X509Revoked`.
+    #[corresponds(X509_REVOKED_add_ext)]
+    pub fn append_extension2(&mut self, extension: &X509ExtensionRef) -> Result<(), ErrorStack> {
+        unsafe {
+            cvt(ffi::X509_REVOKED_add_ext(
+                self.0.as_ptr(),
+                extension.as_ptr(),
+                -1,
+            ))
+            .map(|_| ())
+        }
+    }
+
     /// Consumes the builder, returning the `X509Revoked`.
     pub fn build(self) -> X509Revoked {
         self.0
@@ -1746,10 +1767,6 @@ impl X509RevokedRef {
         }
     }
 }
-
-/// The CRL entry extension identifying the reason for revocation see [`CrlReason`],
-/// this is as defined in RFC 5280 Section 5.3.1.
-pub enum ReasonCode {}
 
 // SAFETY: ReasonCode is defined to be an Asn1Enumerated in the RFC
 // and in OpenSSL.

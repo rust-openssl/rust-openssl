@@ -842,6 +842,17 @@ foreign_type_and_impl_send_sync! {
     pub struct Asn1EnumeratedRef;
 }
 
+impl Asn1Enumerated {
+    /// Converts a bignum to an `Asn1Enumerated`.
+    #[corresponds(BN_to_ASN1_ENUMERATED)]
+    pub fn from_bn(bn: &BigNumRef) -> Result<Self, ErrorStack> {
+        unsafe {
+            cvt_p(ffi::BN_to_ASN1_ENUMERATED(bn.as_ptr(), ptr::null_mut()))
+                .map(|p| Asn1Enumerated::from_ptr(p))
+        }
+    }
+}
+
 impl Asn1EnumeratedRef {
     /// Get the value, if it fits in the required bounds.
     #[corresponds(ASN1_ENUMERATED_get_int64)]
