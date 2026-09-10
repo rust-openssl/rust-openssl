@@ -210,7 +210,7 @@ pub fn wrap_key(
             &key.0 as *const _ as *mut _, // this is safe, the implementation only uses the key as a const pointer.
             iv.as_ref()
                 .map_or(ptr::null(), |iv| iv.as_ptr() as *const _),
-            out.as_ptr() as *mut _,
+            out.as_mut_ptr() as *mut _,
             in_.as_ptr() as *const _,
             in_.len() as AesSizeType,
         );
@@ -249,7 +249,7 @@ pub fn unwrap_key(
             &key.0 as *const _ as *mut _, // this is safe, the implementation only uses the key as a const pointer.
             iv.as_ref()
                 .map_or(ptr::null(), |iv| iv.as_ptr() as *const _),
-            out.as_ptr() as *mut _,
+            out.as_mut_ptr() as *mut _,
             in_.as_ptr() as *const _,
             in_.len() as AesSizeType,
         );
