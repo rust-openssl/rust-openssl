@@ -22,3 +22,5 @@ pub const CMS_USE_KEYID: c_uint = 0x10000;
 pub const CMS_DEBUG_DECRYPT: c_uint = 0x20000;
 pub const CMS_KEY_PARAM: c_uint = 0x40000;
 pub const CMS_ASCIICRLF: c_uint = 0x80000;
+#[cfg(ossl300)]
+pub const CMS_CADES: c_uint = 0x100000;
