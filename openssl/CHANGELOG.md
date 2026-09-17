@@ -5,6 +5,9 @@
 ### Added
 
 * Added the full set of `SslAlert` alert descriptions, along with `SslAlert::reason_code`, `SslAlert::from_reason_code`, and a `Display` implementation.
+* Added `SslSession::new`, `SslSessionRef::set_master_key`, `SslSessionRef::set_cipher` and `SslSessionRef::set_protocol_version`, which build a session that carries an external TLS 1.3 pre shared key.
+* Added `SslRef::cipher_by_id`, which looks a cipher up by its two byte protocol id.
+* Added `SslContextBuilder::set_psk_use_session_callback` and `SslContextBuilder::set_psk_find_session_callback`, which bind the TLS 1.3 external pre shared key session callbacks.
 
 ## [v0.10.81] - 2026-06-12
 

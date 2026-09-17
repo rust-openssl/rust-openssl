@@ -233,6 +233,26 @@ extern "C" {
     pub fn SSL_get_psk_identity(ssl: *const SSL) -> *const c_char;
 }
 
+#[cfg(ossl111)]
+extern "C" {
+    pub fn SSL_CTX_set_psk_use_session_callback(
+        ctx: *mut SSL_CTX,
+        cb: Option<
+            extern "C" fn(
+                *mut SSL,
+                *const EVP_MD,
+                *mut *const c_uchar,
+                *mut size_t,
+                *mut *mut SSL_SESSION,
+            ) -> c_int,
+        >,
+    );
+    pub fn SSL_CTX_set_psk_find_session_callback(
+        ctx: *mut SSL_CTX,
+        cb: Option<extern "C" fn(*mut SSL, *const c_uchar, size_t, *mut *mut SSL_SESSION) -> c_int>,
+    );
+}
+
 extern "C" {
     #[cfg(ossl111)]
     pub fn SSL_CTX_add_custom_ext(
@@ -369,6 +389,16 @@ extern "C" {
     pub fn SSL_SESSION_get_time(s: *const SSL_SESSION) -> c_long;
     pub fn SSL_SESSION_get_timeout(s: *const SSL_SESSION) -> c_long;
     pub fn SSL_SESSION_get_protocol_version(s: *const SSL_SESSION) -> c_int;
+    #[cfg(ossl111)]
+    pub fn SSL_SESSION_set1_master_key(
+        sess: *mut SSL_SESSION,
+        in_: *const c_uchar,
+        len: size_t,
+    ) -> c_int;
+    #[cfg(ossl111)]
+    pub fn SSL_SESSION_set_cipher(s: *mut SSL_SESSION, cipher: *const SSL_CIPHER) -> c_int;
+    #[cfg(ossl111)]
+    pub fn SSL_SESSION_set_protocol_version(s: *mut SSL_SESSION, version: c_int) -> c_int;
 
     #[cfg(any(ossl111, libressl))]
     pub fn SSL_SESSION_set_max_early_data(ctx: *mut SSL_SESSION, max_early_data: u32) -> c_int;
@@ -377,6 +407,7 @@ extern "C" {
 
     pub fn SSL_SESSION_get_id(s: *const SSL_SESSION, len: *mut c_uint) -> *const c_uchar;
     pub fn SSL_SESSION_up_ref(ses: *mut SSL_SESSION) -> c_int;
+    pub fn SSL_SESSION_new() -> *mut SSL_SESSION;
     pub fn SSL_SESSION_free(s: *mut SSL_SESSION);
 }
 const_ptr_api! {
@@ -700,6 +731,7 @@ extern "C" {
 extern "C" {
     pub fn SSL_CIPHER_get_cipher_nid(c: *const SSL_CIPHER) -> c_int;
     pub fn SSL_CIPHER_get_digest_nid(c: *const SSL_CIPHER) -> c_int;
+    pub fn SSL_CIPHER_find(ssl: *mut SSL, ptr: *const c_uchar) -> *const SSL_CIPHER;
 }
 
 const_ptr_api! {

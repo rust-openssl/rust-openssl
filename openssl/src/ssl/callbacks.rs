@@ -15,6 +15,8 @@ use std::sync::Arc;
 
 use crate::dh::Dh;
 use crate::error::ErrorStack;
+#[cfg(ossl111)]
+use crate::hash::MessageDigest;
 use crate::pkey::Params;
 use crate::ssl::AlpnError;
 use crate::ssl::{
@@ -150,6 +152,118 @@ where
         match (*callback)(ssl, identity, psk_sl) {
             Ok(psk_len) if psk_len <= psk_cap => psk_len as u32,
             Ok(_) => 0,
+            Err(e) => {
+                e.put();
+                0
+            }
+        }
+    }
+}
+
+/// Client PSK identity kept alive in the `Ssl` ex data, see `raw_psk_use_session`.
+#[cfg(ossl111)]
+struct PskIdentity(Vec<u8>);
+
+#[cfg(ossl111)]
+pub extern "C" fn raw_psk_use_session<F>(
+    ssl: *mut ffi::SSL,
+    md: *const ffi::EVP_MD,
+    id: *mut *const c_uchar,
+    idlen: *mut size_t,
+    sess: *mut *mut ffi::SSL_SESSION,
+) -> c_int
+where
+    F: Fn(&mut SslRef, Option<MessageDigest>) -> Result<Option<(Vec<u8>, SslSession)>, ErrorStack>
+        + 'static
+        + Sync
+        + Send,
+{
+    unsafe {
+        *id = ptr::null();
+        *idlen = 0;
+        *sess = ptr::null_mut();
+
+        let ssl = SslRef::from_ptr_mut(ssl);
+        let session_ctx_index =
+            try_get_session_ctx_index().expect("BUG: session context index initialization failed");
+        let callback_idx = SslContext::cached_ex_index::<F>();
+
+        // See raw_verify for the rationale: psk_use_session_cb is copied from the SSL_CTX into
+        // the SSL at SSL_new time and is not updated by SSL_set_SSL_CTX, so we must look up the
+        // closure on the original SSL_CTX rather than the current (potentially swapped) one.
+        let callback = ssl
+            .ex_data(*session_ctx_index)
+            .expect("BUG: session context missing")
+            .ex_data(callback_idx)
+            .expect("BUG: psk use session callback missing") as *const F;
+        let md = if md.is_null() {
+            None
+        } else {
+            Some(MessageDigest::from_ptr(md))
+        };
+
+        match (*callback)(ssl, md) {
+            Ok(Some((identity, session))) => {
+                // OpenSSL copies the identity with OPENSSL_memdup after this callback has
+                // returned (ssl/statem/extensions_clnt.c, tls_construct_ctos_early_data), so
+                // the Vec must outlive this function. It is kept in the connection's ex data
+                // until the next call or until the connection is dropped.
+                ssl.set_ex_data(Ssl::cached_ex_index::<PskIdentity>(), PskIdentity(identity));
+                let identity = ssl
+                    .ex_data(Ssl::cached_ex_index::<PskIdentity>())
+                    .expect("BUG: identity missing");
+                *id = identity.0.as_ptr();
+                *idlen = identity.0.len();
+                let p = session.as_ptr();
+                mem::forget(session);
+                *sess = p;
+                1
+            }
+            Ok(None) => 1,
+            Err(e) => {
+                e.put();
+                0
+            }
+        }
+    }
+}
+
+#[cfg(ossl111)]
+pub extern "C" fn raw_psk_find_session<F>(
+    ssl: *mut ffi::SSL,
+    identity: *const c_uchar,
+    identity_len: size_t,
+    sess: *mut *mut ffi::SSL_SESSION,
+) -> c_int
+where
+    F: Fn(&mut SslRef, &[u8]) -> Result<Option<SslSession>, ErrorStack> + 'static + Sync + Send,
+{
+    unsafe {
+        *sess = ptr::null_mut();
+
+        let ssl = SslRef::from_ptr_mut(ssl);
+        let session_ctx_index =
+            try_get_session_ctx_index().expect("BUG: session context index initialization failed");
+        let callback_idx = SslContext::cached_ex_index::<F>();
+
+        // See raw_verify for the rationale: psk_find_session_cb is copied from the SSL_CTX into
+        // the SSL at SSL_new time and is not updated by SSL_set_SSL_CTX, so we must look up the
+        // closure on the original SSL_CTX rather than the current (potentially swapped) one.
+        let callback = ssl
+            .ex_data(*session_ctx_index)
+            .expect("BUG: session context missing")
+            .ex_data(callback_idx)
+            .expect("BUG: psk find session callback missing") as *const F;
+        let identity = util::from_raw_parts(identity, identity_len);
+
+        match (*callback)(ssl, identity) {
+            Ok(Some(session)) => {
+                let p = session.as_ptr();
+                mem::forget(session);
+                *sess = p;
+                1
+            }
+            Ok(None) => 1,
             Err(e) => {
                 e.put();
                 0
