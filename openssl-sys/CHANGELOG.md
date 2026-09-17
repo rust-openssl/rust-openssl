@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+* Added `SSL_CTX_set_psk_use_session_callback`, `SSL_CTX_set_psk_find_session_callback`, `SSL_SESSION_new`, `SSL_SESSION_set1_master_key`, `SSL_SESSION_set_cipher`, `SSL_SESSION_set_protocol_version` and `SSL_CIPHER_find`.
+
 ## [v0.9.117] - 2026-06-12
 
 ### Added

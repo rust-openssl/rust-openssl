@@ -26,7 +26,7 @@ use crate::ssl::test::server::Server;
 use crate::ssl::SslVersion;
 use crate::ssl::{self, NameType, SslConnectorBuilder};
 #[cfg(ossl111)]
-use crate::ssl::{ClientHelloResponse, ExtensionContext};
+use crate::ssl::{ClientHelloResponse, ExtensionContext, SslRef, SslSession};
 use crate::ssl::{
     Error, HandshakeError, MidHandshakeSslStream, ShutdownResult, ShutdownState, Ssl, SslAcceptor,
     SslAcceptorBuilder, SslConnector, SslContext, SslContextBuilder, SslFiletype, SslMethod,
@@ -1468,6 +1468,155 @@ fn psk_ciphers() {
 
     assert!(SERVER_CALLED.load(Ordering::SeqCst));
     assert!(CLIENT_CALLED.load(Ordering::SeqCst));
+}
+
+#[cfg(ossl111)]
+const PSK: &[u8] = b"thisisaverysecurekey";
+#[cfg(ossl111)]
+const IDENTITY: &[u8] = b"thisisaclient";
+
+/// Pins a context to TLS 1.3 with only `TLS_AES_256_GCM_SHA384` enabled.
+#[cfg(ossl111)]
+fn pin_tls13_aes256(ctx: &mut SslContextBuilder) {
+    ctx.set_min_proto_version(Some(SslVersion::TLS1_3)).unwrap();
+    ctx.set_ciphersuites("TLS_AES_256_GCM_SHA384").unwrap();
+}
+
+/// Builds a TLS 1.3 external PSK session bound to `TLS_AES_256_GCM_SHA384`.
+#[cfg(ossl111)]
+fn tls13_psk_session(ssl: &SslRef) -> SslSession {
+    let mut session = SslSession::new().unwrap();
+    session.set_master_key(PSK).unwrap();
+    session
+        .set_cipher(ssl.cipher_by_id([0x13, 0x02]).unwrap())
+        .unwrap();
+    session.set_protocol_version(SslVersion::TLS1_3).unwrap();
+    session
+}
+
+#[cfg(ossl111)]
+#[test]
+fn psk_tls13_session_aes256() {
+    static CLIENT_CALLED: AtomicBool = AtomicBool::new(false);
+    static SERVER_CALLED: AtomicBool = AtomicBool::new(false);
+
+    let mut server = Server::builder();
+    pin_tls13_aes256(server.ctx());
+    server.ctx().set_psk_find_session_callback(|ssl, identity| {
+        assert_eq!(identity, IDENTITY);
+        SERVER_CALLED.store(true, Ordering::SeqCst);
+        Ok(Some(tls13_psk_session(ssl)))
+    });
+
+    let server = server.build();
+
+    let mut client = server.client();
+    pin_tls13_aes256(client.ctx());
+    client.ctx().set_psk_use_session_callback(|ssl, _md| {
+        CLIENT_CALLED.store(true, Ordering::SeqCst);
+        Ok(Some((IDENTITY.to_vec(), tls13_psk_session(ssl))))
+    });
+
+    let s = client.connect();
+
+    assert!(CLIENT_CALLED.load(Ordering::SeqCst));
+    assert!(SERVER_CALLED.load(Ordering::SeqCst));
+    assert_eq!(
+        s.ssl().current_cipher().unwrap().name(),
+        "TLS_AES_256_GCM_SHA384"
+    );
+    assert!(s.ssl().session_reused());
+}
+
+// A PSK offered through the legacy `psk_client_callback` cannot state a hash,
+// so OpenSSL builds the implied session with cipher 0x1301 (SHA256). That
+// session does not match a SHA384 only pinned ciphersuite, so OpenSSL skips
+// the PSK and falls back to a full handshake instead. This is the
+// limitation the session based callbacks in this contract fix.
+#[cfg(ossl111)]
+#[test]
+fn psk_tls13_legacy_callback_skips_psk_with_sha384_only() {
+    let mut server = Server::builder();
+    pin_tls13_aes256(server.ctx());
+    server.ctx().set_psk_server_callback(|_, _, psk| {
+        psk[..PSK.len()].copy_from_slice(PSK);
+        Ok(PSK.len())
+    });
+
+    let server = server.build();
+
+    let mut client = server.client();
+    pin_tls13_aes256(client.ctx());
+    client
+        .ctx()
+        .set_psk_client_callback(move |_, _, identity, psk| {
+            identity[..IDENTITY.len()].copy_from_slice(IDENTITY);
+            identity[IDENTITY.len()] = 0;
+            psk[..PSK.len()].copy_from_slice(PSK);
+            Ok(PSK.len())
+        });
+
+    let s = client.connect();
+    assert!(!s.ssl().session_reused());
+}
+
+#[cfg(ossl111)]
+#[test]
+fn psk_tls13_find_session_none() {
+    static SERVER_CALLED: AtomicBool = AtomicBool::new(false);
+
+    let mut server = Server::builder();
+    pin_tls13_aes256(server.ctx());
+    server.ctx().set_psk_find_session_callback(|_, identity| {
+        assert_eq!(identity, IDENTITY);
+        SERVER_CALLED.store(true, Ordering::SeqCst);
+        Ok(None)
+    });
+
+    let server = server.build();
+
+    let mut client = server.client();
+    pin_tls13_aes256(client.ctx());
+    client.ctx().set_psk_use_session_callback(|ssl, _md| {
+        Ok(Some((IDENTITY.to_vec(), tls13_psk_session(ssl))))
+    });
+
+    client.connect();
+
+    assert!(SERVER_CALLED.load(Ordering::SeqCst));
+}
+
+// `Server::client()` never calls `set_verify` or `set_ca_file`, so the
+// context defaults to `SSL_VERIFY_NONE`. When the client offers no PSK, the
+// handshake still succeeds as a plain certificate based TLS 1.3 handshake
+// because the client never checks the server certificate against a trust
+// store.
+#[cfg(ossl111)]
+#[test]
+fn psk_tls13_use_session_none() {
+    static CLIENT_CALLED: AtomicBool = AtomicBool::new(false);
+    static SERVER_CALLED: AtomicBool = AtomicBool::new(false);
+
+    let mut server = Server::builder();
+    pin_tls13_aes256(server.ctx());
+    server.ctx().set_psk_find_session_callback(|_, _| {
+        SERVER_CALLED.store(true, Ordering::SeqCst);
+        Ok(None)
+    });
+
+    let server = server.build();
+
+    let mut client = server.client();
+    pin_tls13_aes256(client.ctx());
+    client.ctx().set_psk_use_session_callback(|_, _| {
+        CLIENT_CALLED.store(true, Ordering::SeqCst);
+        Ok(None)
+    });
+
+    client.connect();
+
+    assert!(CLIENT_CALLED.load(Ordering::SeqCst));
+    assert!(!SERVER_CALLED.load(Ordering::SeqCst));
 }
 
 // Regression tests: the PSK/cookie trampolines used to forward the callback's

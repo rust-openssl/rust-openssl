@@ -1484,6 +1484,58 @@ impl SslContextBuilder {
         }
     }
 
+    /// Sets the callback that supplies the external PSK session for a TLS 1.3 client.
+    ///
+    /// The callback receives the handshake digest when one is already fixed
+    /// (after a HelloRetryRequest) and `None` on the first ClientHello. It
+    /// returns the identity and a session that carries the PSK, the cipher
+    /// suite and `SslVersion::TLS1_3`, or `None` to offer no PSK. The
+    /// identity is kept in the connection's ex data until the callback runs
+    /// again or the connection is dropped.
+    ///
+    /// Requires OpenSSL 1.1.1 or newer.
+    #[corresponds(SSL_CTX_set_psk_use_session_callback)]
+    #[cfg(ossl111)]
+    pub fn set_psk_use_session_callback<F>(&mut self, callback: F)
+    where
+        F: Fn(
+                &mut SslRef,
+                Option<MessageDigest>,
+            ) -> Result<Option<(Vec<u8>, SslSession)>, ErrorStack>
+            + 'static
+            + Sync
+            + Send,
+    {
+        unsafe {
+            self.set_ex_data(SslContext::cached_ex_index::<F>(), callback);
+            ffi::SSL_CTX_set_psk_use_session_callback(
+                self.as_ptr(),
+                Some(raw_psk_use_session::<F>),
+            );
+        }
+    }
+
+    /// Sets the callback that finds the external PSK session for a TLS 1.3 server.
+    ///
+    /// The callback receives the identity the client offered and returns the
+    /// matching session, or `None` when the identity is unknown.
+    ///
+    /// Requires OpenSSL 1.1.1 or newer.
+    #[corresponds(SSL_CTX_set_psk_find_session_callback)]
+    #[cfg(ossl111)]
+    pub fn set_psk_find_session_callback<F>(&mut self, callback: F)
+    where
+        F: Fn(&mut SslRef, &[u8]) -> Result<Option<SslSession>, ErrorStack> + 'static + Sync + Send,
+    {
+        unsafe {
+            self.set_ex_data(SslContext::cached_ex_index::<F>(), callback);
+            ffi::SSL_CTX_set_psk_find_session_callback(
+                self.as_ptr(),
+                Some(raw_psk_find_session::<F>),
+            );
+        }
+    }
+
     /// Sets the callback which is called when new sessions are negotiated.
     ///
     /// This can be used by clients to implement session caching. While in TLSv1.2 the session is
@@ -2248,6 +2300,19 @@ impl SslSession {
         SslSession,
         ffi::d2i_SSL_SESSION
     }
+
+    /// Creates a new, empty session.
+    ///
+    /// Requires OpenSSL 1.1.1 or newer.
+    #[corresponds(SSL_SESSION_new)]
+    #[cfg(ossl111)]
+    pub fn new() -> Result<SslSession, ErrorStack> {
+        unsafe {
+            ffi::init();
+            let p = cvt_p(ffi::SSL_SESSION_new())?;
+            Ok(SslSession::from_ptr(p))
+        }
+    }
 }
 
 impl ToOwned for SslSessionRef {
@@ -2322,6 +2387,46 @@ impl SslSessionRef {
         unsafe {
             let version = ffi::SSL_SESSION_get_protocol_version(self.as_ptr());
             SslVersion(version)
+        }
+    }
+
+    /// Sets the master key (the PSK for an external TLS 1.3 PSK session).
+    ///
+    /// Requires OpenSSL 1.1.1 or newer.
+    #[corresponds(SSL_SESSION_set1_master_key)]
+    #[cfg(ossl111)]
+    pub fn set_master_key(&mut self, key: &[u8]) -> Result<(), ErrorStack> {
+        unsafe {
+            cvt(ffi::SSL_SESSION_set1_master_key(
+                self.as_ptr(),
+                key.as_ptr(),
+                key.len(),
+            ))
+            .map(|_| ())
+        }
+    }
+
+    /// Sets the cipher suite, and with it the hash the PSK is bound to.
+    ///
+    /// Requires OpenSSL 1.1.1 or newer.
+    #[corresponds(SSL_SESSION_set_cipher)]
+    #[cfg(ossl111)]
+    pub fn set_cipher(&mut self, cipher: &SslCipherRef) -> Result<(), ErrorStack> {
+        unsafe { cvt(ffi::SSL_SESSION_set_cipher(self.as_ptr(), cipher.as_ptr())).map(|_| ()) }
+    }
+
+    /// Sets the protocol version.
+    ///
+    /// Requires OpenSSL 1.1.1 or newer.
+    #[corresponds(SSL_SESSION_set_protocol_version)]
+    #[cfg(ossl111)]
+    pub fn set_protocol_version(&mut self, version: SslVersion) -> Result<(), ErrorStack> {
+        unsafe {
+            cvt(ffi::SSL_SESSION_set_protocol_version(
+                self.as_ptr(),
+                version.0,
+            ))
+            .map(|_| ())
         }
     }
 
@@ -2569,6 +2674,19 @@ impl SslRef {
     pub fn current_cipher(&self) -> Option<&SslCipherRef> {
         unsafe {
             let ptr = ffi::SSL_get_current_cipher(self.as_ptr());
+
+            SslCipherRef::from_const_ptr_opt(ptr)
+        }
+    }
+
+    /// Returns the cipher with the given two byte id, if this connection supports it.
+    ///
+    /// Requires OpenSSL 1.1.1 or newer.
+    #[corresponds(SSL_CIPHER_find)]
+    #[cfg(ossl111)]
+    pub fn cipher_by_id(&self, id: [u8; 2]) -> Option<&SslCipherRef> {
+        unsafe {
+            let ptr = ffi::SSL_CIPHER_find(self.as_ptr(), id.as_ptr());
 
             SslCipherRef::from_const_ptr_opt(ptr)
         }
