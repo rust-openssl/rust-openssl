@@ -99,51 +99,71 @@ pub const NID_sect571r1: c_int = 734;
 pub const NID_brainpoolP224r1: c_int = 925;
 #[cfg(libressl)]
 pub const NID_brainpoolP224r1: c_int = 926;
+#[cfg(awslc)]
+pub const NID_brainpoolP224r1: c_int = 925;
 
 #[cfg(ossl110)]
 pub const NID_brainpoolP256r1: c_int = 927;
 #[cfg(libressl)]
 pub const NID_brainpoolP256r1: c_int = 928;
+#[cfg(awslc)]
+pub const NID_brainpoolP256r1: c_int = 927;
 
 #[cfg(ossl110)]
 pub const NID_brainpoolP320r1: c_int = 929;
 #[cfg(libressl)]
 pub const NID_brainpoolP320r1: c_int = 930;
+#[cfg(awslc)]
+pub const NID_brainpoolP320r1: c_int = 929;
 
 #[cfg(ossl110)]
 pub const NID_brainpoolP384r1: c_int = 931;
 #[cfg(libressl)]
 pub const NID_brainpoolP384r1: c_int = 932;
+#[cfg(awslc)]
+pub const NID_brainpoolP384r1: c_int = 931;
 
 #[cfg(ossl110)]
 pub const NID_brainpoolP512r1: c_int = 933;
 #[cfg(libressl)]
 pub const NID_brainpoolP512r1: c_int = 934;
+#[cfg(awslc)]
+pub const NID_brainpoolP512r1: c_int = 933;
 
 #[cfg(ossl110)]
 pub const NID_brainpoolP224t1: c_int = 926;
 #[cfg(libressl)]
 pub const NID_brainpoolP224t1: c_int = 927;
+#[cfg(awslc)]
+pub const NID_brainpoolP224t1: c_int = 926;
 
 #[cfg(ossl110)]
 pub const NID_brainpoolP256t1: c_int = 928;
 #[cfg(libressl)]
 pub const NID_brainpoolP256t1: c_int = 929;
+#[cfg(awslc)]
+pub const NID_brainpoolP256t1: c_int = 928;
 
 #[cfg(ossl110)]
 pub const NID_brainpoolP320t1: c_int = 930;
 #[cfg(libressl)]
 pub const NID_brainpoolP320t1: c_int = 931;
+#[cfg(awslc)]
+pub const NID_brainpoolP320t1: c_int = 930;
 
 #[cfg(ossl110)]
 pub const NID_brainpoolP384t1: c_int = 932;
 #[cfg(libressl)]
 pub const NID_brainpoolP384t1: c_int = 933;
+#[cfg(awslc)]
+pub const NID_brainpoolP384t1: c_int = 932;
 
 #[cfg(ossl110)]
 pub const NID_brainpoolP512t1: c_int = 934;
 #[cfg(libressl)]
 pub const NID_brainpoolP512t1: c_int = 935;
+#[cfg(awslc)]
+pub const NID_brainpoolP512t1: c_int = 934;
 
 pub const NID_wap_wsg_idm_ecid_wtls1: c_int = 735;
 pub const NID_wap_wsg_idm_ecid_wtls3: c_int = 736;
