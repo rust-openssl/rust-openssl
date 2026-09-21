@@ -5,6 +5,12 @@
 ### Added
 
 * Added the full set of `SslAlert` alert descriptions, along with `SslAlert::reason_code`, `SslAlert::from_reason_code`, and a `Display` implementation.
+* Added `DsaRef::p_opt`, `DsaRef::q_opt`, and `DsaRef::g_opt`.
+
+### Fixed
+
+* `DsaRef::p`, `DsaRef::q`, and `DsaRef::g` now panic instead of constructing a reference to a null `BigNumRef` when the parameter is not set.
+* `Dsa::public_key_from_der` and `Dsa::public_key_from_pem` now reject a SubjectPublicKeyInfo that carries no DSA parameters.
 
 ## [v0.10.81] - 2026-06-12
 

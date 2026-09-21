@@ -157,35 +157,77 @@ where
     }
 
     /// Returns the DSA prime parameter of `self`.
+    ///
+    /// Panics if `self` has no prime parameter set. Use [`DsaRef::p_opt`] to
+    /// handle that case without a panic.
     #[corresponds(DSA_get0_pqg)]
     pub fn p(&self) -> &BigNumRef {
+        self.p_opt().expect("DSA has no p parameter")
+    }
+
+    /// Returns the DSA prime parameter of `self`, or `None` if it is not set.
+    #[corresponds(DSA_get0_pqg)]
+    pub fn p_opt(&self) -> Option<&BigNumRef> {
         unsafe {
             let mut p = ptr::null();
             DSA_get0_pqg(self.as_ptr(), &mut p, ptr::null_mut(), ptr::null_mut());
-            BigNumRef::from_const_ptr(p)
+            BigNumRef::from_const_ptr_opt(p)
         }
     }
 
     /// Returns the DSA sub-prime parameter of `self`.
+    ///
+    /// Panics if `self` has no sub-prime parameter set. Use [`DsaRef::q_opt`]
+    /// to handle that case without a panic.
     #[corresponds(DSA_get0_pqg)]
     pub fn q(&self) -> &BigNumRef {
+        self.q_opt().expect("DSA has no q parameter")
+    }
+
+    /// Returns the DSA sub-prime parameter of `self`, or `None` if it is not
+    /// set.
+    #[corresponds(DSA_get0_pqg)]
+    pub fn q_opt(&self) -> Option<&BigNumRef> {
         unsafe {
             let mut q = ptr::null();
             DSA_get0_pqg(self.as_ptr(), ptr::null_mut(), &mut q, ptr::null_mut());
-            BigNumRef::from_const_ptr(q)
+            BigNumRef::from_const_ptr_opt(q)
         }
     }
 
     /// Returns the DSA base parameter of `self`.
+    ///
+    /// Panics if `self` has no base parameter set. Use [`DsaRef::g_opt`] to
+    /// handle that case without a panic.
     #[corresponds(DSA_get0_pqg)]
     pub fn g(&self) -> &BigNumRef {
+        self.g_opt().expect("DSA has no g parameter")
+    }
+
+    /// Returns the DSA base parameter of `self`, or `None` if it is not set.
+    #[corresponds(DSA_get0_pqg)]
+    pub fn g_opt(&self) -> Option<&BigNumRef> {
         unsafe {
             let mut g = ptr::null();
             DSA_get0_pqg(self.as_ptr(), ptr::null_mut(), ptr::null_mut(), &mut g);
-            BigNumRef::from_const_ptr(g)
+            BigNumRef::from_const_ptr_opt(g)
         }
     }
 }
+/// Returns an error if any of the p, q, g parameters are missing.
+///
+/// `d2i_DSA_PUBKEY` accepts a SubjectPublicKeyInfo whose AlgorithmIdentifier
+/// parameters are absent, which leaves the key without p, q and g.
+fn check_pqg<T>(dsa: &DsaRef<T>) -> Result<(), ErrorStack>
+where
+    T: HasParams,
+{
+    if dsa.p_opt().is_none() || dsa.q_opt().is_none() || dsa.g_opt().is_none() {
+        return Err(ErrorStack::get());
+    }
+    Ok(())
+}
+
 #[cfg(any(boringssl, awslc))]
 type BitType = libc::c_uint;
 #[cfg(not(any(boringssl, awslc)))]
@@ -268,22 +310,41 @@ impl Dsa<Private> {
 }
 
 impl Dsa<Public> {
-    from_pem! {
-        /// Decodes a PEM-encoded SubjectPublicKeyInfo structure containing a DSA key.
-        ///
-        /// The input should have a header of `-----BEGIN PUBLIC KEY-----`.
-        #[corresponds(PEM_read_bio_DSA_PUBKEY)]
-        public_key_from_pem,
-        Dsa<Public>,
-        ffi::PEM_read_bio_DSA_PUBKEY
+    /// Decodes a PEM-encoded SubjectPublicKeyInfo structure containing a DSA key.
+    ///
+    /// The input should have a header of `-----BEGIN PUBLIC KEY-----`.
+    ///
+    /// A key whose AlgorithmIdentifier carries no DSA parameters is rejected.
+    #[corresponds(PEM_read_bio_DSA_PUBKEY)]
+    pub fn public_key_from_pem(pem: &[u8]) -> Result<Dsa<Public>, ErrorStack> {
+        unsafe {
+            crate::init();
+            let bio = crate::bio::MemBioSlice::new(pem)?;
+            let dsa = cvt_p(ffi::PEM_read_bio_DSA_PUBKEY(
+                bio.as_ptr(),
+                ptr::null_mut(),
+                None,
+                ptr::null_mut(),
+            ))
+            .map(|p| Dsa::from_ptr(p))?;
+            check_pqg(&dsa)?;
+            Ok(dsa)
+        }
     }
 
-    from_der! {
-        /// Decodes a DER-encoded SubjectPublicKeyInfo structure containing a DSA key.
-        #[corresponds(d2i_DSA_PUBKEY)]
-        public_key_from_der,
-        Dsa<Public>,
-        ffi::d2i_DSA_PUBKEY
+    /// Decodes a DER-encoded SubjectPublicKeyInfo structure containing a DSA key.
+    ///
+    /// A key whose AlgorithmIdentifier carries no DSA parameters is rejected.
+    #[corresponds(d2i_DSA_PUBKEY)]
+    pub fn public_key_from_der(der: &[u8]) -> Result<Dsa<Public>, ErrorStack> {
+        unsafe {
+            ffi::init();
+            let len = ::std::cmp::min(der.len(), libc::c_long::MAX as usize) as libc::c_long;
+            let dsa = cvt_p(ffi::d2i_DSA_PUBKEY(ptr::null_mut(), &mut der.as_ptr(), len))
+                .map(|p| Dsa::from_ptr(p))?;
+            check_pqg(&dsa)?;
+            Ok(dsa)
+        }
     }
 
     /// Create a new DSA key with only public components.
@@ -599,5 +660,37 @@ mod test {
         .unwrap();
         let s = format!("{:?}", sig);
         assert_eq!(s, "DsaSig { r: 774484690634577222213819810519929266740561094381, s: 910998676210681457251421818099943952372231273347 }");
+    }
+
+    /// A DER SubjectPublicKeyInfo with algorithm id-dsa and ABSENT parameters.
+    const DSA_SPKI_NO_PARAMS: &[u8] = &[
+        0x30, 0x11, 0x30, 0x09, 0x06, 0x07, 0x2A, 0x86, 0x48, 0xCE, 0x38, 0x04, 0x01, 0x03, 0x04,
+        0x00, 0x02, 0x01, 0x05,
+    ];
+
+    fn dsa_without_params() -> Dsa<Params> {
+        unsafe {
+            ffi::init();
+            Dsa::from_ptr(cvt_p(ffi::DSA_new()).unwrap())
+        }
+    }
+
+    #[test]
+    fn public_key_from_der_rejects_missing_params() {
+        assert!(Dsa::public_key_from_der(DSA_SPKI_NO_PARAMS).is_err());
+    }
+
+    #[test]
+    fn p_opt_is_none_without_params() {
+        let dsa = dsa_without_params();
+        assert!(dsa.p_opt().is_none());
+        assert!(dsa.q_opt().is_none());
+        assert!(dsa.g_opt().is_none());
+    }
+
+    #[test]
+    #[should_panic(expected = "DSA has no p parameter")]
+    fn p_panics_without_params() {
+        dsa_without_params().p();
     }
 }
