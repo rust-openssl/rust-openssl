@@ -206,6 +206,7 @@ macro_rules! generic_foreign_type_and_impl_send_sync {
                 fn clone(&self) -> $owned<T> {
                     unsafe {
                         let handle: *mut $ctype = $clone(self.0);
+                        assert!(!handle.is_null());
                         ::foreign_types::ForeignType::from_ptr(handle)
                     }
                 }
@@ -218,6 +219,7 @@ macro_rules! generic_foreign_type_and_impl_send_sync {
                     unsafe {
                         let handle: *mut $ctype =
                             $clone(::foreign_types::ForeignTypeRef::as_ptr(self));
+                        assert!(!handle.is_null());
                         $crate::ForeignType::from_ptr(handle)
                     }
                 }

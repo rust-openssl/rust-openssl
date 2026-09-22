@@ -1169,7 +1169,7 @@ impl fmt::UpperHex for BigNumRef {
                 let s = s.to_uppercase();
 
                 if f.alternate() {
-                    <String as fmt::Display>::fmt(&format!("0x{}", &s), f)
+                    <String as fmt::Display>::fmt(&format!("0x{}", s), f)
                 } else {
                     <str as fmt::Display>::fmt(&s, f)
                 }

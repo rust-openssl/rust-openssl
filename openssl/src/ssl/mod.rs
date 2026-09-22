@@ -412,6 +412,22 @@ bitflags! {
         ///
         /// This should be paired with `SSL_VERIFY_PEER`. It has no effect on the client side.
         const FAIL_IF_NO_PEER_CERT = ffi::SSL_VERIFY_FAIL_IF_NO_PEER_CERT;
+
+        /// On the server side, only request a certificate from the client during the initial
+        /// handshake, and not during renegotiations.
+        ///
+        /// This should be paired with `SSL_VERIFY_PEER`. It has no effect on the client side.
+        #[cfg(not(any(boringssl, awslc)))]
+        const CLIENT_ONCE = ffi::SSL_VERIFY_CLIENT_ONCE;
+
+        /// On the server side, request a certificate from the client via a TLSv1.3
+        /// post-handshake authentication request rather than during the initial handshake.
+        ///
+        /// This should be paired with `SSL_VERIFY_PEER`. It has no effect on the client side.
+        ///
+        /// Requires OpenSSL 1.1.1 or newer.
+        #[cfg(ossl111)]
+        const POST_HANDSHAKE = ffi::SSL_VERIFY_POST_HANDSHAKE;
     }
 }
 
@@ -606,14 +622,84 @@ impl SniError {
 }
 
 /// An SSL/TLS alert.
+///
+/// The same values are used both to signal an alert from a callback and to
+/// identify an alert received from the peer via [`SslAlert::from_reason_code`].
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub struct SslAlert(c_int);
 
 impl SslAlert {
-    /// Alert 112 - `unrecognized_name`.
-    pub const UNRECOGNIZED_NAME: SslAlert = SslAlert(ffi::SSL_AD_UNRECOGNIZED_NAME);
+    pub const CLOSE_NOTIFY: SslAlert = SslAlert(ffi::SSL_AD_CLOSE_NOTIFY);
+    pub const UNEXPECTED_MESSAGE: SslAlert = SslAlert(ffi::SSL_AD_UNEXPECTED_MESSAGE);
+    pub const BAD_RECORD_MAC: SslAlert = SslAlert(ffi::SSL_AD_BAD_RECORD_MAC);
+    pub const DECRYPTION_FAILED: SslAlert = SslAlert(ffi::SSL_AD_DECRYPTION_FAILED);
+    pub const RECORD_OVERFLOW: SslAlert = SslAlert(ffi::SSL_AD_RECORD_OVERFLOW);
+    pub const DECOMPRESSION_FAILURE: SslAlert = SslAlert(ffi::SSL_AD_DECOMPRESSION_FAILURE);
+    pub const HANDSHAKE_FAILURE: SslAlert = SslAlert(ffi::SSL_AD_HANDSHAKE_FAILURE);
+    pub const NO_CERTIFICATE: SslAlert = SslAlert(ffi::SSL_AD_NO_CERTIFICATE);
+    pub const BAD_CERTIFICATE: SslAlert = SslAlert(ffi::SSL_AD_BAD_CERTIFICATE);
+    pub const UNSUPPORTED_CERTIFICATE: SslAlert = SslAlert(ffi::SSL_AD_UNSUPPORTED_CERTIFICATE);
+    pub const CERTIFICATE_REVOKED: SslAlert = SslAlert(ffi::SSL_AD_CERTIFICATE_REVOKED);
+    pub const CERTIFICATE_EXPIRED: SslAlert = SslAlert(ffi::SSL_AD_CERTIFICATE_EXPIRED);
+    pub const CERTIFICATE_UNKNOWN: SslAlert = SslAlert(ffi::SSL_AD_CERTIFICATE_UNKNOWN);
     pub const ILLEGAL_PARAMETER: SslAlert = SslAlert(ffi::SSL_AD_ILLEGAL_PARAMETER);
+    pub const UNKNOWN_CA: SslAlert = SslAlert(ffi::SSL_AD_UNKNOWN_CA);
+    pub const ACCESS_DENIED: SslAlert = SslAlert(ffi::SSL_AD_ACCESS_DENIED);
     pub const DECODE_ERROR: SslAlert = SslAlert(ffi::SSL_AD_DECODE_ERROR);
+    pub const DECRYPT_ERROR: SslAlert = SslAlert(ffi::SSL_AD_DECRYPT_ERROR);
+    pub const EXPORT_RESTRICTION: SslAlert = SslAlert(ffi::SSL_AD_EXPORT_RESTRICTION);
+    pub const PROTOCOL_VERSION: SslAlert = SslAlert(ffi::SSL_AD_PROTOCOL_VERSION);
+    pub const INSUFFICIENT_SECURITY: SslAlert = SslAlert(ffi::SSL_AD_INSUFFICIENT_SECURITY);
+    pub const INTERNAL_ERROR: SslAlert = SslAlert(ffi::SSL_AD_INTERNAL_ERROR);
+    pub const INAPPROPRIATE_FALLBACK: SslAlert = SslAlert(ffi::SSL_AD_INAPPROPRIATE_FALLBACK);
+    pub const USER_CANCELLED: SslAlert = SslAlert(ffi::SSL_AD_USER_CANCELLED);
+    pub const NO_RENEGOTIATION: SslAlert = SslAlert(ffi::SSL_AD_NO_RENEGOTIATION);
+    #[cfg(any(ossl111, libressl, boringssl, awslc))]
+    pub const MISSING_EXTENSION: SslAlert = SslAlert(ffi::SSL_AD_MISSING_EXTENSION);
+    pub const UNSUPPORTED_EXTENSION: SslAlert = SslAlert(ffi::SSL_AD_UNSUPPORTED_EXTENSION);
+    pub const CERTIFICATE_UNOBTAINABLE: SslAlert = SslAlert(ffi::SSL_AD_CERTIFICATE_UNOBTAINABLE);
+    pub const UNRECOGNIZED_NAME: SslAlert = SslAlert(ffi::SSL_AD_UNRECOGNIZED_NAME);
+    pub const BAD_CERTIFICATE_STATUS_RESPONSE: SslAlert =
+        SslAlert(ffi::SSL_AD_BAD_CERTIFICATE_STATUS_RESPONSE);
+    pub const BAD_CERTIFICATE_HASH_VALUE: SslAlert =
+        SslAlert(ffi::SSL_AD_BAD_CERTIFICATE_HASH_VALUE);
+    pub const UNKNOWN_PSK_IDENTITY: SslAlert = SslAlert(ffi::SSL_AD_UNKNOWN_PSK_IDENTITY);
+    #[cfg(any(ossl111, libressl, boringssl, awslc))]
+    pub const CERTIFICATE_REQUIRED: SslAlert = SslAlert(ffi::SSL_AD_CERTIFICATE_REQUIRED);
+    pub const NO_APPLICATION_PROTOCOL: SslAlert = SslAlert(ffi::SSL_AD_NO_APPLICATION_PROTOCOL);
+
+    /// Returns the error reason code reported by [`Error::reason_code`] when
+    /// this alert is received from the peer.
+    ///
+    /// [`Error::reason_code`]: crate::error::Error::reason_code
+    pub fn reason_code(&self) -> c_int {
+        self.0 + ffi::SSL_AD_REASON_OFFSET
+    }
+
+    /// Returns the alert corresponding to an [`Error::reason_code`], or `None`
+    /// if the reason code does not denote a received alert.
+    ///
+    /// [`Error::reason_code`]: crate::error::Error::reason_code
+    pub fn from_reason_code(reason: c_int) -> Option<SslAlert> {
+        let description = reason - ffi::SSL_AD_REASON_OFFSET;
+        if (0..=255).contains(&description) {
+            Some(SslAlert(description))
+        } else {
+            None
+        }
+    }
+}
+
+impl fmt::Display for SslAlert {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
+        // `SSL_alert_desc_string_long` always returns a valid, static,
+        // NUL-terminated ASCII string ("unknown" for unrecognized values).
+        let description = unsafe {
+            let ptr = ffi::SSL_alert_desc_string_long(self.0);
+            CStr::from_ptr(ptr).to_str().unwrap()
+        };
+        fmt.write_str(description)
+    }
 }
 
 /// An error returned from an ALPN selection callback.
@@ -1122,23 +1208,21 @@ impl SslContextBuilder {
     /// `clear_options` for that.
     #[corresponds(SSL_CTX_set_options)]
     pub fn set_options(&mut self, option: SslOptions) -> SslOptions {
-        let bits =
-            unsafe { ffi::SSL_CTX_set_options(self.as_ptr(), option.bits()) } as SslOptionsRepr;
+        let bits = unsafe { ffi::SSL_CTX_set_options(self.as_ptr(), option.bits()) };
         SslOptions::from_bits_retain(bits)
     }
 
     /// Returns the options used by the context.
     #[corresponds(SSL_CTX_get_options)]
     pub fn options(&self) -> SslOptions {
-        let bits = unsafe { ffi::SSL_CTX_get_options(self.as_ptr()) } as SslOptionsRepr;
+        let bits = unsafe { ffi::SSL_CTX_get_options(self.as_ptr()) };
         SslOptions::from_bits_retain(bits)
     }
 
     /// Clears the options used by the context, returning the old set.
     #[corresponds(SSL_CTX_clear_options)]
     pub fn clear_options(&mut self, option: SslOptions) -> SslOptions {
-        let bits =
-            unsafe { ffi::SSL_CTX_clear_options(self.as_ptr(), option.bits()) } as SslOptionsRepr;
+        let bits = unsafe { ffi::SSL_CTX_clear_options(self.as_ptr(), option.bits()) };
         SslOptions::from_bits_retain(bits)
     }
 
@@ -1780,7 +1864,8 @@ impl ToOwned for SslContextRef {
 
     fn to_owned(&self) -> Self::Owned {
         unsafe {
-            SSL_CTX_up_ref(self.as_ptr());
+            let r = SSL_CTX_up_ref(self.as_ptr());
+            assert!(r == 1);
             SslContext::from_ptr(self.as_ptr())
         }
     }
@@ -1938,7 +2023,7 @@ impl SslContextRef {
     #[corresponds(SSL_CTX_get_verify_mode)]
     pub fn verify_mode(&self) -> SslVerifyMode {
         let mode = unsafe { ffi::SSL_CTX_get_verify_mode(self.as_ptr()) };
-        SslVerifyMode::from_bits(mode).expect("SSL_CTX_get_verify_mode returned invalid mode")
+        SslVerifyMode::from_bits_retain(mode)
     }
 
     /// Gets the number of TLS 1.3 session tickets that will be sent to a client after a full
@@ -2170,7 +2255,8 @@ impl ToOwned for SslSessionRef {
 
     fn to_owned(&self) -> SslSession {
         unsafe {
-            SSL_SESSION_up_ref(self.as_ptr());
+            let r = SSL_SESSION_up_ref(self.as_ptr());
+            assert!(r == 1);
             SslSession(self.as_ptr())
         }
     }
@@ -2391,7 +2477,7 @@ impl SslRef {
     #[corresponds(SSL_set_verify_mode)]
     pub fn verify_mode(&self) -> SslVerifyMode {
         let mode = unsafe { ffi::SSL_get_verify_mode(self.as_ptr()) };
-        SslVerifyMode::from_bits(mode).expect("SSL_get_verify_mode returned invalid mode")
+        SslVerifyMode::from_bits_retain(mode)
     }
 
     /// Like [`SslContextBuilder::set_verify_callback`].
@@ -4266,6 +4352,69 @@ cfg_if! {
             return ffi::SSL_get_ex_new_index(0, ptr::null_mut(), None, None, Some(f));
             #[cfg(any(boringssl, awslc))]
             return ffi::SSL_get_ex_new_index(0, ptr::null_mut(), ptr::null_mut(), None, f);
+        }
+    }
+}
+
+#[cfg(test)]
+mod alert_tests {
+    use super::SslAlert;
+
+    #[test]
+    fn reason_code_is_description_plus_offset() {
+        assert_eq!(SslAlert::CLOSE_NOTIFY.reason_code(), 1000);
+        assert_eq!(SslAlert::DECODE_ERROR.reason_code(), 1050);
+        assert_eq!(SslAlert(109).reason_code(), 1109);
+    }
+
+    #[test]
+    fn from_reason_code_maps_alerts() {
+        assert_eq!(
+            SslAlert::from_reason_code(1000),
+            Some(SslAlert::CLOSE_NOTIFY)
+        );
+        assert_eq!(
+            SslAlert::from_reason_code(1050),
+            Some(SslAlert::DECODE_ERROR)
+        );
+        // 1109 has no named `SSL_R_*` macro in BoringSSL/AWS-LC, but is still
+        // derived correctly from the alert description.
+        assert_eq!(SslAlert::from_reason_code(1109), Some(SslAlert(109)));
+    }
+
+    #[test]
+    fn from_reason_code_rejects_non_alert_codes() {
+        // Below the offset.
+        assert_eq!(SslAlert::from_reason_code(0), None);
+        assert_eq!(SslAlert::from_reason_code(267), None);
+        assert_eq!(SslAlert::from_reason_code(999), None);
+        // Above the highest possible alert description (offset + 255).
+        assert_eq!(SslAlert::from_reason_code(1256), None);
+    }
+
+    #[test]
+    fn display_uses_long_description() {
+        assert_eq!(SslAlert::CLOSE_NOTIFY.to_string(), "close notify");
+        assert_eq!(SslAlert::HANDSHAKE_FAILURE.to_string(), "handshake failure");
+        assert_eq!(SslAlert::DECODE_ERROR.to_string(), "decode error");
+        // Alerts OpenSSL does not name fall back to "unknown".
+        assert_eq!(SslAlert(255).to_string(), "unknown");
+    }
+
+    #[test]
+    fn reason_code_round_trips() {
+        let alerts = [
+            SslAlert::CLOSE_NOTIFY,
+            SslAlert::HANDSHAKE_FAILURE,
+            SslAlert::ILLEGAL_PARAMETER,
+            SslAlert::DECODE_ERROR,
+            SslAlert::UNRECOGNIZED_NAME,
+            SslAlert(109),
+            SslAlert(116),
+            SslAlert::NO_APPLICATION_PROTOCOL,
+        ];
+        for alert in alerts {
+            assert_eq!(SslAlert::from_reason_code(alert.reason_code()), Some(alert));
         }
     }
 }

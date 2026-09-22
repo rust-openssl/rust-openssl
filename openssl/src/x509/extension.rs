@@ -18,7 +18,9 @@
 //! ```
 use std::fmt::Write;
 
-use crate::asn1::Asn1Object;
+use crate::asn1::{Asn1Integer, Asn1Object};
+use crate::bn::BigNum;
+use crate::cvt_p;
 use crate::error::ErrorStack;
 use crate::nid::Nid;
 use crate::x509::{GeneralName, Stack, X509Extension, X509Name, X509v3Context};
@@ -551,6 +553,38 @@ impl SubjectAlternativeName {
 
         unsafe {
             X509Extension::new_internal(Nid::SUBJECT_ALT_NAME, self.critical, stack.as_ptr().cast())
+        }
+    }
+}
+
+/// An extension that provides a means of versionning the CRL.
+pub struct CrlNumber(Asn1Integer);
+
+impl CrlNumber {
+    /// Construct a new `CrlNumber` extension.
+    pub fn new(number: BigNum) -> Result<Self, ErrorStack> {
+        let mut max = BigNum::new()?;
+        max.lshift(BigNum::from_u32(1)?.as_ref(), 159)?;
+
+        assert!(
+            !number.is_negative() && number < max,
+            "CrlNumber must be an ASN.1 integer greater than or equal to 0 and less than 2^159"
+        );
+
+        Ok(Self(Asn1Integer::from_bn(&number)?))
+    }
+
+    /// Return a `CrlNumber` extension as an `X509Extension`.
+    pub fn build(self) -> Result<X509Extension, ErrorStack> {
+        unsafe {
+            ffi::init();
+
+            cvt_p(ffi::X509V3_EXT_i2d(
+                Nid::CRL_NUMBER.as_raw(),
+                0,
+                self.0.as_ptr().cast(),
+            ))
+            .map(X509Extension)
         }
     }
 }

@@ -278,9 +278,44 @@ pub const OPENSSL_NPN_UNSUPPORTED: c_int = 0;
 pub const OPENSSL_NPN_NEGOTIATED: c_int = 1;
 pub const OPENSSL_NPN_NO_OVERLAP: c_int = 2;
 
+pub const SSL_AD_REASON_OFFSET: c_int = 1000;
+pub const SSL_AD_CLOSE_NOTIFY: c_int = 0;
+pub const SSL_AD_UNEXPECTED_MESSAGE: c_int = 10;
+pub const SSL_AD_BAD_RECORD_MAC: c_int = 20;
+pub const SSL_AD_DECRYPTION_FAILED: c_int = 21;
+pub const SSL_AD_RECORD_OVERFLOW: c_int = 22;
+pub const SSL_AD_DECOMPRESSION_FAILURE: c_int = 30;
+pub const SSL_AD_HANDSHAKE_FAILURE: c_int = 40;
+pub const SSL_AD_NO_CERTIFICATE: c_int = 41;
+pub const SSL_AD_BAD_CERTIFICATE: c_int = 42;
+pub const SSL_AD_UNSUPPORTED_CERTIFICATE: c_int = 43;
+pub const SSL_AD_CERTIFICATE_REVOKED: c_int = 44;
+pub const SSL_AD_CERTIFICATE_EXPIRED: c_int = 45;
+pub const SSL_AD_CERTIFICATE_UNKNOWN: c_int = 46;
 pub const SSL_AD_ILLEGAL_PARAMETER: c_int = SSL3_AD_ILLEGAL_PARAMETER;
+pub const SSL_AD_UNKNOWN_CA: c_int = 48;
+pub const SSL_AD_ACCESS_DENIED: c_int = 49;
 pub const SSL_AD_DECODE_ERROR: c_int = TLS1_AD_DECODE_ERROR;
+pub const SSL_AD_DECRYPT_ERROR: c_int = 51;
+pub const SSL_AD_EXPORT_RESTRICTION: c_int = 60;
+pub const SSL_AD_PROTOCOL_VERSION: c_int = 70;
+pub const SSL_AD_INSUFFICIENT_SECURITY: c_int = 71;
+pub const SSL_AD_INTERNAL_ERROR: c_int = 80;
+pub const SSL_AD_INAPPROPRIATE_FALLBACK: c_int = 86;
+pub const SSL_AD_USER_CANCELLED: c_int = 90;
+pub const SSL_AD_NO_RENEGOTIATION: c_int = 100;
+#[cfg(any(ossl111, libressl, boringssl, awslc))]
+pub const SSL_AD_MISSING_EXTENSION: c_int = 109;
+pub const SSL_AD_UNSUPPORTED_EXTENSION: c_int = 110;
+pub const SSL_AD_CERTIFICATE_UNOBTAINABLE: c_int = 111;
 pub const SSL_AD_UNRECOGNIZED_NAME: c_int = TLS1_AD_UNRECOGNIZED_NAME;
+pub const SSL_AD_BAD_CERTIFICATE_STATUS_RESPONSE: c_int = 113;
+pub const SSL_AD_BAD_CERTIFICATE_HASH_VALUE: c_int = 114;
+pub const SSL_AD_UNKNOWN_PSK_IDENTITY: c_int = 115;
+#[cfg(any(ossl111, libressl, boringssl, awslc))]
+pub const SSL_AD_CERTIFICATE_REQUIRED: c_int = 116;
+pub const SSL_AD_NO_APPLICATION_PROTOCOL: c_int = 120;
+
 pub const SSL_ERROR_NONE: c_int = 0;
 pub const SSL_ERROR_SSL: c_int = 1;
 pub const SSL_ERROR_SYSCALL: c_int = 5;
@@ -295,6 +330,9 @@ pub const SSL_ERROR_WANT_CLIENT_HELLO_CB: c_int = 11;
 pub const SSL_VERIFY_NONE: c_int = 0;
 pub const SSL_VERIFY_PEER: c_int = 1;
 pub const SSL_VERIFY_FAIL_IF_NO_PEER_CERT: c_int = 2;
+pub const SSL_VERIFY_CLIENT_ONCE: c_int = 4;
+#[cfg(ossl111)]
+pub const SSL_VERIFY_POST_HANDSHAKE: c_int = 8;
 #[cfg(not(osslconf = "OPENSSL_NO_DEPRECATED_3_0"))]
 pub const SSL_CTRL_SET_TMP_DH: c_int = 3;
 #[cfg(not(osslconf = "OPENSSL_NO_DEPRECATED_3_0"))]

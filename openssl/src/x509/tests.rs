@@ -2,9 +2,10 @@ use std::cmp::Ordering;
 
 use crate::asn1::{Asn1Object, Asn1OctetString, Asn1Time};
 use crate::bn::{BigNum, MsbOption};
+use crate::error::ErrorStack;
 use crate::hash::MessageDigest;
 use crate::nid::Nid;
-use crate::pkey::{PKey, Private};
+use crate::pkey::{PKey, PKeyRef, Private};
 use crate::rsa::Rsa;
 #[cfg(not(any(boringssl, awslc)))]
 use crate::ssl::SslFiletype;
@@ -19,7 +20,7 @@ use crate::x509::store::X509StoreBuilder;
 use crate::x509::verify::{X509VerifyFlags, X509VerifyParam};
 #[cfg(any(ossl110, boringssl, awslc))]
 use crate::x509::X509PurposeId;
-use crate::x509::X509PurposeRef;
+use crate::x509::{CrlNumber, X509CrlBuilder, X509PurposeRef, X509Ref, X509RevokedBuilder};
 #[cfg(ossl110)]
 use crate::x509::{CrlReason, X509Builder};
 use crate::x509::{
@@ -43,7 +44,7 @@ fn test_cert_loading() {
     let cert = X509::from_pem(cert).unwrap();
     let fingerprint = cert.digest(MessageDigest::sha1()).unwrap();
 
-    let hash_str = "59172d9313e84459bcff27f967e79e6e9217e584";
+    let hash_str = "a1d812f2dfc1fdd3830b7dd0dbf50fecb479f471";
     let hash_vec = Vec::from_hex(hash_str).unwrap();
 
     assert_eq!(hash_vec, &*fingerprint);
@@ -62,7 +63,7 @@ fn test_debug() {
     assert!(debugged.contains(r#"countryName = "AU""#));
     assert!(debugged.contains(r#"stateOrProvinceName = "Some-State""#));
     assert!(debugged.contains(r#"not_before: Aug 14 17:00:03 2016 GMT"#));
-    assert!(debugged.contains(r#"not_after: Aug 12 17:00:03 2026 GMT"#));
+    assert!(debugged.contains(r#"not_after: Dec 31 23:59:59 2037 GMT"#));
 }
 
 #[test]
@@ -73,7 +74,7 @@ fn test_cert_issue_validity() {
     let not_after = cert.not_after().to_string();
 
     assert_eq!(not_before, "Aug 14 17:00:03 2016 GMT");
-    assert_eq!(not_after, "Aug 12 17:00:03 2026 GMT");
+    assert_eq!(not_after, "Dec 31 23:59:59 2037 GMT");
 }
 
 #[test]
@@ -110,7 +111,7 @@ fn test_nid_values() {
     assert_eq!(email.data().as_slice(), b"test@example.com");
 
     let friendly = subject.entries_by_nid(Nid::FRIENDLYNAME).next().unwrap();
-    assert_eq!(&**friendly.data().as_utf8().unwrap(), "Example");
+    assert_eq!(friendly.data().to_string().unwrap(), "Example");
 }
 
 #[test]
@@ -133,7 +134,7 @@ fn test_nameref_iterator() {
 
     let friendly = all_entries.next().unwrap();
     assert_eq!(friendly.object().nid().as_raw(), Nid::FRIENDLYNAME.as_raw());
-    assert_eq!(&**friendly.data().as_utf8().unwrap(), "Example");
+    assert_eq!(friendly.data().to_string().unwrap(), "Example");
 
     if all_entries.next().is_some() {
         panic!();
@@ -219,10 +220,10 @@ fn test_authority_issuer_and_serial() {
     assert_eq!(1, authority_issuer.len());
     let dn = authority_issuer[0].directory_name().unwrap();
     let mut o = dn.entries_by_nid(Nid::ORGANIZATIONNAME);
-    let o = o.next().unwrap().data().as_utf8().unwrap();
+    let o = o.next().unwrap().data().to_string().unwrap();
     assert_eq!(o.as_bytes(), b"PyCA");
     let mut cn = dn.entries_by_nid(Nid::COMMONNAME);
-    let cn = cn.next().unwrap().data().as_utf8().unwrap();
+    let cn = cn.next().unwrap().data().to_string().unwrap();
     assert_eq!(cn.as_bytes(), b"cryptography.io");
 
     let authority_serial = cert.authority_serial().unwrap();
@@ -379,6 +380,7 @@ fn x509_extension_new_from_der() {
 #[test]
 fn x509_extension_to_der() {
     let builder = X509::builder().unwrap();
+    let bn = BigNum::from_u32(42).unwrap();
 
     for (ext, expected) in [
         (
@@ -408,6 +410,13 @@ fn x509_extension_to_der() {
                 .build()
                 .unwrap(),
             b"0\x22\x06\x03U\x1d%\x04\x1b0\x19\x06\x08+\x06\x01\x05\x05\x07\x03\x01\x06\x03\x887\x01\x06\x08+\x06\x01\x05\x05\x07\x03\x02",
+        ),
+        (
+            CrlNumber::new(bn)
+                .unwrap()
+                .build()
+                .unwrap(),
+            b"\x30\x0a\x06\x03\x55\x1d\x14\x04\x03\x02\x01\x2a",
         ),
     ] {
         assert_eq!(&ext.to_der().unwrap(), expected);
@@ -466,11 +475,11 @@ fn test_stack_from_pem() {
     assert_eq!(certs.len(), 2);
     assert_eq!(
         hex::encode(certs[0].digest(MessageDigest::sha1()).unwrap()),
-        "59172d9313e84459bcff27f967e79e6e9217e584"
+        "a1d812f2dfc1fdd3830b7dd0dbf50fecb479f471"
     );
     assert_eq!(
         hex::encode(certs[1].digest(MessageDigest::sha1()).unwrap()),
-        "c0cbdf7cdd03c9773e5468e1f6d2da7d5cbb1875"
+        "9826e2edbd5b80acd2a868ffcca95a86e7a4ad72"
     );
 }
 
@@ -492,13 +501,13 @@ fn signature() {
     let signature = cert.signature();
     assert_eq!(
         hex::encode(signature.as_slice()),
-        "4af607b889790b43470442cfa551cdb8b6d0b0340d2958f76b9e3ef6ad4992230cead6842587f0ecad5\
-         78e6e11a221521e940187e3d6652de14e84e82f6671f097cc47932e022add3c0cb54a26bf27fa84c107\
-         4971caa6bee2e42d34a5b066c427f2d452038082b8073993399548088429de034fdd589dcfb0dd33be7\
-         ebdfdf698a28d628a89568881d658151276bde333600969502c4e62e1d3470a683364dfb241f78d310a\
-         89c119297df093eb36b7fd7540224f488806780305d1e79ffc938fe2275441726522ab36d88348e6c51\
-         f13dcc46b5e1cdac23c974fd5ef86aa41e91c9311655090a52333bc79687c748d833595d4c5f987508f\
-         e121997410d37c"
+        "94348146b9873cdef635ed65e9e9ff9ac1fca10b60c8caefadea69fdca7a2a126766f1fb9999bb163c1\
+         835bd759de7fc85940457111b109853e23e8048270d16affe307b5fe7bdbcf5103d69ecfa17ff30f70e\
+         e9b5a658d6cd6b4f3674e8b03d303f1a500e1e2bdd1da36417f1e6583df67d3ec651f20416e8251293b\
+         2a9a694db34da04288c932e2b1cde6b91bea54c9f36c592e129a2ce6051924676ffc931620c4d4da74e\
+         a98f4647ae60d2d0a53b2d190ab0d75aad11be1de4b518ba5a5625f96d8ef039984b40f9ee85371939b\
+         5ae9da84d83d3e52feb72c4d596f67054b08a6a4e4a3fa7fe701b4bb34881c070ea9aa88899b219cc16\
+         4c388863161b6a"
     );
     let algorithm = cert.signature_algorithm();
     assert_eq!(algorithm.object().nid(), Nid::SHA256WITHRSAENCRYPTION);
@@ -839,7 +848,11 @@ fn test_name_to_owned() {
 
 #[test]
 fn test_verify_param_set_time_fails_verification() {
-    const TEST_T_2030: time_t = 1893456000;
+    // The certificate fixtures expire at the end of 2037 so that this clock,
+    // which has to fall after their notAfter for the verification to fail,
+    // still fits in a 32-bit time_t. Such a time_t cannot represent any point
+    // after 2038-01-19.
+    const TEST_T_2038: time_t = 2145916800;
 
     let cert = include_bytes!("../../test/cert.pem");
     let cert = X509::from_pem(cert).unwrap();
@@ -850,7 +863,7 @@ fn test_verify_param_set_time_fails_verification() {
     let mut store_bldr = X509StoreBuilder::new().unwrap();
     store_bldr.add_cert(ca).unwrap();
     let mut verify_params = X509VerifyParam::new().unwrap();
-    verify_params.set_time(TEST_T_2030);
+    verify_params.set_time(TEST_T_2038);
     store_bldr.set_param(&verify_params).unwrap();
     let store = store_bldr.build();
 
@@ -1257,4 +1270,119 @@ fn test_ocsp_responders_invalid_utf8() {
     let cert = include_bytes!("../../test/aia_bad_utf8_cert.pem");
     let cert = X509::from_pem(cert).unwrap();
     assert!(cert.ocsp_responders().is_err());
+}
+
+#[test]
+fn test_x509_revoked_builder() {
+    let mut builder = X509RevokedBuilder::new().unwrap();
+    let bn = BigNum::from_u32(1024).unwrap();
+    let d = Asn1Time::from_unix(0).unwrap();
+
+    builder
+        .set_serial_number(&bn.to_asn1_integer().unwrap())
+        .unwrap();
+    builder.set_revocation_date(&d).unwrap();
+
+    let revoked = builder.build();
+
+    assert_eq!(revoked.serial_number().to_bn().unwrap(), bn);
+    assert_eq!(
+        revoked.revocation_date().compare(&d).unwrap(),
+        Ordering::Equal
+    )
+}
+
+fn build_ca() -> Result<(PKey<Private>, X509), ErrorStack> {
+    let rsa = Rsa::generate(2048)?;
+    let pkey = PKey::from_rsa(rsa)?;
+
+    let mut name = X509Name::builder()?;
+    name.append_entry_by_nid(Nid::COMMONNAME, "foorbar.com")?;
+    let name = name.build();
+
+    // Build certificate
+    let mut builder = X509::builder()?;
+    builder.set_version(2)?;
+    builder.set_subject_name(&name)?;
+    builder.set_issuer_name(&name)?;
+    builder.set_pubkey(&pkey)?;
+    builder.set_not_before(&*Asn1Time::days_from_now(0)?)?;
+    builder.set_not_after(&*Asn1Time::days_from_now(365)?)?;
+
+    let exts = {
+        let ctx = builder.x509v3_context(None, None);
+        let san = SubjectAlternativeName::new()
+            .dns("foobar.com")
+            .build(&ctx)?;
+        vec![san]
+    };
+
+    for ext in exts {
+        builder.append_extension(ext)?;
+    }
+
+    builder.sign(&pkey, MessageDigest::sha256())?;
+    let ca_cert = builder.build();
+    Ok((pkey, ca_cert))
+}
+
+fn build_crl(
+    key: &PKeyRef<Private>,
+    cert: &X509Ref,
+    extensions: Vec<X509Extension>,
+) -> Result<X509Crl, ErrorStack> {
+    let mut builder = X509RevokedBuilder::new()?;
+    let bn = BigNum::from_u32(1024)?;
+    let d = Asn1Time::from_unix(0)?;
+
+    builder.set_serial_number(&*bn.to_asn1_integer()?)?;
+    builder.set_revocation_date(&d)?;
+    let revoked = builder.build();
+    let revokeds = vec![revoked];
+
+    let mut builder = X509CrlBuilder::new()?;
+
+    builder.set_issuer_name(cert.issuer_name())?;
+    builder.set_last_update(&*Asn1Time::days_from_now(0)?)?;
+    builder.set_next_update(&*Asn1Time::days_from_now(30)?)?;
+
+    for ext in extensions {
+        builder.append_extension(ext)?;
+    }
+    for revoked in revokeds {
+        builder.add_revoked(revoked)?;
+    }
+
+    builder.sign(key, MessageDigest::sha256())?;
+
+    builder.build()
+}
+
+#[test]
+fn test_x509_crl_builder() {
+    let (pkey, ca_cert) = build_ca().unwrap();
+
+    let dummy = X509::builder().unwrap();
+    let ctx = dummy.x509v3_context(Some(ca_cert.as_ref()), None);
+    let aki = AuthorityKeyIdentifier::new()
+        .issuer(true)
+        .build(&ctx)
+        .unwrap();
+    let n = CrlNumber::new(BigNum::from_u32(42).unwrap())
+        .unwrap()
+        .build()
+        .unwrap();
+
+    let exts = vec![aki, n];
+    let crl = build_crl(&pkey, &ca_cert, exts).unwrap();
+    assert!(crl.verify(&pkey).unwrap());
+
+    assert_eq!(crl.get_revoked().unwrap().len(), 1);
+
+    let (critical, n) = crl
+        .extension::<CrlNumber>()
+        .unwrap()
+        .expect("Crl Number extension should be present");
+    assert!(!critical, "Crl Number extension is not critical");
+    assert_eq!(n.to_bn().unwrap().to_string(), "42");
 }

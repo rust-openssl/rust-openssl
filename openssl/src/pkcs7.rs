@@ -7,6 +7,7 @@ use std::ptr;
 use crate::asn1::Asn1ObjectRef;
 use crate::bio::{MemBio, MemBioSlice};
 use crate::error::ErrorStack;
+#[cfg(not(awslc))]
 use crate::nid::Nid;
 use crate::pkey::{HasPrivate, PKeyRef};
 use crate::stack::{Stack, StackRef, Stackable};
@@ -42,6 +43,8 @@ foreign_type_and_impl_send_sync! {
     pub struct Pkcs7Ref;
 }
 
+// AWS-LC does not expose `PKCS7_SIGNED_free`, which the owned type requires.
+#[cfg(not(awslc))]
 foreign_type_and_impl_send_sync! {
     type CType = ffi::PKCS7_SIGNED;
     fn drop = ffi::PKCS7_SIGNED_free;
@@ -69,11 +72,15 @@ bitflags! {
         const BINARY = ffi::PKCS7_BINARY;
         const NOATTR = ffi::PKCS7_NOATTR;
         const NOSMIMECAP = ffi::PKCS7_NOSMIMECAP;
+        #[cfg(not(awslc))]
         const NOOLDMIMETYPE = ffi::PKCS7_NOOLDMIMETYPE;
+        #[cfg(not(awslc))]
         const CRLFEOL = ffi::PKCS7_CRLFEOL;
         const STREAM = ffi::PKCS7_STREAM;
+        #[cfg(not(awslc))]
         const NOCRL = ffi::PKCS7_NOCRL;
         const PARTIAL = ffi::PKCS7_PARTIAL;
+        #[cfg(not(awslc))]
         const REUSE_DIGEST = ffi::PKCS7_REUSE_DIGEST;
         #[cfg(ossl110)]
         const NO_DUAL_CONTENT = ffi::PKCS7_NO_DUAL_CONTENT;
@@ -104,6 +111,7 @@ impl Pkcs7 {
     /// Returns the loaded signature, along with the cleartext message (if
     /// available).
     #[corresponds(SMIME_read_PKCS7)]
+    #[cfg(not(awslc))]
     pub fn from_smime(input: &[u8]) -> Result<(Pkcs7, Option<Vec<u8>>), ErrorStack> {
         ffi::init();
 
@@ -181,6 +189,7 @@ impl Pkcs7 {
 impl Pkcs7Ref {
     /// Converts PKCS#7 structure to S/MIME format
     #[corresponds(SMIME_write_PKCS7)]
+    #[cfg(not(awslc))]
     pub fn to_smime(&self, input: &[u8], flags: Pkcs7Flags) -> Result<Vec<u8>, ErrorStack> {
         let input_bio = MemBioSlice::new(input)?;
         let output = MemBio::new()?;
@@ -319,6 +328,7 @@ impl Pkcs7Ref {
     }
 
     /// Get the signed data of a PKCS#7 structure of type PKCS7_SIGNED
+    #[cfg(not(awslc))]
     pub fn signed(&self) -> Option<&Pkcs7SignedRef> {
         unsafe {
             if self.type_().map(|x| x.nid()) != Some(Nid::PKCS7_SIGNED) {
@@ -330,6 +340,7 @@ impl Pkcs7Ref {
     }
 }
 
+#[cfg(not(awslc))]
 impl Pkcs7SignedRef {
     /// Get the stack of certificates from the PKCS7_SIGNED object
     pub fn certificates(&self) -> Option<&StackRef<X509>> {
@@ -372,11 +383,22 @@ mod tests {
             Nid::PKCS7_ENVELOPED
         );
 
-        let encrypted = pkcs7
-            .to_smime(message.as_bytes(), flags)
-            .expect("should succeed");
+        #[cfg(not(awslc))]
+        let pkcs7_decoded = {
+            let encrypted = pkcs7
+                .to_smime(message.as_bytes(), flags)
+                .expect("should succeed");
 
-        let (pkcs7_decoded, _) = Pkcs7::from_smime(encrypted.as_slice()).expect("should succeed");
+            Pkcs7::from_smime(encrypted.as_slice())
+                .expect("should succeed")
+                .0
+        };
+        // AWS-LC's SMIME functions are no-ops, so roundtrip through PEM instead.
+        #[cfg(awslc)]
+        let pkcs7_decoded = {
+            let encrypted = pkcs7.to_pem().expect("should succeed");
+            Pkcs7::from_pem(encrypted.as_slice()).expect("should succeed")
+        };
 
         let decoded = pkcs7_decoded
             .decrypt(&pkey, &cert, Pkcs7Flags::empty())
@@ -409,12 +431,20 @@ mod tests {
             Nid::PKCS7_SIGNED
         );
 
-        let signed = pkcs7
-            .to_smime(message.as_bytes(), flags)
-            .expect("should succeed");
-        println!("{:?}", String::from_utf8(signed.clone()).unwrap());
-        let (pkcs7_decoded, content) =
-            Pkcs7::from_smime(signed.as_slice()).expect("should succeed");
+        #[cfg(not(awslc))]
+        let (pkcs7_decoded, content) = {
+            let signed = pkcs7
+                .to_smime(message.as_bytes(), flags)
+                .expect("should succeed");
+            println!("{:?}", String::from_utf8(signed.clone()).unwrap());
+            Pkcs7::from_smime(signed.as_slice()).expect("should succeed")
+        };
+        // AWS-LC's SMIME functions are no-ops, so roundtrip through PEM instead.
+        #[cfg(awslc)]
+        let pkcs7_decoded = {
+            let signed = pkcs7.to_pem().expect("should succeed");
+            Pkcs7::from_pem(signed.as_slice()).expect("should succeed")
+        };
 
         let mut output = Vec::new();
         pkcs7_decoded
@@ -428,6 +458,7 @@ mod tests {
             .expect("should succeed");
 
         assert_eq!(output, message.as_bytes());
+        #[cfg(not(awslc))]
         assert_eq!(content.expect("should be non-empty"), message.as_bytes());
     }
 
@@ -457,12 +488,20 @@ mod tests {
             Nid::PKCS7_SIGNED
         );
 
-        let signed = pkcs7
-            .to_smime(message.as_bytes(), flags)
-            .expect("should succeed");
+        #[cfg(not(awslc))]
+        let (pkcs7_decoded, content) = {
+            let signed = pkcs7
+                .to_smime(message.as_bytes(), flags)
+                .expect("should succeed");
 
-        let (pkcs7_decoded, content) =
-            Pkcs7::from_smime(signed.as_slice()).expect("should succeed");
+            Pkcs7::from_smime(signed.as_slice()).expect("should succeed")
+        };
+        // AWS-LC's SMIME functions are no-ops, so roundtrip through PEM instead.
+        #[cfg(awslc)]
+        let pkcs7_decoded = {
+            let signed = pkcs7.to_pem().expect("should succeed");
+            Pkcs7::from_pem(signed.as_slice()).expect("should succeed")
+        };
 
         let mut output = Vec::new();
         pkcs7_decoded
@@ -470,6 +509,7 @@ mod tests {
             .expect("should succeed");
 
         assert_eq!(output, message.as_bytes());
+        #[cfg(not(awslc))]
         assert!(content.is_none());
     }
 
@@ -498,11 +538,22 @@ mod tests {
             Nid::PKCS7_SIGNED
         );
 
-        let signed = pkcs7
-            .to_smime(message.as_bytes(), flags)
-            .expect("should succeed");
+        #[cfg(not(awslc))]
+        let pkcs7_decoded = {
+            let signed = pkcs7
+                .to_smime(message.as_bytes(), flags)
+                .expect("should succeed");
 
-        let (pkcs7_decoded, _) = Pkcs7::from_smime(signed.as_slice()).expect("should succeed");
+            Pkcs7::from_smime(signed.as_slice())
+                .expect("should succeed")
+                .0
+        };
+        // AWS-LC's SMIME functions are no-ops, so roundtrip through PEM instead.
+        #[cfg(awslc)]
+        let pkcs7_decoded = {
+            let signed = pkcs7.to_pem().expect("should succeed");
+            Pkcs7::from_pem(signed.as_slice()).expect("should succeed")
+        };
 
         let empty_certs = Stack::new().unwrap();
         let signer_certs = pkcs7_decoded
@@ -515,6 +566,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(not(awslc))]
     fn invalid_from_smime() {
         let input = String::from("Invalid SMIME Message");
         let result = Pkcs7::from_smime(input.as_bytes());
@@ -523,6 +575,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(not(awslc))]
     fn signed_data_certificates() {
         let cert = include_bytes!("../test/cert.pem");
         let cert = X509::from_pem(cert).unwrap();
@@ -549,6 +602,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(not(awslc))]
     fn signed_data_certificates_no_signed_data() {
         let cert = include_bytes!("../test/certs.pem");
         let cert = X509::from_pem(cert).unwrap();

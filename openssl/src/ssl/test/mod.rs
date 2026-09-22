@@ -213,7 +213,7 @@ fn verify_callback() {
     let server = Server::builder().build();
 
     let mut client = server.client();
-    let expected = "59172d9313e84459bcff27f967e79e6e9217e584";
+    let expected = "a1d812f2dfc1fdd3830b7dd0dbf50fecb479f471";
     client
         .ctx()
         .set_verify_callback(SslVerifyMode::PEER, move |_, x509| {
@@ -235,7 +235,7 @@ fn ssl_verify_callback() {
     let server = Server::builder().build();
 
     let mut client = server.client().build().builder();
-    let expected = "59172d9313e84459bcff27f967e79e6e9217e584";
+    let expected = "a1d812f2dfc1fdd3830b7dd0dbf50fecb479f471";
     client
         .ssl()
         .set_verify_callback(SslVerifyMode::PEER, move |_, x509| {
@@ -290,7 +290,7 @@ fn peer_certificate() {
     let fingerprint = cert.digest(MessageDigest::sha1()).unwrap();
     assert_eq!(
         hex::encode(fingerprint),
-        "59172d9313e84459bcff27f967e79e6e9217e584"
+        "a1d812f2dfc1fdd3830b7dd0dbf50fecb479f471"
     );
 }
 
@@ -693,6 +693,27 @@ fn default_verify_paths() {
     println!("{}", String::from_utf8_lossy(&result));
     assert!(result.starts_with(b"HTTP/1.0"));
     assert!(result.ends_with(b"</HTML>\r\n") || result.ends_with(b"</html>"));
+}
+
+#[test]
+fn verify_mode_round_trip() {
+    let mut ctx = SslContext::builder(SslMethod::tls()).unwrap();
+    let mut mode = SslVerifyMode::PEER;
+    mode |= SslVerifyMode::FAIL_IF_NO_PEER_CERT;
+    #[cfg(not(any(boringssl, awslc)))]
+    {
+        mode |= SslVerifyMode::CLIENT_ONCE;
+    }
+    #[cfg(ossl111)]
+    {
+        mode |= SslVerifyMode::POST_HANDSHAKE;
+    }
+    ctx.set_verify(mode);
+
+    let ctx = ctx.build();
+    assert_eq!(ctx.verify_mode(), mode);
+    let ssl = Ssl::new(&ctx).unwrap();
+    assert_eq!(ssl.verify_mode(), mode);
 }
 
 #[test]

@@ -540,6 +540,8 @@ extern "C" {
     pub fn SSL_get_error(ssl: *const SSL, ret: c_int) -> c_int;
     pub fn SSL_get_version(ssl: *const SSL) -> *const c_char;
 
+    pub fn SSL_alert_desc_string_long(value: c_int) -> *const c_char;
+
     pub fn SSL_do_handshake(ssl: *mut SSL) -> c_int;
     pub fn SSL_shutdown(ssl: *mut SSL) -> c_int;
 
