@@ -7,7 +7,7 @@
 
 use bitflags::bitflags;
 use foreign_types::{ForeignType, ForeignTypeRef};
-use libc::c_uint;
+use libc::{c_int, c_uint};
 use std::ptr;
 
 use crate::bio::{MemBio, MemBioSlice};
@@ -120,6 +120,42 @@ impl CmsContentInfoRef {
         }
     }
 
+    /// Decrypt detached content using the recipient's private key and certificate.
+    ///
+    /// This is used to decrypt content that was encrypted with [`CmsContentInfo::encrypt_detached`].
+    /// The CMS structure (`self`) contains the encrypted symmetric key and algorithm parameters,
+    /// while the actual encrypted content is provided separately in `encrypted_content`.
+    ///
+    /// [`CmsContentInfo::encrypt_detached`]: struct.CmsContentInfo.html#method.encrypt_detached
+    #[corresponds(CMS_decrypt)]
+    pub fn decrypt_detached<T>(
+        &self,
+        pkey: &PKeyRef<T>,
+        cert: &X509,
+        encrypted_content: &[u8],
+    ) -> Result<Vec<u8>, ErrorStack>
+    where
+        T: HasPrivate,
+    {
+        unsafe {
+            let pkey = pkey.as_ptr();
+            let cert = cert.as_ptr();
+            let dcont = MemBioSlice::new(encrypted_content)?;
+            let out = MemBio::new()?;
+
+            cvt(ffi::CMS_decrypt(
+                self.as_ptr(),
+                pkey,
+                cert,
+                dcont.as_ptr(),
+                out.as_ptr(),
+                0,
+            ))?;
+
+            Ok(out.get_buf().to_owned())
+        }
+    }
+
     to_der! {
         /// Serializes this CmsContentInfo using DER.
         #[corresponds(i2d_CMS_ContentInfo)]
@@ -222,6 +258,107 @@ impl CmsContentInfo {
             ))?;
 
             Ok(CmsContentInfo::from_ptr(cms))
+        }
+    }
+
+    /// Encrypt data with detached content.
+    ///
+    /// This creates a CMS EnvelopedData structure where the encrypted content is
+    /// returned separately from the CMS structure. The CMS structure contains the
+    /// encrypted symmetric key and algorithm parameters needed for decryption,
+    /// while the actual encrypted data is returned as a separate byte vector.
+    ///
+    /// This is useful when you need to handle the encrypted content separately,
+    /// for example when splitting it into blocks or storing it in a different location.
+    ///
+    /// The `flags` parameter will have `STREAM`, `PARTIAL`, and `DETACHED` flags
+    /// added automatically.
+    ///
+    /// # Example
+    /// ```
+    /// use openssl::cms::{CmsContentInfo, CMSOptions};
+    /// use openssl::stack::Stack;
+    /// use openssl::symm::Cipher;
+    /// use openssl::x509::X509;
+    ///
+    /// # fn example() -> Result<(), Box<dyn std::error::Error>> {
+    /// let cert_pem = include_bytes!("../test/cms_pubkey.der");
+    /// let cert = X509::from_der(cert_pem)?;
+    /// let mut certs = Stack::new()?;
+    /// certs.push(cert)?;
+    ///
+    /// let data = b"Hello, World!";
+    /// let (cms, encrypted_data) = CmsContentInfo::encrypt_detached(
+    ///     &certs,
+    ///     data,
+    ///     Cipher::aes_256_cbc(),
+    ///     CMSOptions::empty(),
+    /// )?;
+    ///
+    /// // cms contains the envelope (encrypted key, algorithm info)
+    /// // encrypted_data contains the ciphertext
+    /// let envelope_der = cms.to_der()?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    #[corresponds(CMS_encrypt)]
+    pub fn encrypt_detached(
+        certs: &StackRef<X509>,
+        data: &[u8],
+        cipher: Cipher,
+        flags: CMSOptions,
+    ) -> Result<(CmsContentInfo, Vec<u8>), ErrorStack> {
+        unsafe {
+            // Add streaming and detached flags
+            let stream_flags =
+                flags | CMSOptions::STREAM | CMSOptions::PARTIAL | CMSOptions::DETACHED;
+
+            // Create CMS structure with streaming mode (no input data yet)
+            let cms = cvt_p(ffi::CMS_encrypt(
+                certs.as_ptr(),
+                ptr::null_mut(),
+                cipher.as_ptr(),
+                stream_flags.bits(),
+            ))?;
+
+            let cms = CmsContentInfo::from_ptr(cms);
+
+            // Create output BIO for encrypted data
+            let out = MemBio::new()?;
+
+            // Initialize data streaming - returns cipher BIO chain pushed onto output
+            let bio = cvt_p(ffi::CMS_dataInit(cms.as_ptr(), out.as_ptr()))?;
+
+            // Write plaintext through the cipher BIO
+            let len = data.len() as c_int;
+            let written = ffi::BIO_write(bio, data.as_ptr() as *const _, len);
+            if written != len {
+                // Clean up the filter BIO chain
+                ffi::BIO_pop(bio);
+                ffi::BIO_free(bio);
+                return Err(ErrorStack::get());
+            }
+
+            // Flush the BIO
+            if ffi::BIO_ctrl(bio, ffi::BIO_CTRL_FLUSH, 0, ptr::null_mut()) != 1 {
+                ffi::BIO_pop(bio);
+                ffi::BIO_free(bio);
+                return Err(ErrorStack::get());
+            }
+
+            // Finalize the CMS structure
+            let final_ret = ffi::CMS_dataFinal(cms.as_ptr(), bio);
+
+            // Pop the filter BIO off the chain so our output BIO is standalone
+            ffi::BIO_pop(bio);
+            // Free just the filter BIO (not the whole chain)
+            ffi::BIO_free(bio);
+
+            if final_ret != 1 {
+                return Err(ErrorStack::get());
+            }
+
+            Ok((cms, out.get_buf().to_owned()))
         }
     }
 
@@ -364,6 +501,59 @@ mod test {
             assert_eq!(input, decrypt_with_cert_check);
             assert_eq!(input, decrypt_without_cert_check);
         }
+    }
+
+    #[test]
+    fn cms_encrypt_decrypt_detached() {
+        #[cfg(ossl300)]
+        let _provider = crate::provider::Provider::try_load(None, "legacy", true).unwrap();
+
+        // load cert with public key only
+        let pub_cert_bytes = include_bytes!("../test/cms_pubkey.der");
+        let pub_cert = X509::from_der(pub_cert_bytes).expect("failed to load pub cert");
+
+        // load cert with private key
+        let priv_cert_bytes = include_bytes!("../test/cms.p12");
+        let priv_cert = Pkcs12::from_der(priv_cert_bytes).expect("failed to load priv cert");
+        let priv_cert = priv_cert
+            .parse2("mypass")
+            .expect("failed to parse priv cert");
+
+        // encrypt cms message using public key cert with detached content
+        let input = b"My Message for detached encryption";
+        let mut cert_stack = Stack::new().expect("failed to create stack");
+        cert_stack
+            .push(pub_cert)
+            .expect("failed to add pub cert to stack");
+
+        let (cms, encrypted_content) = CmsContentInfo::encrypt_detached(
+            &cert_stack,
+            input,
+            Cipher::des_ede3_cbc(),
+            CMSOptions::empty(),
+        )
+        .expect("failed to create encrypted cms with detached content");
+
+        // Verify that we got both parts
+        let envelope_der = cms.to_der().expect("failed to create der from cms");
+        assert!(!envelope_der.is_empty());
+        assert!(!encrypted_content.is_empty());
+
+        // The encrypted content should be different from the input
+        assert_ne!(input.as_slice(), encrypted_content.as_slice());
+
+        // Decrypt using the detached method
+        let cms_restored =
+            CmsContentInfo::from_der(&envelope_der).expect("failed to read cms from der");
+        let decrypted = cms_restored
+            .decrypt_detached(
+                priv_cert.pkey.as_ref().unwrap(),
+                priv_cert.cert.as_ref().unwrap(),
+                &encrypted_content,
+            )
+            .expect("failed to decrypt detached cms");
+
+        assert_eq!(input.as_slice(), decrypted.as_slice());
     }
 
     fn cms_sign_verify_generic_helper(is_detached: bool) {
