@@ -18,12 +18,12 @@
 //! ```
 use std::fmt::Write;
 
-use crate::asn1::{Asn1Integer, Asn1Object};
+use crate::asn1::{Asn1Enumerated, Asn1Integer, Asn1Object};
 use crate::bn::BigNum;
 use crate::cvt_p;
 use crate::error::ErrorStack;
 use crate::nid::Nid;
-use crate::x509::{GeneralName, Stack, X509Extension, X509Name, X509v3Context};
+use crate::x509::{CrlReason, GeneralName, Stack, X509Extension, X509Name, X509v3Context};
 use foreign_types::ForeignType;
 
 /// An extension which indicates whether a certificate is a CA certificate.
@@ -581,6 +581,32 @@ impl CrlNumber {
 
             cvt_p(ffi::X509V3_EXT_i2d(
                 Nid::CRL_NUMBER.as_raw(),
+                0,
+                self.0.as_ptr().cast(),
+            ))
+            .map(X509Extension)
+        }
+    }
+}
+
+/// The CRL entry extension identifying the reason for revocation, see [`CrlReason`],
+/// this is as defined in RFC 5280 Section 5.3.1.
+pub struct ReasonCode(Asn1Enumerated);
+
+impl ReasonCode {
+    /// Construct a new `ReasonCode` extension.
+    pub fn new(reason: CrlReason) -> Result<Self, ErrorStack> {
+        let number = BigNum::from_u32(reason.as_raw() as u32)?;
+        Ok(Self(Asn1Enumerated::from_bn(&number)?))
+    }
+
+    /// Return a `ReasonCode` extension as an `X509Extension`.
+    pub fn build(self) -> Result<X509Extension, ErrorStack> {
+        unsafe {
+            ffi::init();
+
+            cvt_p(ffi::X509V3_EXT_i2d(
+                Nid::from_raw(ffi::NID_crl_reason).as_raw(),
                 0,
                 self.0.as_ptr().cast(),
             ))
