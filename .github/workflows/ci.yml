@@ -453,3 +453,7 @@ jobs:
             fi
             cargo test --manifest-path=openssl-errors/Cargo.toml --target ${{ matrix.target }} $features
           if: ${{ !(matrix.library.name == 'boringssl' || matrix.library.name == 'aws-lc' || endsWith(matrix.library.name, 'no-deprecated')) }}
+        - name: Check openssl-no-deprecated
+          if: ${{ endsWith(matrix.library.name, 'no-deprecated') }}
+          run: |
+            cargo check --manifest-path=openssl/Cargo.toml --target ${{ matrix.target }} $features
