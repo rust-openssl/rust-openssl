@@ -477,6 +477,12 @@ impl X509Ref {
         }
     }
 
+    /// Returns `true` if this certificate is a CA certificate.
+    #[corresponds(X509_check_ca)]
+    pub fn is_ca(&self) -> bool {
+        unsafe { ffi::X509_check_ca(self.as_ptr()) != 0 }
+    }
+
     /// Retrieves the path length extension from a certificate, if it exists.
     #[corresponds(X509_get_pathlen)]
     #[cfg(any(ossl110, boringssl, awslc))]
