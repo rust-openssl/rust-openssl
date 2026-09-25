@@ -17,4 +17,6 @@ extern "C" {
         ctx: *mut OSSL_LIB_CTX,
         path: *const c_char,
     ) -> c_int;
+    #[cfg(ossl300)]
+    pub fn OSSL_PROVIDER_get_params(prov: *const OSSL_PROVIDER, params: *mut OSSL_PARAM) -> c_int;
 }
