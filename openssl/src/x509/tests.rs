@@ -169,6 +169,18 @@ fn test_subject_alt_name() {
 }
 
 #[test]
+fn test_is_ca() {
+    let cert = X509::from_pem(include_bytes!("../../test/root-ca.pem")).unwrap();
+    assert!(cert.is_ca());
+
+    let cert = X509::from_pem(include_bytes!("../../test/intermediate-ca.pem")).unwrap();
+    assert!(cert.is_ca());
+
+    let cert = X509::from_pem(include_bytes!("../../test/leaf.pem")).unwrap();
+    assert!(!cert.is_ca());
+}
+
+#[test]
 #[cfg(any(ossl110, boringssl, awslc))]
 fn test_retrieve_pathlen() {
     let cert = include_bytes!("../../test/root-ca.pem");
