@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+* Added the `vendored-4` feature, which builds OpenSSL 4 from `openssl-src` 400.x. `vendored` still builds the 3.x line.
+
 ## [v0.9.117] - 2026-06-12
 
 ### Added
