@@ -306,8 +306,9 @@ jobs:
               tar_flags="--strip-components=1"
               ;;
             "boringssl")
-              url="https://boringssl.googlesource.com/boringssl/+archive/${{ matrix.library.version }}.tar.gz"
-              tar_flags=""
+              # Fetched by commit over git below: the commit hash pins the
+              # content, and googlesource's +archive tarballs are neither
+              # byte-stable nor reliably served.
               ;;
             "aws-lc")
               url="https://github.com/aws/aws-lc/archive/refs/tags/${{ matrix.library.version }}.tar.gz"
@@ -339,7 +340,13 @@ jobs:
             mkdir /tmp/build
             cd /tmp/build
 
-            curl -L $url | tar $tar_flags -xzf -
+            if [[ "${{ matrix.library.name }}" == "boringssl" ]]; then
+              git init -q .
+              git fetch -q --depth 1 https://boringssl.googlesource.com/boringssl "${{ matrix.library.version }}"
+              git checkout -q FETCH_HEAD
+            else
+              curl -L $url | tar $tar_flags -xzf -
+            fi
 
             case "${{ matrix.library.name }}" in
             "openssl")
