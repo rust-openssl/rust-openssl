@@ -116,7 +116,8 @@ jobs:
       - run: echo "version=$(rustc --version)" >> $GITHUB_OUTPUT
         id: rust-version
       - run: echo "VCPKG_ROOT=$env:VCPKG_INSTALLATION_ROOT" | Out-File -FilePath $env:GITHUB_ENV -Append
-      - run: vcpkg install openssl:${{ matrix.os.arch }}-windows-static-md
+      # The overlay only replaces the arm64 triplet; see the file for why.
+      - run: vcpkg install openssl:${{ matrix.os.arch }}-windows-static-md --overlay-triplets=.github/vcpkg-triplets
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ~/.cargo/registry/index
