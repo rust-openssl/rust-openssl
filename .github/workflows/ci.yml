@@ -345,7 +345,8 @@ jobs:
               git fetch -q --depth 1 https://boringssl.googlesource.com/boringssl "${{ matrix.library.version }}"
               git checkout -q FETCH_HEAD
             else
-              curl -L $url | tar $tar_flags -xzf -
+              curl -fsSL --retry 5 --retry-all-errors --retry-delay 5 -o /tmp/source.tar.gz "$url"
+              tar $tar_flags -xzf /tmp/source.tar.gz
             fi
 
             case "${{ matrix.library.name }}" in
