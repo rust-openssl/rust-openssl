@@ -7,6 +7,7 @@
 //! Internet protocols, including SSL/TLS, which is the basis for HTTPS,
 //! the secure protocol for browsing the web.
 
+use bitflags::bitflags;
 use foreign_types::{ForeignType, ForeignTypeRef, Opaque};
 use libc::{c_int, c_long, c_uint, c_void};
 use std::cmp::{self, Ordering};
@@ -372,6 +373,40 @@ impl X509Builder {
     }
 }
 
+bitflags! {
+    /// Flags in the certificate's `KeyUsage` extension.
+    #[derive(Copy, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[repr(transparent)]
+    pub struct X509KeyUsage: u32 {
+        const DIGITAL_SIGNATURE = ffi::X509v3_KU_DIGITAL_SIGNATURE as _;
+        const NON_REPUDIATION = ffi::X509v3_KU_NON_REPUDIATION as _;
+        const KEY_ENCIPHERMENT = ffi::X509v3_KU_KEY_ENCIPHERMENT as _;
+        const DATA_ENCIPHERMENT = ffi::X509v3_KU_DATA_ENCIPHERMENT as _;
+        const KEY_AGREEMENT = ffi::X509v3_KU_KEY_AGREEMENT as _;
+        const KEY_CERT_SIGN = ffi::X509v3_KU_KEY_CERT_SIGN as _;
+        const CRL_SIGN = ffi::X509v3_KU_CRL_SIGN as _;
+        const ENCIPHER_ONLY = ffi::X509v3_KU_ENCIPHER_ONLY as _;
+        const DECIPHER_ONLY = ffi::X509v3_KU_DECIPHER_ONLY as _;
+    }
+}
+
+bitflags! {
+    /// Purposes recognized in a certificate's `ExtendedKeyUsage` extension.
+    #[derive(Copy, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[repr(transparent)]
+    pub struct X509ExtendedKeyUsage: u32 {
+        const SSL_SERVER = ffi::XKU_SSL_SERVER as _;
+        const SSL_CLIENT = ffi::XKU_SSL_CLIENT as _;
+        const SMIME = ffi::XKU_SMIME as _;
+        const CODE_SIGN = ffi::XKU_CODE_SIGN as _;
+        const SGC = ffi::XKU_SGC as _;
+        const OCSP_SIGN = ffi::XKU_OCSP_SIGN as _;
+        const TIMESTAMP = ffi::XKU_TIMESTAMP as _;
+        const DVCS = ffi::XKU_DVCS as _;
+        const ANYEKU = ffi::XKU_ANYEKU as _;
+    }
+}
+
 foreign_type_and_impl_send_sync! {
     type CType = ffi::X509;
     fn drop = ffi::X509_free;
@@ -522,6 +557,39 @@ impl X509Ref {
         unsafe {
             let r = ffi::X509_get0_authority_serial(self.as_ptr());
             Asn1IntegerRef::from_const_ptr_opt(r)
+        }
+    }
+
+    /// Returns the flags in this certificate's `KeyUsage` extension, if it exists.
+    ///
+    /// Returns `None` if the extension is absent, in which case key usage is
+    /// typically unrestricted. Returns `Some(X509KeyUsage::empty())` if the
+    /// certificate's extensions could not be processed.
+    #[corresponds(X509_get_key_usage)]
+    pub fn key_usage(&self) -> Option<X509KeyUsage> {
+        let bits = unsafe { ffi::X509_get_key_usage(self.as_ptr()) };
+        if bits == u32::MAX {
+            None
+        } else {
+            Some(X509KeyUsage::from_bits_retain(bits))
+        }
+    }
+
+    /// Returns the purposes recognized in this certificate's `ExtendedKeyUsage`
+    /// extension, if it exists.
+    ///
+    /// Returns `None` if the extension is absent, in which case extended key usage is
+    /// typically unrestricted. Only the purposes defined in `X509ExtendedKeyUsage` are
+    /// represented; other purpose OIDs in the extension are not visible, so an extension
+    /// listing only such purposes returns `Some(X509ExtendedKeyUsage::empty())`. The
+    /// same value is returned if the certificate's extensions could not be processed.
+    #[corresponds(X509_get_extended_key_usage)]
+    pub fn extended_key_usage(&self) -> Option<X509ExtendedKeyUsage> {
+        let bits = unsafe { ffi::X509_get_extended_key_usage(self.as_ptr()) };
+        if bits == u32::MAX {
+            None
+        } else {
+            Some(X509ExtendedKeyUsage::from_bits_retain(bits))
         }
     }
 
@@ -2592,6 +2660,8 @@ impl X509PurposeId {
 }
 
 /// A reference to an [`X509_PURPOSE`].
+///
+/// [`X509_PURPOSE`]: https://docs.openssl.org/master/man3/X509_check_purpose/
 pub struct X509PurposeRef(Opaque);
 
 /// Implements a wrapper type for the static `X509_PURPOSE` table in OpenSSL.
