@@ -106,11 +106,8 @@ extern "C" {
 
     #[cfg(ossl110)]
     pub fn X509_get_pathlen(x: *mut X509) -> c_long;
-    #[cfg(ossl110)]
     pub fn X509_get_extension_flags(x: *mut X509) -> u32;
-    #[cfg(ossl110)]
     pub fn X509_get_key_usage(x: *mut X509) -> u32;
-    #[cfg(ossl110)]
     pub fn X509_get_extended_key_usage(x: *mut X509) -> u32;
     #[cfg(ossl110)]
     pub fn X509_get0_subject_key_id(x: *mut X509) -> *const ASN1_OCTET_STRING;

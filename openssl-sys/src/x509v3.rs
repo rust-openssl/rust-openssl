@@ -71,7 +71,6 @@ pub const XKU_SGC: u32 = 0x10;
 pub const XKU_OCSP_SIGN: u32 = 0x20;
 pub const XKU_TIMESTAMP: u32 = 0x40;
 pub const XKU_DVCS: u32 = 0x80;
-#[cfg(ossl110)]
 pub const XKU_ANYEKU: u32 = 0x100;
 
 pub const X509_PURPOSE_SSL_CLIENT: c_int = 1;

@@ -18,9 +18,10 @@ use crate::x509::extension::{
 use crate::x509::store::X509Lookup;
 use crate::x509::store::X509StoreBuilder;
 use crate::x509::verify::{X509VerifyFlags, X509VerifyParam};
-#[cfg(any(ossl110, boringssl, awslc))]
-use crate::x509::X509PurposeId;
-use crate::x509::{CrlNumber, X509CrlBuilder, X509PurposeRef, X509Ref, X509RevokedBuilder};
+use crate::x509::{
+    CrlNumber, X509CrlBuilder, X509ExtendedKeyUsage, X509KeyUsage, X509PurposeId, X509PurposeRef,
+    X509Ref, X509RevokedBuilder,
+};
 #[cfg(ossl110)]
 use crate::x509::{CrlReason, X509Builder};
 use crate::x509::{
@@ -351,6 +352,14 @@ fn x509_builder() {
         .unwrap();
     assert_eq!(cn.data().as_slice(), b"foobar.com");
     assert_eq!(serial, x509.serial_number().to_bn().unwrap());
+    assert_eq!(
+        x509.key_usage(),
+        Some(X509KeyUsage::DIGITAL_SIGNATURE | X509KeyUsage::KEY_ENCIPHERMENT)
+    );
+    assert_eq!(
+        x509.extended_key_usage(),
+        Some(X509ExtendedKeyUsage::SSL_SERVER | X509ExtendedKeyUsage::SSL_CLIENT)
+    );
 }
 
 #[test]
@@ -1008,7 +1017,6 @@ fn test_verify_param_auth_level() {
 }
 
 #[test]
-#[cfg(any(ossl110, boringssl, awslc))]
 fn test_set_purpose() {
     let cert = include_bytes!("../../test/leaf.pem");
     let cert = X509::from_pem(cert).unwrap();
@@ -1033,7 +1041,6 @@ fn test_set_purpose() {
 }
 
 #[test]
-#[cfg(any(ossl110, boringssl, awslc))]
 fn test_set_purpose_fails_verification() {
     let cert = include_bytes!("../../test/leaf.pem");
     let cert = X509::from_pem(cert).unwrap();
