@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+* Added `X509_check_ca`.
+
 ## [v0.9.117] - 2026-06-12
 
 ### Added
