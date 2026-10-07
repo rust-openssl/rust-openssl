@@ -16,7 +16,6 @@ pub use std::ffi::c_int;
 extern crate bssl_sys;
 
 #[cfg(boringssl)]
-#[path = "."]
 mod boringssl {
     #[cfg(feature = "unstable_boringssl")]
     pub use bssl_sys::*;
@@ -33,7 +32,6 @@ pub use boringssl::*;
 extern crate aws_lc_sys;
 
 #[cfg(awslc)]
-#[path = "."]
 #[allow(unpredictable_function_pointer_comparisons)]
 mod aws_lc {
     #[cfg(all(feature = "aws-lc", not(feature = "aws-lc-fips")))]
