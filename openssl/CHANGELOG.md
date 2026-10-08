@@ -4,6 +4,8 @@
 
 ### Added
 
+* Added the `vendored-4` feature, which builds OpenSSL 4 from `openssl-src` 400.x via `openssl-sys/vendored-4`.
+
 * Added the full set of `SslAlert` alert descriptions, along with `SslAlert::reason_code`, `SslAlert::from_reason_code`, and a `Display` implementation.
 * Added `DsaRef::p_opt`, `DsaRef::q_opt`, and `DsaRef::g_opt`.
 
