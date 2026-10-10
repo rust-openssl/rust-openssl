@@ -95,6 +95,9 @@ fn main() {
         if version >= 0x30200000 {
             cfg.header("openssl/thread.h");
         }
+        if version >= 0x40000000 {
+            cfg.header("openssl/ech.h").header("openssl/hpke.h");
+        }
     }
 
     cfg.rename_type(|s| {
