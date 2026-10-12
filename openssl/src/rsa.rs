@@ -23,17 +23,27 @@
 //! let mut buf = vec![0; rsa.size() as usize];
 //! let encrypted_len = rsa.public_encrypt(data, &mut buf, Padding::PKCS1).unwrap();
 //! ```
+#[cfg(not(osslconf = "OPENSSL_NO_DEPRECATED_3_0"))]
 use foreign_types::{ForeignType, ForeignTypeRef};
 use libc::c_int;
+#[cfg(not(osslconf = "OPENSSL_NO_DEPRECATED_3_0"))]
 use std::fmt;
+#[cfg(not(osslconf = "OPENSSL_NO_DEPRECATED_3_0"))]
 use std::mem;
+#[cfg(not(osslconf = "OPENSSL_NO_DEPRECATED_3_0"))]
 use std::ptr;
 
+#[cfg(not(osslconf = "OPENSSL_NO_DEPRECATED_3_0"))]
 use crate::bn::{BigNum, BigNumRef};
+#[cfg(not(osslconf = "OPENSSL_NO_DEPRECATED_3_0"))]
 use crate::error::ErrorStack;
+#[cfg(not(osslconf = "OPENSSL_NO_DEPRECATED_3_0"))]
 use crate::pkey::{HasPrivate, HasPublic, Private, Public};
+#[cfg(not(osslconf = "OPENSSL_NO_DEPRECATED_3_0"))]
 use crate::util::ForeignTypeRefExt;
+#[cfg(not(osslconf = "OPENSSL_NO_DEPRECATED_3_0"))]
 use crate::{cvt, cvt_n, cvt_p, LenType};
+#[cfg(not(osslconf = "OPENSSL_NO_DEPRECATED_3_0"))]
 use openssl_macros::corresponds;
 
 /// Type of encryption padding to use.
@@ -62,6 +72,7 @@ impl Padding {
     }
 }
 
+#[cfg(not(osslconf = "OPENSSL_NO_DEPRECATED_3_0"))]
 generic_foreign_type_and_impl_send_sync! {
     type CType = ffi::RSA;
     fn drop = ffi::RSA_free;
@@ -73,12 +84,14 @@ generic_foreign_type_and_impl_send_sync! {
     pub struct RsaRef<T>;
 }
 
+#[cfg(not(osslconf = "OPENSSL_NO_DEPRECATED_3_0"))]
 impl<T> Clone for Rsa<T> {
     fn clone(&self) -> Rsa<T> {
         (**self).to_owned()
     }
 }
 
+#[cfg(not(osslconf = "OPENSSL_NO_DEPRECATED_3_0"))]
 impl<T> ToOwned for RsaRef<T> {
     type Owned = Rsa<T>;
 
@@ -91,6 +104,7 @@ impl<T> ToOwned for RsaRef<T> {
     }
 }
 
+#[cfg(not(osslconf = "OPENSSL_NO_DEPRECATED_3_0"))]
 impl<T> RsaRef<T>
 where
     T: HasPrivate,
@@ -251,6 +265,7 @@ where
     }
 }
 
+#[cfg(not(osslconf = "OPENSSL_NO_DEPRECATED_3_0"))]
 impl<T> RsaRef<T>
 where
     T: HasPublic,
@@ -368,6 +383,7 @@ where
     }
 }
 
+#[cfg(not(osslconf = "OPENSSL_NO_DEPRECATED_3_0"))]
 impl Rsa<Public> {
     /// Creates a new RSA key with only public components.
     ///
@@ -424,10 +440,12 @@ impl Rsa<Public> {
     }
 }
 
+#[cfg(not(osslconf = "OPENSSL_NO_DEPRECATED_3_0"))]
 pub struct RsaPrivateKeyBuilder {
     rsa: Rsa<Private>,
 }
 
+#[cfg(not(osslconf = "OPENSSL_NO_DEPRECATED_3_0"))]
 impl RsaPrivateKeyBuilder {
     /// Creates a new `RsaPrivateKeyBuilder`.
     ///
@@ -492,6 +510,7 @@ impl RsaPrivateKeyBuilder {
     }
 }
 
+#[cfg(not(osslconf = "OPENSSL_NO_DEPRECATED_3_0"))]
 impl Rsa<Private> {
     /// Creates a new RSA key with private components (public components are assumed).
     ///
@@ -578,18 +597,20 @@ impl Rsa<Private> {
     }
 }
 
+#[cfg(not(osslconf = "OPENSSL_NO_DEPRECATED_3_0"))]
 impl<T> fmt::Debug for Rsa<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "Rsa")
     }
 }
 
+#[cfg(not(osslconf = "OPENSSL_NO_DEPRECATED_3_0"))]
 use ffi::{
     RSA_get0_crt_params, RSA_get0_factors, RSA_get0_key, RSA_set0_crt_params, RSA_set0_factors,
     RSA_set0_key,
 };
 
-#[cfg(test)]
+#[cfg(all(test, not(osslconf = "OPENSSL_NO_DEPRECATED_3_0")))]
 mod test {
     use crate::symm::Cipher;
 
