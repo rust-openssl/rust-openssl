@@ -14,4 +14,5 @@ ctest = "0.5"
 
 [features]
 vendored = ['openssl-sys/vendored']
+vendored-4 = ['openssl-sys/vendored-4']
 bindgen = ['openssl-sys/bindgen']

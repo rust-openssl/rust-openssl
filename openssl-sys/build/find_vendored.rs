@@ -1,4 +1,9 @@
+// `vendored-4` builds OpenSSL 4 from openssl-src 400.x; `vendored` builds the
+// 3.x line. Both crates expose the same Build and Artifacts API.
+#[cfg(not(feature = "vendored-4"))]
 use openssl_src;
+#[cfg(feature = "vendored-4")]
+use openssl_src_400 as openssl_src;
 use std::path::PathBuf;
 
 use super::env;
