@@ -269,6 +269,9 @@ where
     ///
     /// Returns the number of bytes written to `to`, or the number of bytes
     /// that would be written, if `to` is `None.
+    ///
+    /// Returns an error if `to` is shorter than the length returned when `to`
+    /// is `None`.
     #[corresponds(EVP_PKEY_verify_recover)]
     #[inline]
     pub fn verify_recover(
@@ -276,6 +279,16 @@ where
         sig: &[u8],
         to: Option<&mut [u8]>,
     ) -> Result<usize, ErrorStack> {
+        // OpenSSL does not treat the output length as a bound for all key
+        // types (RSA writes up to the modulus size), so check it here.
+        if let Some(buf) = &to {
+            if buf.len() < self.verify_recover(sig, None)? {
+                return Err(ErrorStack::internal_error(
+                    "verify_recover output buffer is too small",
+                ));
+            }
+        }
+
         let mut written = to.as_ref().map_or(0, |b| b.len());
         unsafe {
             cvt(ffi::EVP_PKEY_verify_recover(
@@ -1345,6 +1358,14 @@ mod test {
         assert_eq!(length, 51);
         // The digest is the end of the DigestInfo structure.
         assert_eq!(result_buf[length - digest.len()..length], digest);
+
+        // A buffer shorter than the reported length is rejected instead of
+        // being written past.
+        let mut short_buf = vec![0; 8];
+        assert!(ctx
+            .verify_recover(&signature, Some(&mut short_buf))
+            .is_err());
+        assert_eq!(short_buf, [0; 8]);
     }
 
     #[test]
