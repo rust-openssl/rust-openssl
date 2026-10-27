@@ -578,7 +578,8 @@ fn test_store_ctx_cleared_after_init() {
     // The certificate, chain and store passed to `init` have been dropped, so
     // the context must not refer to them anymore.
     assert!(context.current_cert().is_none());
-    assert!(context.verify_cert().is_err());
+    // BoringSSL reports this as a failed verification, the others as an error.
+    assert!(!context.verify_cert().unwrap_or(false));
 }
 
 #[test]
@@ -602,7 +603,7 @@ fn test_store_ctx_nested_init() {
                 c.init(&tmp_store, &tmp, &tmp_chain, |_| Ok(())).unwrap();
             }
             // The inner `init` has cleaned up the context.
-            assert!(c.verify_cert().is_err());
+            assert!(!c.verify_cert().unwrap_or(false));
             assert!(c.current_cert().is_none());
             Ok(())
         })
