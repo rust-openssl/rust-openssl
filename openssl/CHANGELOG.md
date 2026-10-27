@@ -6,6 +6,7 @@
 
 * Added the full set of `SslAlert` alert descriptions, along with `SslAlert::reason_code`, `SslAlert::from_reason_code`, and a `Display` implementation.
 * Added `DsaRef::p_opt`, `DsaRef::q_opt`, and `DsaRef::g_opt`.
+* Added `argon2d_with_version`, `argon2i_with_version`, and `argon2id_with_version`, along with `Argon2Version`, to select version 0x10 of Argon2.
 
 ### Fixed
 
