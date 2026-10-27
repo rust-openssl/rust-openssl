@@ -140,6 +140,16 @@ impl X509StoreContextRef {
             fn drop(&mut self) {
                 unsafe {
                     ffi::X509_STORE_CTX_cleanup(self.0.as_ptr());
+                    // OpenSSL and LibreSSL leave the certificate pointers in
+                    // place after cleanup, but they are only borrowed for the
+                    // duration of `init`. Clear them so that `verify_cert` and
+                    // `current_cert` can't use them afterwards. BoringSSL and
+                    // AWS-LC zero the whole context on cleanup.
+                    #[cfg(not(any(boringssl, awslc)))]
+                    {
+                        ffi::X509_STORE_CTX_set_cert(self.0.as_ptr(), ptr::null_mut());
+                        ffi::X509_STORE_CTX_set_current_cert(self.0.as_ptr(), ptr::null_mut());
+                    }
                 }
             }
         }
@@ -162,7 +172,7 @@ impl X509StoreContextRef {
     /// Returns `true` if verification succeeds. The `error` method will return the specific
     /// validation error if the certificate was not valid.
     ///
-    /// This will only work inside of a call to `init`.
+    /// This will only work inside of a call to `init`, and returns an error otherwise.
     #[corresponds(X509_verify_cert)]
     pub fn verify_cert(&mut self) -> Result<bool, ErrorStack> {
         unsafe { cvt_n(ffi::X509_verify_cert(self.as_ptr())).map(|n| n != 0) }

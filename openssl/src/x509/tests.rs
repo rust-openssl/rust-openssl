@@ -553,6 +553,63 @@ fn test_verify_cert() {
 }
 
 #[test]
+fn test_store_ctx_cleared_after_init() {
+    let mut context = X509StoreContext::new().unwrap();
+
+    {
+        let cert = include_bytes!("../../test/cert.pem");
+        let cert = X509::from_pem(cert).unwrap();
+        let ca = include_bytes!("../../test/root-ca.pem");
+        let ca = X509::from_pem(ca).unwrap();
+        let chain = Stack::new().unwrap();
+        let mut store_bldr = X509StoreBuilder::new().unwrap();
+        store_bldr.add_cert(ca).unwrap();
+        let store = store_bldr.build();
+
+        assert!(context
+            .init(&store, &cert, &chain, |c| {
+                let ok = c.verify_cert()?;
+                assert!(c.current_cert().is_some());
+                Ok(ok)
+            })
+            .unwrap());
+    }
+
+    // The certificate, chain and store passed to `init` have been dropped, so
+    // the context must not refer to them anymore.
+    assert!(context.current_cert().is_none());
+    assert!(context.verify_cert().is_err());
+}
+
+#[test]
+fn test_store_ctx_nested_init() {
+    let cert = include_bytes!("../../test/cert.pem");
+    let cert = X509::from_pem(cert).unwrap();
+    let ca = include_bytes!("../../test/root-ca.pem");
+    let ca = X509::from_pem(ca).unwrap();
+    let chain = Stack::new().unwrap();
+    let mut store_bldr = X509StoreBuilder::new().unwrap();
+    store_bldr.add_cert(ca).unwrap();
+    let store = store_bldr.build();
+
+    let mut context = X509StoreContext::new().unwrap();
+    context
+        .init(&store, &cert, &chain, |c| {
+            {
+                let tmp = X509::from_pem(include_bytes!("../../test/cert.pem")).unwrap();
+                let tmp_chain = Stack::new().unwrap();
+                let tmp_store = X509StoreBuilder::new().unwrap().build();
+                c.init(&tmp_store, &tmp, &tmp_chain, |_| Ok(())).unwrap();
+            }
+            // The inner `init` has cleaned up the context.
+            assert!(c.verify_cert().is_err());
+            assert!(c.current_cert().is_none());
+            Ok(())
+        })
+        .unwrap();
+}
+
+#[test]
 fn test_verify_fails() {
     let cert = include_bytes!("../../test/cert.pem");
     let cert = X509::from_pem(cert).unwrap();
