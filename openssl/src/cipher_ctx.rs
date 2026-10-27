@@ -296,30 +296,39 @@ impl CipherCtxRef {
         }
     }
 
+    /// Returns how many bytes a wrap-mode cipher adds to the input rounded up
+    /// to 8 bytes, or `None` if the cipher isn't a wrap-mode cipher.
     #[cfg(not(any(boringssl, awslc)))]
-    fn is_wrap_mode(&self) -> bool {
+    fn wrap_mode_overhead(&self) -> Option<usize> {
         unsafe {
             let cipher = EVP_CIPHER_CTX_get0_cipher(self.as_ptr());
-            if cipher.is_null() {
-                return false;
+            if cipher.is_null()
+                || ffi::EVP_CIPHER_flags(cipher) & ffi::EVP_CIPH_MODE != ffi::EVP_CIPH_WRAP_MODE
+            {
+                return None;
             }
-            ffi::EVP_CIPHER_flags(cipher) & ffi::EVP_CIPH_MODE == ffi::EVP_CIPH_WRAP_MODE
+            // The AES key wraps (RFC 3394, RFC 5649) add one 8-byte block, but
+            // the Triple-DES key wrap (RFC 3217) adds two: an IV and a checksum.
+            if ffi::EVP_CIPHER_nid(cipher) == ffi::NID_id_smime_alg_CMS3DESwrap {
+                Some(16)
+            } else {
+                Some(8)
+            }
         }
     }
 
     #[cfg(any(boringssl, awslc))]
-    fn is_wrap_mode(&self) -> bool {
-        false
+    fn wrap_mode_overhead(&self) -> Option<usize> {
+        None
     }
 
     fn cipher_update_output_size(&self, input_len: usize) -> usize {
         // Wrap-mode ciphers have EVP_CIPH_FLAG_CUSTOM_CIPHER set and emit their
-        // entire output (plaintext rounded up to 8 bytes + 8-byte IV) in a
-        // single update call, so the usual `inlen + block_size` bound is too
-        // small for key-wrap-with-padding inputs that aren't already a
-        // multiple of 8.
-        if self.is_wrap_mode() {
-            return input_len.saturating_add(7) / 8 * 8 + 8;
+        // entire output (plaintext rounded up to 8 bytes + the wrap overhead)
+        // in a single update call, so the usual `inlen + block_size` bound is
+        // too small for them.
+        if let Some(overhead) = self.wrap_mode_overhead() {
+            return input_len.saturating_add(7) / 8 * 8 + overhead;
         }
         let mut block_size = self.block_size();
         if block_size == 1 {
@@ -753,6 +762,8 @@ impl CipherCtxRef {
 #[cfg(test)]
 mod test {
     use super::*;
+    #[cfg(ossl110)]
+    use crate::nid::Nid;
     use crate::{cipher::Cipher, rand::rand_bytes};
     #[cfg(not(any(boringssl, awslc)))]
     use std::slice;
@@ -1333,5 +1344,58 @@ mod test {
         // and let OpenSSL write past the end of the slice.
         let mut buf = [0u8; 17];
         let _ = ctx.cipher_update_inplace(&mut buf, 9);
+    }
+
+    #[test]
+    #[cfg(ossl110)]
+    fn test_aes_wrap_cipher_update_exact_buffer_size() {
+        let cipher = Cipher::aes_128_wrap();
+        let key = [0u8; 16];
+        let pt = [0u8; 16];
+
+        let mut ctx = CipherCtx::new().unwrap();
+        ctx.set_flags(CipherCtxFlags::FLAG_WRAP_ALLOW);
+        ctx.encrypt_init(Some(cipher), Some(&key), None).unwrap();
+
+        // AES key wrap only adds 8 bytes, so a buffer of exactly that size is
+        // accepted.
+        let mut out = [0u8; 24];
+        assert_eq!(ctx.cipher_update(&pt, Some(&mut out)).unwrap(), 24);
+    }
+
+    #[test]
+    #[cfg(ossl110)]
+    fn test_des3_wrap_cipher_update_vec_buffer_size() {
+        let cipher = Cipher::from_nid(Nid::ID_SMIME_ALG_CMS3DESWRAP).unwrap();
+        let key = [0x11u8; 24];
+        let pt = [0x33u8; 16];
+
+        let mut ctx = CipherCtx::new().unwrap();
+        ctx.set_flags(CipherCtxFlags::FLAG_WRAP_ALLOW);
+        ctx.encrypt_init(Some(cipher), Some(&key), None).unwrap();
+
+        let mut out = vec![];
+        let len = ctx.cipher_update_vec(&pt, &mut out).unwrap();
+        // Triple-DES key wrap adds an 8-byte IV and an 8-byte checksum.
+        assert!(out.capacity() >= len);
+        assert_eq!(len, 32);
+    }
+
+    #[test]
+    #[cfg(ossl110)]
+    #[should_panic(expected = "Output buffer size should be at least 32 bytes.")]
+    fn test_des3_wrap_cipher_update_buffer_size() {
+        let cipher = Cipher::from_nid(Nid::ID_SMIME_ALG_CMS3DESWRAP).unwrap();
+        let key = [0x11u8; 24];
+        let pt = [0x33u8; 16];
+
+        let mut ctx = CipherCtx::new().unwrap();
+        ctx.set_flags(CipherCtxFlags::FLAG_WRAP_ALLOW);
+        ctx.encrypt_init(Some(cipher), Some(&key), None).unwrap();
+
+        // The AES bound (24 bytes) would let this through and let OpenSSL
+        // write 32 bytes into the slice.
+        let mut out = [0u8; 24];
+        let _ = ctx.cipher_update(&pt, Some(&mut out));
     }
 }
