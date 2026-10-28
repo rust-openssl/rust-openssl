@@ -296,45 +296,48 @@ impl CipherCtxRef {
         }
     }
 
-    /// Returns how many bytes a wrap-mode cipher adds to the input rounded up
-    /// to 8 bytes, or `None` if the cipher isn't a wrap-mode cipher.
     #[cfg(not(any(boringssl, awslc)))]
-    fn wrap_mode_overhead(&self) -> Option<usize> {
+    fn is_wrap_mode(&self) -> bool {
         unsafe {
             let cipher = EVP_CIPHER_CTX_get0_cipher(self.as_ptr());
-            if cipher.is_null()
-                || ffi::EVP_CIPHER_flags(cipher) & ffi::EVP_CIPH_MODE != ffi::EVP_CIPH_WRAP_MODE
-            {
-                return None;
+            if cipher.is_null() {
+                return false;
             }
-            // The AES key wraps (RFC 3394, RFC 5649) add one 8-byte block, but
-            // the Triple-DES key wrap (RFC 3217) adds two: an IV and a checksum.
-            if ffi::EVP_CIPHER_nid(cipher) == ffi::NID_id_smime_alg_CMS3DESwrap {
-                Some(16)
-            } else {
-                Some(8)
-            }
+            ffi::EVP_CIPHER_flags(cipher) & ffi::EVP_CIPH_MODE == ffi::EVP_CIPH_WRAP_MODE
         }
     }
 
     #[cfg(any(boringssl, awslc))]
-    fn wrap_mode_overhead(&self) -> Option<usize> {
-        None
+    fn is_wrap_mode(&self) -> bool {
+        false
     }
 
-    fn cipher_update_output_size(&self, input_len: usize) -> usize {
+    fn cipher_update_output_size(&self, input: &[u8]) -> Result<usize, ErrorStack> {
         // Wrap-mode ciphers have EVP_CIPH_FLAG_CUSTOM_CIPHER set and emit their
-        // entire output (plaintext rounded up to 8 bytes + the wrap overhead)
-        // in a single update call, so the usual `inlen + block_size` bound is
-        // too small for them.
-        if let Some(overhead) = self.wrap_mode_overhead() {
-            return input_len.saturating_add(7) / 8 * 8 + overhead;
+        // entire output in a single update call, so the usual
+        // `inlen + block_size` bound is too small for them. How much they add
+        // depends on the cipher (8 bytes for the AES key wraps, 16 for the
+        // Triple-DES key wrap), but they all return the output length without
+        // processing any data when called without an output buffer.
+        if self.is_wrap_mode() {
+            let inlen = c_int::try_from(input.len()).unwrap();
+            let mut outlen = 0;
+            unsafe {
+                cvt(ffi::EVP_CipherUpdate(
+                    self.as_ptr(),
+                    ptr::null_mut(),
+                    &mut outlen,
+                    input.as_ptr(),
+                    inlen,
+                ))?;
+            }
+            return Ok(outlen as usize);
         }
         let mut block_size = self.block_size();
         if block_size == 1 {
             block_size = 0;
         }
-        input_len + block_size
+        Ok(input.len() + block_size)
     }
 
     /// Returns the block size of the context's cipher.
@@ -593,7 +596,7 @@ impl CipherCtxRef {
         output: Option<&mut [u8]>,
     ) -> Result<usize, ErrorStack> {
         if let Some(output) = &output {
-            let min_output_size = self.cipher_update_output_size(input.len());
+            let min_output_size = self.cipher_update_output_size(input)?;
             assert!(
                 output.len() >= min_output_size,
                 "Output buffer size should be at least {} bytes.",
@@ -649,7 +652,7 @@ impl CipherCtxRef {
         output: &mut Vec<u8>,
     ) -> Result<usize, ErrorStack> {
         let base = output.len();
-        output.resize(base + self.cipher_update_output_size(input.len()), 0);
+        output.resize(base + self.cipher_update_output_size(input)?, 0);
         let len = self.cipher_update(input, Some(&mut output[base..]))?;
         output.truncate(base + len);
 
@@ -676,7 +679,7 @@ impl CipherCtxRef {
         inlen: usize,
     ) -> Result<usize, ErrorStack> {
         assert!(inlen <= data.len(), "Input size may not exceed buffer size");
-        let min_output_size = self.cipher_update_output_size(inlen);
+        let min_output_size = self.cipher_update_output_size(&data[..inlen])?;
         assert!(
             data.len() >= min_output_size,
             "Output buffer size must be at least {} bytes.",
@@ -1379,6 +1382,28 @@ mod test {
         // Triple-DES key wrap adds an 8-byte IV and an 8-byte checksum.
         assert!(out.capacity() >= len);
         assert_eq!(len, 32);
+    }
+
+    #[test]
+    #[cfg(ossl110)]
+    fn test_des3_wrap_unwrap() {
+        let cipher = Cipher::from_nid(Nid::ID_SMIME_ALG_CMS3DESWRAP).unwrap();
+        let key = [0x11u8; 24];
+        let pt = [0x33u8; 16];
+
+        let mut ctx = CipherCtx::new().unwrap();
+        ctx.set_flags(CipherCtxFlags::FLAG_WRAP_ALLOW);
+        ctx.encrypt_init(Some(cipher), Some(&key), None).unwrap();
+        let mut wrapped = vec![];
+        ctx.cipher_update_vec(&pt, &mut wrapped).unwrap();
+        assert_eq!(wrapped.len(), 32);
+
+        let mut ctx = CipherCtx::new().unwrap();
+        ctx.set_flags(CipherCtxFlags::FLAG_WRAP_ALLOW);
+        ctx.decrypt_init(Some(cipher), Some(&key), None).unwrap();
+        let mut unwrapped = vec![];
+        ctx.cipher_update_vec(&wrapped, &mut unwrapped).unwrap();
+        assert_eq!(unwrapped, pt);
     }
 
     #[test]
