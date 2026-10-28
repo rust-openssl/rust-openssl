@@ -43,6 +43,8 @@ extern "C" {
         chain: *mut stack_st_X509,
     ) -> c_int;
     pub fn X509_STORE_CTX_cleanup(ctx: *mut X509_STORE_CTX);
+    pub fn X509_STORE_CTX_set_cert(ctx: *mut X509_STORE_CTX, x: *mut X509);
+    pub fn X509_STORE_CTX_set_current_cert(ctx: *mut X509_STORE_CTX, x: *mut X509);
 
     pub fn X509_STORE_add_cert(store: *mut X509_STORE, x: *mut X509) -> c_int;
 
