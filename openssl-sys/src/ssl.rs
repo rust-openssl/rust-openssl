@@ -82,7 +82,7 @@ cfg_if! {
 }
 #[cfg(ossl110)]
 pub const SSL_OP_SAFARI_ECDHE_ECDSA_BUG: ssl_op_type!() = 0x00000040;
-#[cfg(ossl300)]
+#[cfg(any(ossl300, awslc))]
 pub const SSL_OP_IGNORE_UNEXPECTED_EOF: ssl_op_type!() = 0x00000080;
 
 #[cfg(not(libressl430))]
