@@ -138,14 +138,44 @@ fn retryable_flush_completes_handshake() {
     }
 }
 
+fn assert_transport_error(
+    error: crate::ssl::Error,
+    expected: ErrorCode,
+    kind: io::ErrorKind,
+    message: &str,
+) {
+    #[cfg(libressl)]
+    if kind == io::ErrorKind::BrokenPipe {
+        // LibreSSL adds SSL_R_UNKNOWN for these synthetic BIO failures.
+        assert_eq!(error.code(), ErrorCode::SSL);
+        assert!(error.io_error().is_none());
+        let errors = error.ssl_error().unwrap().errors();
+        assert_eq!(errors.len(), 1);
+        assert_eq!(errors[0].library_code(), 20); // ERR_LIB_SSL in LibreSSL's err.h.
+        assert_eq!(errors[0].reason_code(), 999); // SSL_R_UNKNOWN in LibreSSL's ssl.h.
+        assert!(std::error::Error::source(&error)
+            .unwrap()
+            .is::<crate::error::ErrorStack>());
+        return;
+    }
+
+    assert_eq!(error.code(), expected);
+    let error = error.into_io_error().unwrap();
+    assert_eq!(error.kind(), kind);
+    assert_eq!(error.to_string(), message);
+}
+
 #[test]
 fn hard_flush_error_is_preserved() {
     let mut client = client(&[io::ErrorKind::BrokenPipe]);
     let error = client.do_handshake().unwrap_err();
-    assert_eq!(error.code(), ErrorCode::SYSCALL);
-    let error = error.into_io_error().unwrap();
-    assert_eq!(error.kind(), io::ErrorKind::BrokenPipe);
-    assert_eq!(error.to_string(), "injected flush error");
+    assert!(client.get_ref().flush_errors.is_empty());
+    assert_transport_error(
+        error,
+        ErrorCode::SYSCALL,
+        io::ErrorKind::BrokenPipe,
+        "injected flush error",
+    );
 }
 
 #[test]
@@ -155,10 +185,13 @@ fn hard_flush_error_after_retry_is_not_retryable() {
     assert_eq!(error.code(), ErrorCode::WANT_WRITE);
     assert_eq!(error.io_error().unwrap().kind(), io::ErrorKind::WouldBlock);
     let error = client.do_handshake().unwrap_err();
-    assert_eq!(error.code(), ErrorCode::SYSCALL);
-    let error = error.into_io_error().unwrap();
-    assert_eq!(error.kind(), io::ErrorKind::BrokenPipe);
-    assert_eq!(error.to_string(), "injected flush error");
+    assert!(client.get_ref().flush_errors.is_empty());
+    assert_transport_error(
+        error,
+        ErrorCode::SYSCALL,
+        io::ErrorKind::BrokenPipe,
+        "injected flush error",
+    );
 }
 
 #[test]
@@ -176,9 +209,8 @@ fn non_flush_io_errors_keep_their_classification() {
         } else {
             ErrorCode::WANT_READ
         };
-        assert_eq!(error.code(), expected);
-        assert_eq!(error.io_error().unwrap().kind(), kind);
-        assert_eq!(error.io_error().unwrap().to_string(), "injected read error");
+        assert!(reader.get_ref().read_error.is_none());
+        assert_transport_error(error, expected, kind, "injected read error");
 
         let mut writer = client(&[]);
         writer.get_mut().write_error = Some(kind);
@@ -188,11 +220,7 @@ fn non_flush_io_errors_keep_their_classification() {
         } else {
             ErrorCode::WANT_WRITE
         };
-        assert_eq!(error.code(), expected);
-        assert_eq!(error.io_error().unwrap().kind(), kind);
-        assert_eq!(
-            error.io_error().unwrap().to_string(),
-            "injected write error"
-        );
+        assert!(writer.get_ref().write_error.is_none());
+        assert_transport_error(error, expected, kind, "injected write error");
     }
 }
