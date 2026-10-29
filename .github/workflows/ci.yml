@@ -185,6 +185,8 @@ jobs:
             - name: openssl
               version: vendored
             - name: openssl
+              version: vendored-4
+            - name: openssl
               version: 4.0.0
             - name: openssl
               version: 3.6.0
@@ -285,7 +287,7 @@ jobs:
           with:
             path: /opt/openssl
             key: openssl-${{ matrix.target }}-${{ matrix.library.name }}-${{ matrix.library.version }}-7
-          if: matrix.library.version != 'vendored'
+          if: ${{ !startsWith(matrix.library.version, 'vendored') }}
           id: openssl-cache
         - run: |
             echo "RUST_TEST_THREADS=1" >> $GITHUB_ENV
@@ -394,7 +396,7 @@ jobs:
               ;;
             esac
 
-          if: matrix.library.version != 'vendored' && !steps.openssl-cache.outputs.cache-hit
+          if: ${{ !startsWith(matrix.library.version, 'vendored') && !steps.openssl-cache.outputs.cache-hit }}
         - run: |
             mkdir -p .cargo
             echo '[patch.crates-io]' > .cargo/config.toml
@@ -418,8 +420,8 @@ jobs:
             key: target-${{ matrix.target }}-${{ matrix.bindgen }}-${{ matrix.library.name }}-${{ matrix.library.version }}-${{ steps.rust-version.outputs.version }}-${{ hashFiles('Cargo.lock') }}
         - name: Run systest
           run: |
-            if [[ "${{ matrix.library.version }}" == "vendored" ]]; then
-              features="--features vendored"
+            if [[ "${{ matrix.library.version }}" == vendored* ]]; then
+              features="--features ${{ matrix.library.version }}"
             fi
             if [[ "${{ matrix.bindgen }}" == "true" ]]; then
               features="$features --features bindgen"
@@ -433,11 +435,11 @@ jobs:
               features="--features unstable_boringssl"
               BORINGSSL_BUILD_DIR="$OPENSSL_DIR/build/"
             fi
-            if [[ "${{ matrix.library.version }}" == "vendored" ]]; then
+            if [[ "${{ matrix.library.version }}" == vendored* ]]; then
               if [[ "${{ matrix.library.name }}" == "aws-lc" ]]; then
                 features="--features aws-lc"
               else
-                features="--features vendored"
+                features="--features ${{ matrix.library.version }}"
               fi
             fi
             if [[ "${{ matrix.bindgen }}" == "true" ]]; then
@@ -446,8 +448,8 @@ jobs:
             cargo test --manifest-path=openssl/Cargo.toml --target ${{ matrix.target }} $features
         - name: Test openssl-errors
           run: |
-            if [[ "${{ matrix.library.version }}" == "vendored" ]]; then
-              features="--features openssl-sys/vendored"
+            if [[ "${{ matrix.library.version }}" == vendored* ]]; then
+              features="--features openssl-sys/${{ matrix.library.version }}"
             fi
             if [[ "${{ matrix.bindgen }}" == "true" ]]; then
               features="$features --features openssl-sys/bindgen"

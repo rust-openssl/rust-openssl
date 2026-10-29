@@ -19,6 +19,7 @@ v110 = []
 v111 = []
 
 vendored = ['ffi/vendored']
+vendored-4 = ['ffi/vendored-4']
 bindgen = ['ffi/bindgen']
 unstable_boringssl = ["ffi/unstable_boringssl"]
 aws-lc = ["ffi/aws-lc"]

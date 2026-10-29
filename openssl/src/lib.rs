@@ -19,6 +19,9 @@
 //! openssl = { version = "0.10", features = ["vendored"] }
 //! ```
 //!
+//! `vendored` builds the OpenSSL 3 line (`openssl-src` 300.x). The `vendored-4` feature builds OpenSSL 4 from
+//! `openssl-src` 400.x instead, for code that needs a 4.x API; when both features are enabled, `vendored-4` wins.
+//!
 //! The vendored copy will be configured to automatically find a configuration and root certificates at `/usr/local/ssl`.
 //! This path can be overridden with an environment variable (see the manual section below).
 //! Alternatively, the `openssl-probe` crate can be used to find root certificates at runtime.
