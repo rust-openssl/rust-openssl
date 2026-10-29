@@ -1,17 +1,24 @@
 //! Low level Elliptic Curve Digital Signature Algorithm (ECDSA) functions.
 
 use foreign_types::{ForeignType, ForeignTypeRef};
+#[cfg(not(osslconf = "OPENSSL_NO_DEPRECATED_3_0"))]
 use libc::c_int;
 use std::fmt;
 use std::mem;
 use std::ptr;
 
 use crate::bn::{BigNum, BigNumRef};
+#[cfg(not(osslconf = "OPENSSL_NO_DEPRECATED_3_0"))]
+use crate::cvt_n;
+use crate::cvt_p;
+#[cfg(not(osslconf = "OPENSSL_NO_DEPRECATED_3_0"))]
 use crate::ec::EcKeyRef;
 use crate::error::ErrorStack;
+#[cfg(not(osslconf = "OPENSSL_NO_DEPRECATED_3_0"))]
 use crate::pkey::{HasPrivate, HasPublic};
 use crate::util::ForeignTypeRefExt;
-use crate::{cvt_n, cvt_p, LenType};
+#[cfg(not(osslconf = "OPENSSL_NO_DEPRECATED_3_0"))]
+use crate::LenType;
 use openssl_macros::corresponds;
 
 foreign_type_and_impl_send_sync! {
@@ -27,6 +34,7 @@ foreign_type_and_impl_send_sync! {
 impl EcdsaSig {
     /// Computes a digital signature of the hash value `data` using the private EC key eckey.
     #[corresponds(ECDSA_do_sign)]
+    #[cfg(not(osslconf = "OPENSSL_NO_DEPRECATED_3_0"))]
     pub fn sign<T>(data: &[u8], eckey: &EcKeyRef<T>) -> Result<EcdsaSig, ErrorStack>
     where
         T: HasPrivate,
@@ -81,6 +89,7 @@ impl EcdsaSigRef {
 
     /// Verifies if the signature is a valid ECDSA signature using the given public key.
     #[corresponds(ECDSA_do_verify)]
+    #[cfg(not(osslconf = "OPENSSL_NO_DEPRECATED_3_0"))]
     pub fn verify<T>(&self, data: &[u8], eckey: &EcKeyRef<T>) -> Result<bool, ErrorStack>
     where
         T: HasPublic,
@@ -129,7 +138,7 @@ impl fmt::Debug for EcdsaSigRef {
 
 use ffi::{ECDSA_SIG_get0, ECDSA_SIG_set0};
 
-#[cfg(test)]
+#[cfg(all(test, not(osslconf = "OPENSSL_NO_DEPRECATED_3_0")))]
 mod test {
     use super::*;
     use crate::ec::EcGroup;

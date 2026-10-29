@@ -6,19 +6,26 @@
 //! without the private key.
 
 use foreign_types::{ForeignType, ForeignTypeRef};
-#[cfg(not(any(boringssl, awslc)))]
+#[cfg(all(
+    not(any(boringssl, awslc)),
+    not(osslconf = "OPENSSL_NO_DEPRECATED_3_0")
+))]
 use libc::c_int;
 use std::fmt;
 use std::mem;
 use std::ptr;
 
 use crate::bn::{BigNum, BigNumRef};
+#[cfg(not(osslconf = "OPENSSL_NO_DEPRECATED_3_0"))]
+use crate::cvt;
+use crate::cvt_p;
 use crate::error::ErrorStack;
+#[cfg(not(osslconf = "OPENSSL_NO_DEPRECATED_3_0"))]
 use crate::pkey::{HasParams, HasPrivate, HasPublic, Params, Private, Public};
 use crate::util::ForeignTypeRefExt;
-use crate::{cvt, cvt_p};
 use openssl_macros::corresponds;
 
+#[cfg(not(osslconf = "OPENSSL_NO_DEPRECATED_3_0"))]
 generic_foreign_type_and_impl_send_sync! {
     type CType = ffi::DSA;
     fn drop = ffi::DSA_free;
@@ -61,12 +68,14 @@ generic_foreign_type_and_impl_send_sync! {
     pub struct DsaRef<T>;
 }
 
+#[cfg(not(osslconf = "OPENSSL_NO_DEPRECATED_3_0"))]
 impl<T> Clone for Dsa<T> {
     fn clone(&self) -> Dsa<T> {
         (**self).to_owned()
     }
 }
 
+#[cfg(not(osslconf = "OPENSSL_NO_DEPRECATED_3_0"))]
 impl<T> ToOwned for DsaRef<T> {
     type Owned = Dsa<T>;
 
@@ -79,6 +88,7 @@ impl<T> ToOwned for DsaRef<T> {
     }
 }
 
+#[cfg(not(osslconf = "OPENSSL_NO_DEPRECATED_3_0"))]
 impl<T> DsaRef<T>
 where
     T: HasPublic,
@@ -110,6 +120,7 @@ where
     }
 }
 
+#[cfg(not(osslconf = "OPENSSL_NO_DEPRECATED_3_0"))]
 impl<T> DsaRef<T>
 where
     T: HasPrivate,
@@ -146,6 +157,7 @@ where
     }
 }
 
+#[cfg(not(osslconf = "OPENSSL_NO_DEPRECATED_3_0"))]
 impl<T> DsaRef<T>
 where
     T: HasParams,
@@ -218,6 +230,7 @@ where
 ///
 /// `d2i_DSA_PUBKEY` accepts a SubjectPublicKeyInfo whose AlgorithmIdentifier
 /// parameters are absent, which leaves the key without p, q and g.
+#[cfg(not(osslconf = "OPENSSL_NO_DEPRECATED_3_0"))]
 fn check_pqg<T>(dsa: &DsaRef<T>) -> Result<(), ErrorStack>
 where
     T: HasParams,
@@ -228,11 +241,15 @@ where
     Ok(())
 }
 
-#[cfg(any(boringssl, awslc))]
+#[cfg(all(any(boringssl, awslc), not(osslconf = "OPENSSL_NO_DEPRECATED_3_0")))]
 type BitType = libc::c_uint;
-#[cfg(not(any(boringssl, awslc)))]
+#[cfg(all(
+    not(any(boringssl, awslc)),
+    not(osslconf = "OPENSSL_NO_DEPRECATED_3_0")
+))]
 type BitType = c_int;
 
+#[cfg(not(osslconf = "OPENSSL_NO_DEPRECATED_3_0"))]
 impl Dsa<Params> {
     /// Creates a DSA params based upon the given parameters.
     #[corresponds(DSA_set0_pqg)]
@@ -276,6 +293,7 @@ impl Dsa<Params> {
     }
 }
 
+#[cfg(not(osslconf = "OPENSSL_NO_DEPRECATED_3_0"))]
 impl Dsa<Private> {
     /// Generate a DSA key pair.
     ///
@@ -309,6 +327,7 @@ impl Dsa<Private> {
     }
 }
 
+#[cfg(not(osslconf = "OPENSSL_NO_DEPRECATED_3_0"))]
 impl Dsa<Public> {
     /// Decodes a PEM-encoded SubjectPublicKeyInfo structure containing a DSA key.
     ///
@@ -369,12 +388,14 @@ impl Dsa<Public> {
     }
 }
 
+#[cfg(not(osslconf = "OPENSSL_NO_DEPRECATED_3_0"))]
 impl<T> fmt::Debug for Dsa<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "DSA")
     }
 }
 
+#[cfg(not(osslconf = "OPENSSL_NO_DEPRECATED_3_0"))]
 use ffi::{DSA_get0_key, DSA_get0_pqg, DSA_set0_key, DSA_set0_pqg};
 
 foreign_type_and_impl_send_sync! {
