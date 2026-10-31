@@ -1,3 +1,9 @@
+#[cfg(not(osslconf = "OPENSSL_NO_PSK"))]
+#[cfg(ossl111)]
+use ffi::EVP_MD;
+#[cfg(not(osslconf = "OPENSSL_NO_PSK"))]
+#[cfg(ossl111)]
+use ffi::SSL_SESSION;
 use foreign_types::ForeignType;
 use foreign_types::ForeignTypeRef;
 #[cfg(any(ossl111, not(osslconf = "OPENSSL_NO_PSK")))]
@@ -9,12 +15,18 @@ use libc::{c_int, c_uchar, c_uint, c_void};
 use std::ffi::CStr;
 use std::mem;
 use std::ptr;
+#[cfg(not(osslconf = "OPENSSL_NO_PSK"))]
+#[cfg(ossl111)]
+use std::ptr::null_mut;
 #[cfg(any(ossl111, boringssl, awslc))]
 use std::str;
 use std::sync::Arc;
 
 use crate::dh::Dh;
 use crate::error::ErrorStack;
+#[cfg(not(osslconf = "OPENSSL_NO_PSK"))]
+#[cfg(ossl111)]
+use crate::hash::MessageDigest;
 use crate::pkey::Params;
 use crate::ssl::AlpnError;
 use crate::ssl::{
@@ -24,6 +36,9 @@ use crate::ssl::{
 #[cfg(ossl111)]
 use crate::ssl::{ClientHelloResponse, ExtensionContext};
 use crate::util;
+#[cfg(not(osslconf = "OPENSSL_NO_PSK"))]
+#[cfg(ossl111)]
+use crate::util::ForeignTypeExt;
 #[cfg(any(ossl111, boringssl, awslc))]
 use crate::util::ForeignTypeRefExt;
 #[cfg(ossl111)]
@@ -155,6 +170,129 @@ where
                 0
             }
         }
+    }
+}
+
+#[cfg(not(osslconf = "OPENSSL_NO_PSK"))]
+#[cfg(ossl111)]
+pub extern "C" fn raw_psk_use_session<F>(
+    ssl: *mut ffi::SSL,
+    msg_digest: *const EVP_MD,
+    identity: *mut *const c_uchar,
+    identity_len: *mut size_t,
+    session: *mut *mut SSL_SESSION,
+) -> c_int
+where
+    F: Fn(
+            &mut SslRef,
+            Option<MessageDigest>,
+            &mut Option<SslSession>,
+        ) -> Result<Option<Vec<u8>>, ErrorStack>
+        + 'static
+        + Sync
+        + Send,
+{
+    unsafe {
+        let ssl = SslRef::from_ptr_mut(ssl);
+        let callback_idx = SslContext::cached_ex_index::<F>();
+
+        let callback = ssl
+            .ssl_context()
+            .ex_data(callback_idx)
+            .expect("BUG: psk callback missing") as *const F;
+
+        let msg_digest = if msg_digest.is_null() {
+            None
+        } else {
+            Some(MessageDigest::from_ptr(msg_digest))
+        };
+
+        let mut cb_session = SslSession::from_ptr_opt(*session);
+
+        let result = match (*callback)(ssl, msg_digest, &mut cb_session) {
+            Ok(result) => {
+                if let Some(cb_identity) = result {
+                    // tell OpenSSL we're going ahead with PSK by supplying the session parameter
+                    *identity_len = cb_identity.len();
+                    *identity =
+                        std::ffi::CString::new(cb_identity).unwrap().into_raw() as *const u8;
+                };
+                1
+            }
+            Err(e) => {
+                e.put();
+                0
+            }
+        };
+
+        // pass the chosen session back to openssl
+        *session = match cb_session {
+            Some(cb_session) => {
+                // The session will be held by openssl, without forgetting it,
+                // rust will drop the session.
+                let cb_ptr = cb_session.as_ptr();
+                std::mem::forget(cb_session);
+                SslSessionRef::from_ptr(cb_ptr).as_ptr()
+            }
+            None => null_mut::<SSL_SESSION>(),
+        };
+
+        result
+    }
+}
+
+#[cfg(not(osslconf = "OPENSSL_NO_PSK"))]
+#[cfg(ossl111)]
+pub extern "C" fn raw_psk_find_session<F>(
+    ssl: *mut ffi::SSL,
+    identity: *const c_uchar,
+    identity_len: size_t,
+    session: *mut *mut SSL_SESSION,
+) -> c_int
+where
+    F: Fn(&mut SslRef, Option<&[u8]>, &mut Option<SslSession>) -> Result<(), ErrorStack>
+        + 'static
+        + Sync
+        + Send,
+{
+    unsafe {
+        let ssl = SslRef::from_ptr_mut(ssl);
+        let callback_idx = SslContext::cached_ex_index::<F>();
+
+        let callback = ssl
+            .ssl_context()
+            .ex_data(callback_idx)
+            .expect("BUG: psk callback missing") as *const F;
+
+        let identity = if identity.is_null() {
+            None
+        } else {
+            Some(util::from_raw_parts(identity, identity_len))
+        };
+        // Create the session, it has to be done and simplifies the callback signature
+        let mut cb_session = SslSession::from_ptr_opt(*session);
+
+        let result = match (*callback)(ssl, identity, &mut cb_session) {
+            Ok(()) => 1,
+            Err(e) => {
+                e.put();
+                0
+            }
+        };
+
+        // pass the chosen session back to openssl
+        *session = match cb_session {
+            Some(cb_session) => {
+                // The session will be held by openssl, without forgetting it,
+                // rust will drop the session.
+                let sess_ptr = cb_session.as_ptr();
+                std::mem::forget(cb_session);
+                SslSessionRef::from_ptr(sess_ptr).as_ptr()
+            }
+            None => null_mut::<SSL_SESSION>(),
+        };
+
+        result
     }
 }
 
