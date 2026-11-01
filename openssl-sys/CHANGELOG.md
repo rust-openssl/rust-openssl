@@ -16,6 +16,10 @@
 
 * Bumped `aws-lc-fips-sys` to 0.14.
 
+### Fixed
+
+* Fixed the values of `SSL_OP_TLSEXT_PADDING` and `SSL_OP_ALL` on OpenSSL 4.1.
+
 ## [v0.9.117] - 2026-06-12
 
 ### Added

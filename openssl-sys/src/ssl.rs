@@ -74,7 +74,8 @@ cfg_if! {
 
 pub const SSL_OP_LEGACY_SERVER_CONNECT: ssl_op_type!() = 0x00000004;
 cfg_if! {
-    if #[cfg(libressl)] {
+    // OpenSSL 4.1 made SSL_OP_TLSEXT_PADDING obsolete and removed it from SSL_OP_ALL.
+    if #[cfg(any(libressl, ossl410))] {
         pub const SSL_OP_TLSEXT_PADDING: ssl_op_type!() = 0x0;
     } else {
         pub const SSL_OP_TLSEXT_PADDING: ssl_op_type!() = 0x10;
