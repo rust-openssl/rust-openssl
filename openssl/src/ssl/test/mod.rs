@@ -402,6 +402,10 @@ fn test_connect_with_srtp_ctx() {
             .unwrap();
 
         stream.write_all(&[0]).unwrap();
+        // Keep the connection open until the client is done. Under DTLS 1.3,
+        // the client's read also sends an ACK for the server's
+        // NewSessionTicket, which fails if the socket has been closed.
+        stream.read_exact(&mut [0]).unwrap();
 
         buf
     });
@@ -426,6 +430,7 @@ fn test_connect_with_srtp_ctx() {
         .expect("extract");
 
     stream.read_exact(&mut [0]).unwrap();
+    stream.write_all(&[0]).unwrap();
 
     let buf2 = guard.join().unwrap();
 
@@ -471,6 +476,10 @@ fn test_connect_with_srtp_ssl() {
             .unwrap();
 
         stream.write_all(&[0]).unwrap();
+        // Keep the connection open until the client is done. Under DTLS 1.3,
+        // the client's read also sends an ACK for the server's
+        // NewSessionTicket, which fails if the socket has been closed.
+        stream.read_exact(&mut [0]).unwrap();
 
         buf
     });
@@ -495,6 +504,7 @@ fn test_connect_with_srtp_ssl() {
         .expect("extract");
 
     stream.read_exact(&mut [0]).unwrap();
+    stream.write_all(&[0]).unwrap();
 
     let buf2 = guard.join().unwrap();
 
