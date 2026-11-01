@@ -213,7 +213,7 @@ fn verify_callback() {
     let server = Server::builder().build();
 
     let mut client = server.client();
-    let expected = "a1d812f2dfc1fdd3830b7dd0dbf50fecb479f471";
+    let expected = "0b8fe8f15bdc0ef5d32acbd9a872b80bcbde8fe6";
     client
         .ctx()
         .set_verify_callback(SslVerifyMode::PEER, move |_, x509| {
@@ -235,7 +235,7 @@ fn ssl_verify_callback() {
     let server = Server::builder().build();
 
     let mut client = server.client().build().builder();
-    let expected = "a1d812f2dfc1fdd3830b7dd0dbf50fecb479f471";
+    let expected = "0b8fe8f15bdc0ef5d32acbd9a872b80bcbde8fe6";
     client
         .ssl()
         .set_verify_callback(SslVerifyMode::PEER, move |_, x509| {
@@ -290,7 +290,7 @@ fn peer_certificate() {
     let fingerprint = cert.digest(MessageDigest::sha1()).unwrap();
     assert_eq!(
         hex::encode(fingerprint),
-        "a1d812f2dfc1fdd3830b7dd0dbf50fecb479f471"
+        "0b8fe8f15bdc0ef5d32acbd9a872b80bcbde8fe6"
     );
 }
 
@@ -402,6 +402,10 @@ fn test_connect_with_srtp_ctx() {
             .unwrap();
 
         stream.write_all(&[0]).unwrap();
+        // Keep the connection open until the client is done. Under DTLS 1.3,
+        // the client's read also sends an ACK for the server's
+        // NewSessionTicket, which fails if the socket has been closed.
+        stream.read_exact(&mut [0]).unwrap();
 
         buf
     });
@@ -426,6 +430,7 @@ fn test_connect_with_srtp_ctx() {
         .expect("extract");
 
     stream.read_exact(&mut [0]).unwrap();
+    stream.write_all(&[0]).unwrap();
 
     let buf2 = guard.join().unwrap();
 
@@ -471,6 +476,10 @@ fn test_connect_with_srtp_ssl() {
             .unwrap();
 
         stream.write_all(&[0]).unwrap();
+        // Keep the connection open until the client is done. Under DTLS 1.3,
+        // the client's read also sends an ACK for the server's
+        // NewSessionTicket, which fails if the socket has been closed.
+        stream.read_exact(&mut [0]).unwrap();
 
         buf
     });
@@ -495,6 +504,7 @@ fn test_connect_with_srtp_ssl() {
         .expect("extract");
 
     stream.read_exact(&mut [0]).unwrap();
+    stream.write_all(&[0]).unwrap();
 
     let buf2 = guard.join().unwrap();
 

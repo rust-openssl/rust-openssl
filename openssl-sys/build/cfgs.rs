@@ -99,6 +99,9 @@ pub fn get(openssl_version: Option<u64>, libressl_version: Option<u64>) -> Vec<&
         if openssl_version >= 0x4_00_00_00_0 {
             cfgs.push("ossl400");
         }
+        if openssl_version >= 0x4_01_00_00_0 {
+            cfgs.push("ossl410");
+        }
     }
 
     cfgs

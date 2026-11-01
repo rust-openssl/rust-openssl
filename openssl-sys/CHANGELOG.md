@@ -2,6 +2,24 @@
 
 ## [Unreleased]
 
+## [v0.9.118] - 2026-11-01
+
+### Added
+
+* Added support for LibreSSL 4.4.
+* Added `NID_brainpoolP192r1` and `NID_brainpoolP192t1`.
+* Brainpool NID constants are now available on AWS-LC.
+* Added `X509_STORE_CTX_set_cert` and `X509_STORE_CTX_set_current_cert`.
+* `X509_get_extension_flags`, `X509_get_key_usage`, `X509_get_extended_key_usage`, and `XKU_ANYEKU` are now available on all supported libraries.
+
+### Changed
+
+* Bumped `aws-lc-fips-sys` to 0.14.
+
+### Fixed
+
+* Fixed the values of `SSL_OP_TLSEXT_PADDING` and `SSL_OP_ALL` on OpenSSL 4.1.
+
 ## [v0.9.117] - 2026-06-12
 
 ### Added
@@ -760,7 +778,8 @@ Fixed builds against OpenSSL built with `no-cast`.
 * Added `X509_verify` and `X509_REQ_verify`.
 * Added `EVP_MD_type` and `EVP_GROUP_get_curve_name`.
 
-[Unreleased]: https://github.com/rust-openssl/rust-openssl/compare/openssl-sys-v0.9.117...master
+[Unreleased]: https://github.com/rust-openssl/rust-openssl/compare/openssl-sys-v0.9.118...master
+[v0.9.118]: https://github.com/rust-openssl/rust-openssl/compare/openssl-sys-v0.9.117...openssl-sys-v0.9.118
 [v0.9.117]: https://github.com/rust-openssl/rust-openssl/compare/openssl-sys-v0.9.116...openssl-sys-v0.9.117
 [v0.9.116]: https://github.com/rust-openssl/rust-openssl/compare/openssl-sys-v0.9.115...openssl-sys-v0.9.116
 [v0.9.115]: https://github.com/rust-openssl/rust-openssl/compare/openssl-sys-v0.9.114...openssl-sys-v0.9.115

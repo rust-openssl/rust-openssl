@@ -2,15 +2,30 @@
 
 ## [Unreleased]
 
+## [v0.10.82] - 2026-11-01
+
+### Fixed
+
+* Fixed an out-of-bounds write in `CipherCtxRef::cipher_update`, `cipher_update_vec`, and `cipher_update_inplace` when used with the Triple-DES key wrap cipher.
+* Fixed an out-of-bounds write in `PkeyCtxRef::verify_recover` when the output buffer is shorter than the recovered data. An error is now returned instead.
+* Fixed a use-after-free in `X509StoreContextRef::verify_cert` and `X509StoreContextRef::current_cert` when called after `X509StoreContextRef::init` returned.
+* `ToOwned` and `Clone` implementations now panic instead of causing a double-free if incrementing the reference count fails.
+* `DsaRef::p`, `DsaRef::q`, and `DsaRef::g` now panic instead of constructing a reference to a null `BigNumRef` when the parameter is not set.
+* `Dsa::public_key_from_der` and `Dsa::public_key_from_pem` now reject a SubjectPublicKeyInfo that carries no DSA parameters.
+
 ### Added
 
 * Added the full set of `SslAlert` alert descriptions, along with `SslAlert::reason_code`, `SslAlert::from_reason_code`, and a `Display` implementation.
 * Added `DsaRef::p_opt`, `DsaRef::q_opt`, and `DsaRef::g_opt`.
+* Added `X509Ref::key_usage` and `X509Ref::extended_key_usage`, along with the `X509KeyUsage` and `X509ExtendedKeyUsage` types.
+* Added `Nid::BRAINPOOL_P192R1` and `Nid::BRAINPOOL_P192T1`.
+* Brainpool `Nid` constants are now available on AWS-LC.
+* The `pkcs7` module is now available on AWS-LC.
+* Added support for LibreSSL 4.4.
 
-### Fixed
+### Changed
 
-* `DsaRef::p`, `DsaRef::q`, and `DsaRef::g` now panic instead of constructing a reference to a null `BigNumRef` when the parameter is not set.
-* `Dsa::public_key_from_der` and `Dsa::public_key_from_pem` now reject a SubjectPublicKeyInfo that carries no DSA parameters.
+* `X509CrlBuilder::build` now returns an error instead of panicking when a required field is missing.
 
 ## [v0.10.81] - 2026-06-12
 
@@ -1127,7 +1142,8 @@
 
 Look at the [release tags] for information about older releases.
 
-[Unreleased]: https://github.com/rust-openssl/rust-openssl/compare/openssl-v0.10.81...master
+[Unreleased]: https://github.com/rust-openssl/rust-openssl/compare/openssl-v0.10.82...master
+[v0.10.82]: https://github.com/rust-openssl/rust-openssl/compare/openssl-v0.10.81...openssl-v0.10.82
 [v0.10.81]: https://github.com/rust-openssl/rust-openssl/compare/openssl-v0.10.80...openssl-v0.10.81
 [v0.10.80]: https://github.com/rust-openssl/rust-openssl/compare/openssl-v0.10.79...openssl-v0.10.80
 [v0.10.79]: https://github.com/rust-openssl/rust-openssl/compare/openssl-v0.10.78...openssl-v0.10.79

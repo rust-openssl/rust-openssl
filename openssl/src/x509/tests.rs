@@ -45,7 +45,7 @@ fn test_cert_loading() {
     let cert = X509::from_pem(cert).unwrap();
     let fingerprint = cert.digest(MessageDigest::sha1()).unwrap();
 
-    let hash_str = "a1d812f2dfc1fdd3830b7dd0dbf50fecb479f471";
+    let hash_str = "0b8fe8f15bdc0ef5d32acbd9a872b80bcbde8fe6";
     let hash_vec = Vec::from_hex(hash_str).unwrap();
 
     assert_eq!(hash_vec, &*fingerprint);
@@ -484,7 +484,7 @@ fn test_stack_from_pem() {
     assert_eq!(certs.len(), 2);
     assert_eq!(
         hex::encode(certs[0].digest(MessageDigest::sha1()).unwrap()),
-        "a1d812f2dfc1fdd3830b7dd0dbf50fecb479f471"
+        "0b8fe8f15bdc0ef5d32acbd9a872b80bcbde8fe6"
     );
     assert_eq!(
         hex::encode(certs[1].digest(MessageDigest::sha1()).unwrap()),
@@ -510,13 +510,13 @@ fn signature() {
     let signature = cert.signature();
     assert_eq!(
         hex::encode(signature.as_slice()),
-        "94348146b9873cdef635ed65e9e9ff9ac1fca10b60c8caefadea69fdca7a2a126766f1fb9999bb163c1\
-         835bd759de7fc85940457111b109853e23e8048270d16affe307b5fe7bdbcf5103d69ecfa17ff30f70e\
-         e9b5a658d6cd6b4f3674e8b03d303f1a500e1e2bdd1da36417f1e6583df67d3ec651f20416e8251293b\
-         2a9a694db34da04288c932e2b1cde6b91bea54c9f36c592e129a2ce6051924676ffc931620c4d4da74e\
-         a98f4647ae60d2d0a53b2d190ab0d75aad11be1de4b518ba5a5625f96d8ef039984b40f9ee85371939b\
-         5ae9da84d83d3e52feb72c4d596f67054b08a6a4e4a3fa7fe701b4bb34881c070ea9aa88899b219cc16\
-         4c388863161b6a"
+        "99195ffd60e2ace1f28b3c9bf2b7e7a73ec43258a66e5a02e6d8312bc311485610fad2fa9d286a832da\
+         12dcb15d4e369e4a9ebbc99c5c56b9a2fbd0b5e6b40a2cfe792f6c511b5a3f7a6423202c6b0b2873ab7\
+         d3d67bac879300877c48e9a319fdab263a26f5418556a6ac7bca5b944325907d4b95779b9c8800693c2\
+         47d2eaa481f613a255c6d265543997ef10db2b577736bd54e6049fe82a6dcccbf5ef15e27a1bd0a066c\
+         7747cf770a0a5404b65199930d8200a1a1d7f07563ed96c2e7f3b0fd188bf80de4024fd7ff53227aa12\
+         4034f60f5cc18ed68af7f025afc6dfbdee356fcaa5fb903e2f6e3ed5547693dc89eafafae20767611a2\
+         11be4208612ffb"
     );
     let algorithm = cert.signature_algorithm();
     assert_eq!(algorithm.object().nid(), Nid::SHA256WITHRSAENCRYPTION);
