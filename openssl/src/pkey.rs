@@ -190,7 +190,7 @@ impl<T> ToOwned for PKeyRef<T> {
     fn to_owned(&self) -> PKey<T> {
         unsafe {
             let r = EVP_PKEY_up_ref(self.as_ptr());
-            assert!(r == 1);
+            crate::util::check_up_ref(r);
             PKey::from_ptr(self.as_ptr())
         }
     }

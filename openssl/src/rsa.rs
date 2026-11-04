@@ -85,7 +85,7 @@ impl<T> ToOwned for RsaRef<T> {
     fn to_owned(&self) -> Rsa<T> {
         unsafe {
             let r = ffi::RSA_up_ref(self.as_ptr());
-            assert!(r == 1);
+            crate::util::check_up_ref(r);
             Rsa::from_ptr(self.as_ptr())
         }
     }

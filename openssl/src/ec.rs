@@ -952,7 +952,7 @@ impl<T> ToOwned for EcKeyRef<T> {
     fn to_owned(&self) -> EcKey<T> {
         unsafe {
             let r = ffi::EC_KEY_up_ref(self.as_ptr());
-            assert!(r == 1);
+            crate::util::check_up_ref(r);
             EcKey::from_ptr(self.as_ptr())
         }
     }
