@@ -401,6 +401,22 @@ where
     callback(ssl, line);
 }
 
+#[cfg(ossl400)]
+pub unsafe extern "C" fn raw_ech_callback<F>(ssl: *mut ffi::SSL, arg: *const c_char) -> c_uint
+where
+    F: Fn(&SslRef, &str) -> bool + 'static + Sync + Send,
+{
+    let ssl = SslRef::from_ptr(ssl);
+    let callback = ssl
+        .ssl_context()
+        .ex_data(SslContext::cached_ex_index::<F>())
+        .expect("BUG: ECH callback missing");
+    let line = CStr::from_ptr(arg).to_bytes();
+    let line = str::from_utf8_unchecked(line);
+
+    callback(ssl, line) as c_uint
+}
+
 #[cfg(ossl111)]
 pub unsafe extern "C" fn raw_stateless_cookie_generate<F>(
     ssl: *mut ffi::SSL,

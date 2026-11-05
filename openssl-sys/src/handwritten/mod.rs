@@ -11,6 +11,8 @@ pub use self::decoder::*;
 pub use self::dh::*;
 pub use self::dsa::*;
 pub use self::ec::*;
+#[cfg(ossl400)]
+pub use self::ech::*;
 #[cfg(ossl300)]
 pub use self::encoder::*;
 pub use self::err::*;
@@ -55,6 +57,8 @@ mod decoder;
 mod dh;
 mod dsa;
 mod ec;
+#[cfg(ossl400)]
+mod ech;
 #[cfg(ossl300)]
 mod encoder;
 mod err;

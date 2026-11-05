@@ -161,6 +161,17 @@ pub enum OSSL_PROVIDER {}
 #[cfg(ossl300)]
 pub enum OSSL_LIB_CTX {}
 
+#[cfg(ossl400)]
+pub enum OSSL_ECHSTORE {}
+
+#[cfg(ossl400)]
+#[repr(C)]
+pub struct OSSL_HPKE_SUITE {
+    pub kem_id: u16,
+    pub kdf_id: u16,
+    pub aead_id: u16,
+}
+
 #[cfg(ossl300)]
 #[repr(C)]
 pub struct OSSL_PARAM {
