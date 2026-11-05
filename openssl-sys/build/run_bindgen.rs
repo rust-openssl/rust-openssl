@@ -12,6 +12,8 @@ const INCLUDES: &str = "
 #include <openssl/aes.h>
 #include <openssl/asn1.h>
 #include <openssl/bio.h>
+#include <openssl/ui.h>
+#include <openssl/engine.h>
 #include <openssl/cmac.h>
 #include <openssl/conf.h>
 #include <openssl/crypto.h>
