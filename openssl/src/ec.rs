@@ -21,9 +21,12 @@ use libc::c_int;
 use std::fmt;
 use std::ptr;
 
-use crate::bn::{BigNum, BigNumContext, BigNumContextRef, BigNumRef};
+#[cfg(not(osslconf = "OPENSSL_NO_DEPRECATED_3_0"))]
+use crate::bn::BigNumContext;
+use crate::bn::{BigNum, BigNumContextRef, BigNumRef};
 use crate::error::ErrorStack;
 use crate::nid::Nid;
+#[cfg(not(osslconf = "OPENSSL_NO_DEPRECATED_3_0"))]
 use crate::pkey::{HasParams, HasPrivate, HasPublic, Params, Private, Public};
 use crate::util::ForeignTypeRefExt;
 use crate::{cvt, cvt_n, cvt_p, init};
@@ -175,6 +178,7 @@ impl EcGroupRef {
     /// Places the components of a curve over a prime field in the provided `BigNum`s.
     /// The components make up the formula `y^2 mod p = x^3 + ax + b mod p`.
     #[corresponds(EC_GROUP_get_curve_GFp)]
+    #[cfg(not(osslconf = "OPENSSL_NO_DEPRECATED_3_0"))]
     pub fn components_gfp(
         &self,
         p: &mut BigNumRef,
@@ -201,7 +205,7 @@ impl EcGroupRef {
     /// a term in the polynomial.  It will be set to 3 `1`s or 5 `1`s depending on
     /// using a trinomial or pentanomial.
     #[corresponds(EC_GROUP_get_curve_GF2m)]
-    #[cfg(not(osslconf = "OPENSSL_NO_EC2M"))]
+    #[cfg(not(any(osslconf = "OPENSSL_NO_EC2M", osslconf = "OPENSSL_NO_DEPRECATED_3_0")))]
     pub fn components_gf2m(
         &self,
         p: &mut BigNumRef,
@@ -356,6 +360,7 @@ impl fmt::Debug for EcGroupRef {
             }
         } else {
             // let chains are only allowed in Rust 2024 or later
+            #[cfg(not(osslconf = "OPENSSL_NO_DEPRECATED_3_0"))]
             if let Ok(mut p) = BigNum::new() {
                 if let Ok(mut a) = BigNum::new() {
                     if let Ok(mut b) = BigNum::new() {
@@ -688,6 +693,7 @@ impl EcPointRef {
     /// Places affine coordinates of a curve over a prime field in the provided
     /// `x` and `y` `BigNum`s
     #[corresponds(EC_POINT_get_affine_coordinates_GFp)]
+    #[cfg(not(osslconf = "OPENSSL_NO_DEPRECATED_3_0"))]
     pub fn affine_coordinates_gfp(
         &self,
         group: &EcGroupRef,
@@ -733,6 +739,7 @@ impl EcPointRef {
     /// Sets affine coordinates of a curve over a prime field using the provided
     /// `x` and `y` `BigNum`s
     #[corresponds(EC_POINT_set_affine_coordinates_GFp)]
+    #[cfg(not(osslconf = "OPENSSL_NO_DEPRECATED_3_0"))]
     pub fn set_affine_coordinates_gfp(
         &mut self,
         group: &EcGroupRef,
@@ -755,7 +762,7 @@ impl EcPointRef {
     /// Places affine coordinates of a curve over a binary field in the provided
     /// `x` and `y` `BigNum`s
     #[corresponds(EC_POINT_get_affine_coordinates_GF2m)]
-    #[cfg(not(osslconf = "OPENSSL_NO_EC2M"))]
+    #[cfg(not(any(osslconf = "OPENSSL_NO_EC2M", osslconf = "OPENSSL_NO_DEPRECATED_3_0")))]
     pub fn affine_coordinates_gf2m(
         &self,
         group: &EcGroupRef,
@@ -851,6 +858,7 @@ impl EcPoint {
     }
 }
 
+#[cfg(not(osslconf = "OPENSSL_NO_DEPRECATED_3_0"))]
 generic_foreign_type_and_impl_send_sync! {
     type CType = ffi::EC_KEY;
     fn drop = ffi::EC_KEY_free;
@@ -861,6 +869,7 @@ generic_foreign_type_and_impl_send_sync! {
     pub struct EcKeyRef<T>;
 }
 
+#[cfg(not(osslconf = "OPENSSL_NO_DEPRECATED_3_0"))]
 impl<T> EcKeyRef<T>
 where
     T: HasPrivate,
@@ -896,6 +905,7 @@ where
     }
 }
 
+#[cfg(not(osslconf = "OPENSSL_NO_DEPRECATED_3_0"))]
 impl<T> EcKeyRef<T>
 where
     T: HasPublic,
@@ -926,6 +936,7 @@ where
     }
 }
 
+#[cfg(not(osslconf = "OPENSSL_NO_DEPRECATED_3_0"))]
 impl<T> EcKeyRef<T>
 where
     T: HasParams,
@@ -946,6 +957,7 @@ where
     }
 }
 
+#[cfg(not(osslconf = "OPENSSL_NO_DEPRECATED_3_0"))]
 impl<T> ToOwned for EcKeyRef<T> {
     type Owned = EcKey<T>;
 
@@ -958,6 +970,7 @@ impl<T> ToOwned for EcKeyRef<T> {
     }
 }
 
+#[cfg(not(osslconf = "OPENSSL_NO_DEPRECATED_3_0"))]
 impl EcKey<Params> {
     /// Constructs an `EcKey` corresponding to a known curve.
     ///
@@ -984,6 +997,7 @@ impl EcKey<Params> {
     }
 }
 
+#[cfg(not(osslconf = "OPENSSL_NO_DEPRECATED_3_0"))]
 impl EcKey<Public> {
     /// Constructs an `EcKey` from the specified group with the associated [`EcPoint`]: `public_key`.
     ///
@@ -1076,6 +1090,7 @@ impl EcKey<Public> {
     }
 }
 
+#[cfg(not(osslconf = "OPENSSL_NO_DEPRECATED_3_0"))]
 impl EcKey<Private> {
     /// Generates a new public/private key pair on the specified curve.
     ///
@@ -1180,12 +1195,14 @@ impl EcKey<Private> {
     }
 }
 
+#[cfg(not(osslconf = "OPENSSL_NO_DEPRECATED_3_0"))]
 impl<T> Clone for EcKey<T> {
     fn clone(&self) -> EcKey<T> {
         (**self).to_owned()
     }
 }
 
+#[cfg(not(osslconf = "OPENSSL_NO_DEPRECATED_3_0"))]
 impl<T> fmt::Debug for EcKey<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "EcKey")

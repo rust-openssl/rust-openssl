@@ -32,6 +32,7 @@ bitflags! {
     #[derive(Copy, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
     #[repr(transparent)]
     pub struct X509VerifyFlags: c_ulong {
+        #[cfg(not(osslconf = "OPENSSL_NO_DEPRECATED_3_0"))]
         const CB_ISSUER_CHECK = ffi::X509_V_FLAG_CB_ISSUER_CHECK as _;
         const USE_CHECK_TIME = ffi::X509_V_FLAG_USE_CHECK_TIME as _;
         const CRL_CHECK = ffi::X509_V_FLAG_CRL_CHECK as _;

@@ -13,8 +13,10 @@ use std::ptr;
 use std::str;
 use std::sync::Arc;
 
+#[cfg(not(osslconf = "OPENSSL_NO_DEPRECATED_3_0"))]
 use crate::dh::Dh;
 use crate::error::ErrorStack;
+#[cfg(not(osslconf = "OPENSSL_NO_DEPRECATED_3_0"))]
 use crate::pkey::Params;
 use crate::ssl::AlpnError;
 use crate::ssl::{
@@ -230,6 +232,7 @@ where
     }
 }
 
+#[cfg(not(osslconf = "OPENSSL_NO_DEPRECATED_3_0"))]
 pub unsafe extern "C" fn raw_tmp_dh<F>(
     ssl: *mut ffi::SSL,
     is_export: c_int,
@@ -257,6 +260,7 @@ where
     }
 }
 
+#[cfg(not(osslconf = "OPENSSL_NO_DEPRECATED_3_0"))]
 pub unsafe extern "C" fn raw_tmp_dh_ssl<F>(
     ssl: *mut ffi::SSL,
     is_export: c_int,

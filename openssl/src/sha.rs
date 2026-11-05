@@ -36,6 +36,7 @@
 //! println!("Hash = {}", hex::encode(hash));
 //! ```
 use cfg_if::cfg_if;
+#[cfg(not(osslconf = "OPENSSL_NO_DEPRECATED_3_0"))]
 use libc::c_void;
 use openssl_macros::corresponds;
 use std::mem::MaybeUninit;
