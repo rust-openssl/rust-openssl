@@ -134,6 +134,13 @@
 #[doc(inline)]
 pub use ffi::init;
 
+#[doc(no_inline, alias = "sys", alias = "openssl-sys", alias = "openssl_sys")]
+/// Re-export of the `openssl-sys` crate
+pub use ffi;
+#[doc(no_inline)]
+/// Re-export of `ForeignType` traits
+pub use foreign_types::{ForeignType, ForeignTypeRef};
+
 use libc::c_int;
 #[cfg(ossl300)]
 use libc::c_long;
