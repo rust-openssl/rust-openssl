@@ -122,7 +122,8 @@ compilation process.";
 {}
 
 Make sure you also have the development packages of openssl installed.
-For example, `libssl-dev` on Ubuntu or `openssl-devel` on Fedora.
+For example, `libssl-dev` on Ubuntu or `openssl-devel` on Fedora. For other
+platforms see https://docs.rs/openssl/latest/openssl/#automatic
 
 If you're in a situation where you think the directory *should* be found
 automatically, please open a bug at https://github.com/rust-openssl/rust-openssl
