@@ -54,4 +54,7 @@ extern "C" {
         out: *mut BIO,
         flags: c_uint,
     ) -> c_int;
+
+    pub fn CMS_dataInit(cms: *mut CMS_ContentInfo, icont: *mut BIO) -> *mut BIO;
+    pub fn CMS_dataFinal(cms: *mut CMS_ContentInfo, bio: *mut BIO) -> c_int;
 }
