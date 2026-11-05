@@ -1865,7 +1865,7 @@ impl ToOwned for SslContextRef {
     fn to_owned(&self) -> Self::Owned {
         unsafe {
             let r = SSL_CTX_up_ref(self.as_ptr());
-            assert!(r == 1);
+            crate::util::check_up_ref(r);
             SslContext::from_ptr(self.as_ptr())
         }
     }
@@ -2256,7 +2256,7 @@ impl ToOwned for SslSessionRef {
     fn to_owned(&self) -> SslSession {
         unsafe {
             let r = SSL_SESSION_up_ref(self.as_ptr());
-            assert!(r == 1);
+            crate::util::check_up_ref(r);
             SslSession(self.as_ptr())
         }
     }

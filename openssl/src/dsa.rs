@@ -73,7 +73,7 @@ impl<T> ToOwned for DsaRef<T> {
     fn to_owned(&self) -> Dsa<T> {
         unsafe {
             let r = ffi::DSA_up_ref(self.as_ptr());
-            assert!(r == 1);
+            crate::util::check_up_ref(r);
             Dsa::from_ptr(self.as_ptr())
         }
     }

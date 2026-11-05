@@ -117,3 +117,18 @@ pub unsafe fn from_raw_parts_mut<'a, T>(data: *mut T, len: usize) -> &'a mut [T]
         slice::from_raw_parts_mut(data, len)
     }
 }
+
+/// Checks the return value of an OpenSSL `*_up_ref` function, aborting the process on failure.
+///
+/// OpenSSL and LibreSSL's `*_up_ref` functions increment the reference count and then return 0 if
+/// the new count is not greater than 1, which happens when the count overflows (e.g. because
+/// owned values were leaked with `mem::forget`). At that point the count has already been
+/// modified, so panicking is not sufficient: a caller could catch the panic and keep incrementing
+/// until the wrapped count becomes a small positive number again, after which the object would be
+/// freed while live references to it still exist. Like `Arc`, we abort instead.
+#[inline]
+pub fn check_up_ref(r: c_int) {
+    if r != 1 {
+        std::process::abort();
+    }
+}
