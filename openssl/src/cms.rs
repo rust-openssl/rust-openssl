@@ -45,6 +45,8 @@ bitflags! {
         const DEBUG_DECRYPT = ffi::CMS_DEBUG_DECRYPT;
         const KEY_PARAM = ffi::CMS_KEY_PARAM;
         const ASCIICRLF = ffi::CMS_ASCIICRLF;
+        #[cfg(all(not(libressl), not(ossl101), not(ossl102), not(ossl110), not(ossl110g), not(ossl110h), not(ossl111), not(ossl111d)))]
+        const CADES = ffi::CMS_CADES;
     }
 }
 
