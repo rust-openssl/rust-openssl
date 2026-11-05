@@ -174,6 +174,9 @@ pub mod lib_ctx;
 pub mod md;
 pub mod md_ctx;
 pub mod memcmp;
+/// Unified ML-DSA API that works with both OpenSSL and BoringSSL
+#[cfg(any(ossl350, boringssl))]
+pub mod ml_dsa;
 pub mod nid;
 #[cfg(not(osslconf = "OPENSSL_NO_OCSP"))]
 pub mod ocsp;
@@ -185,12 +188,16 @@ pub mod pkcs5;
 pub mod pkcs7;
 pub mod pkey;
 pub mod pkey_ctx;
+#[cfg(any(ossl350, boringssl))]
+pub mod pkey_ml_dsa;
 #[cfg(ossl300)]
 pub mod provider;
 pub mod rand;
 pub mod rsa;
 pub mod sha;
 pub mod sign;
+#[cfg(ossl300)]
+pub mod signature;
 pub mod srtp;
 pub mod ssl;
 pub mod stack;
