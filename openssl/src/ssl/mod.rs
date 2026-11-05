@@ -3676,7 +3676,7 @@ impl<S: Read + Write> SslStream<S> {
         let ret = unsafe {
             ffi::SSL_read_early_data(
                 self.ssl.as_ptr(),
-                buf.as_ptr() as *mut c_void,
+                buf.as_mut_ptr() as *mut c_void,
                 buf.len(),
                 &mut read,
             )
