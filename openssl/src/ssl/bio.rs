@@ -13,9 +13,14 @@ use std::ptr;
 use crate::error::ErrorStack;
 use crate::{cvt_p, util};
 
+pub struct IoError {
+    pub error: io::Error,
+    pub is_flush: bool,
+}
+
 pub struct StreamState<S> {
     pub stream: S,
-    pub error: Option<io::Error>,
+    pub error: Option<IoError>,
     pub panic: Option<Box<dyn Any + Send>>,
     pub dtls_mtu_size: c_long,
 }
@@ -49,7 +54,7 @@ pub fn new<S: Read + Write>(stream: S) -> Result<(*mut BIO, BioMethod), ErrorSta
     }
 }
 
-pub unsafe fn take_error<S>(bio: *mut BIO) -> Option<io::Error> {
+pub unsafe fn take_error<S>(bio: *mut BIO) -> Option<IoError> {
     let state = state::<S>(bio);
     state.error.take()
 }
@@ -94,7 +99,10 @@ unsafe extern "C" fn bwrite<S: Write>(bio: *mut BIO, buf: *const c_char, len: c_
             if retriable_error(&err) {
                 BIO_set_retry_write(bio);
             }
-            state.error = Some(err);
+            state.error = Some(IoError {
+                error: err,
+                is_flush: false,
+            });
             -1
         }
         Err(err) => {
@@ -116,7 +124,10 @@ unsafe extern "C" fn bread<S: Read>(bio: *mut BIO, buf: *mut c_char, len: c_int)
             if retriable_error(&err) {
                 BIO_set_retry_read(bio);
             }
-            state.error = Some(err);
+            state.error = Some(IoError {
+                error: err,
+                is_flush: false,
+            });
             -1
         }
         Err(err) => {
@@ -127,7 +138,7 @@ unsafe extern "C" fn bread<S: Read>(bio: *mut BIO, buf: *mut c_char, len: c_int)
 }
 
 #[allow(clippy::match_like_matches_macro)] // matches macro requires rust 1.42.0
-fn retriable_error(err: &io::Error) -> bool {
+pub(super) fn retriable_error(err: &io::Error) -> bool {
     match err.kind() {
         io::ErrorKind::WouldBlock | io::ErrorKind::NotConnected => true,
         _ => false,
@@ -147,10 +158,17 @@ unsafe extern "C" fn ctrl<S: Write>(
     let state = state::<S>(bio);
 
     if cmd == BIO_CTRL_FLUSH {
+        BIO_clear_retry_flags(bio);
         match catch_unwind(AssertUnwindSafe(|| state.stream.flush())) {
             Ok(Ok(())) => 1,
             Ok(Err(err)) => {
-                state.error = Some(err);
+                if retriable_error(&err) {
+                    BIO_set_retry_write(bio);
+                }
+                state.error = Some(IoError {
+                    error: err,
+                    is_flush: true,
+                });
                 0
             }
             Err(err) => {
