@@ -47,6 +47,9 @@ cfg_if::cfg_if! {
         const OSSL_KDF_PARAM_SALT: &CStr = c"salt";
         const OSSL_KDF_PARAM_INFO: &CStr = c"info";
         const OSSL_KDF_PARAM_MODE: &CStr = c"mode";
+        const OSSL_KDF_PARAM_PASSWORD: &CStr = c"pass";
+        const OSSL_KDF_PARAM_ITER: &CStr = c"iter";
+        const OSSL_KDF_PARAM_PKCS5: &CStr = c"pkcs5";
 
         /// Derives a key using a KDF.
         fn kdf_digest(
@@ -101,6 +104,31 @@ cfg_if::cfg_if! {
             let params = bld.to_param()?;
             kdf_digest(c"HKDF", ctx, &params, out)
         }
+
+        pub fn pbkdf2(
+            digest: &MdRef,
+            pass: &[u8],
+            salt: &[u8],
+            iter: Option<u32>,
+            pkcs5_compliance: Option<bool>,
+            ctx: Option<&LibCtxRef>,
+            out: &mut [u8],
+        ) -> Result<(), ErrorStack> {
+            let mut bld = OsslParamBuilder::new()?;
+            let sn = digest.type_().short_name()?;
+            bld.add_utf8_string(OSSL_KDF_PARAM_DIGEST, sn.as_bytes())?;
+            bld.add_octet_string(OSSL_KDF_PARAM_PASSWORD, pass)?;
+            bld.add_octet_string(OSSL_KDF_PARAM_SALT, salt)?;
+            if let Some(iter) = iter {
+                bld.add_uint(OSSL_KDF_PARAM_ITER, iter)?;
+            }
+            if let Some(pkcs5_compliance) = pkcs5_compliance {
+                let pkcs5_param = if pkcs5_compliance { 0 } else { 1 };
+                bld.add_int(OSSL_KDF_PARAM_PKCS5, pkcs5_param)?;
+            }
+            let params = bld.to_param()?;
+            kdf_digest(c"PBKDF2", ctx, &params, out)
+        }
     }
 }
 
@@ -108,9 +136,7 @@ cfg_if::cfg_if! {
     if #[cfg(all(ossl320, not(osslconf = "OPENSSL_NO_ARGON2")))] {
         use std::cmp;
 
-        const OSSL_KDF_PARAM_PASSWORD: &CStr = c"pass";
         const OSSL_KDF_PARAM_SECRET: &CStr = c"secret";
-        const OSSL_KDF_PARAM_ITER: &CStr = c"iter";
         const OSSL_KDF_PARAM_SIZE: &CStr = c"size";
         const OSSL_KDF_PARAM_THREADS: &CStr = c"threads";
         const OSSL_KDF_PARAM_ARGON2_AD: &CStr = c"ad";
@@ -443,6 +469,135 @@ mod tests {
             "673a081d70cce7acfc48",
         );
         hkdf_test_helper(digest, &key, salt, &info, expected_prk, expected);
+    }
+
+    #[cfg(ossl300)]
+    fn pbkdf2_test_helper(
+        digest: &crate::md::MdRef,
+        pass: &[u8],
+        salt: &[u8],
+        iter: Option<u32>,
+        expected_dk_hex: &str,
+    ) {
+        let expected_dk = hex::decode(expected_dk_hex).unwrap();
+        let mut dk = vec![0; expected_dk.len()];
+
+        // Force disable PKCS#5 compliance for test vectors
+        let pkcs5_compliance = Some(false);
+
+        super::pbkdf2(digest, pass, salt, iter, pkcs5_compliance, None, &mut dk).unwrap();
+        assert_eq!(dk, expected_dk);
+    }
+
+    #[test]
+    #[cfg(ossl300)]
+    fn pbkdf2_rfc_6070_case_1() {
+        // RFC 6070 test 1 (1 iteration)
+        let digest = crate::md::Md::sha1();
+        let pass = "password".as_bytes();
+        let salt = "salt".as_bytes();
+        let iter = Some(1);
+        let expected_dk = "0c60c80f961f0e71f3a9b524af6012062fe037a6";
+        pbkdf2_test_helper(digest, pass, salt, iter, expected_dk);
+    }
+
+    #[test]
+    #[cfg(ossl300)]
+    fn pbkdf2_rfc_6070_case_2() {
+        // RFC 6070 test 2 (2 iterations)
+        let digest = crate::md::Md::sha1();
+        let pass = "password".as_bytes();
+        let salt = "salt".as_bytes();
+        let iter = Some(2);
+        let expected_dk = "ea6c014dc72d6f8ccd1ed92ace1d41f0d8de8957";
+        pbkdf2_test_helper(digest, pass, salt, iter, expected_dk);
+    }
+
+    #[test]
+    #[cfg(ossl300)]
+    fn pbkdf2_rfc_6070_case_3() {
+        // RFC 6070 test 3 (4096 iterations)
+        let digest = crate::md::Md::sha1();
+        let pass = "password".as_bytes();
+        let salt = "salt".as_bytes();
+        let iter = Some(4096);
+        let expected_dk = "4b007901b765489abead49d926f721d065a429c1";
+        pbkdf2_test_helper(digest, pass, salt, iter, expected_dk);
+    }
+
+    #[test]
+    #[cfg(ossl300)]
+    fn pbkdf2_rfc_6070_case_4() {
+        // RFC 6070 test 4 (16777216 iterations)
+        let digest = crate::md::Md::sha1();
+        let pass = "password".as_bytes();
+        let salt = "salt".as_bytes();
+        let iter = Some(16777216);
+        let expected_dk = "eefe3d61cd4da4e4e9945b3d6ba2158c2634e984";
+        pbkdf2_test_helper(digest, pass, salt, iter, expected_dk);
+    }
+
+    #[test]
+    #[cfg(ossl300)]
+    fn pbkdf2_rfc_6070_case_5() {
+        // RFC 6070 test 5
+        let digest = crate::md::Md::sha1();
+        let pass = "passwordPASSWORDpassword".as_bytes();
+        let salt = "saltSALTsaltSALTsaltSALTsaltSALTsalt".as_bytes();
+        let iter = Some(4096);
+        let expected_dk = concat!(
+            "3d2eec4fe41c849b",
+            "80c8d83662c0e44a",
+            "8b291a964cf2f070",
+            "38"
+        );
+        pbkdf2_test_helper(digest, pass, salt, iter, expected_dk);
+    }
+
+    #[test]
+    #[cfg(ossl300)]
+    fn pbkdf2_rfc_6070_case_6() {
+        // RFC 6070 test 6 (nul byte in pass/salt)
+        let digest = crate::md::Md::sha1();
+        let pass = "pass\0word".as_bytes();
+        let salt = "sa\0lt".as_bytes();
+        let iter = Some(4096);
+        let expected_dk = "56fa6aa75548099dcc37d7f03425e0c3";
+        pbkdf2_test_helper(digest, pass, salt, iter, expected_dk);
+    }
+
+    #[test]
+    #[cfg(ossl300)]
+    fn pbkdf2_rfc_7914_sha256_case_1() {
+        // RFC 7914 HMAC-SHA-256 test case 1
+        let digest = crate::md::Md::sha256();
+        let pass = "passwd".as_bytes();
+        let salt = "salt".as_bytes();
+        let iter = Some(1);
+        let expected_dk = concat!(
+            "55ac046e56e3089fec1691c22544b605",
+            "f94185216dde0465e68b9d57c20dacbc",
+            "49ca9cccf179b645991664b39d77ef31",
+            "7c71b845b1e30bd509112041d3a19783"
+        );
+        pbkdf2_test_helper(digest, pass, salt, iter, expected_dk);
+    }
+
+    #[test]
+    #[cfg(ossl300)]
+    fn pbkdf2_rfc_7914_sha256_case_2() {
+        // RFC 7914 HMAC-SHA-256 test case 2
+        let digest = crate::md::Md::sha256();
+        let pass = "Password".as_bytes();
+        let salt = "NaCl".as_bytes();
+        let iter = Some(80000);
+        let expected_dk = concat!(
+            "4ddcd8f60b98be21830cee5ef22701f9",
+            "641a4418d04c0414aeff08876b34ab56",
+            "a1d425a1225833549adb841b51c9b317",
+            "6a272bdebba1d078478f62b397f33c8d"
+        );
+        pbkdf2_test_helper(digest, pass, salt, iter, expected_dk);
     }
 
     #[test]
