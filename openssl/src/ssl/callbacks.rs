@@ -96,9 +96,10 @@ where
             None
         };
         // Give the callback mutable slices into which it can write the identity and psk.
-        let identity_sl = util::from_raw_parts_mut(identity as *mut u8, max_identity_len as usize);
+        let identity_sl =
+            util::zeroed_slice_from_raw_parts_mut(identity as *mut u8, max_identity_len as usize);
         #[allow(clippy::unnecessary_cast)]
-        let psk_sl = util::from_raw_parts_mut(psk as *mut u8, max_psk_len as usize);
+        let psk_sl = util::zeroed_slice_from_raw_parts_mut(psk as *mut u8, max_psk_len as usize);
         let psk_cap = psk_sl.len();
         match (*callback)(ssl, hint, identity_sl, psk_sl) {
             Ok(psk_len) if psk_len <= psk_cap => psk_len as u32,
@@ -145,7 +146,7 @@ where
         };
         // Give the callback mutable slices into which it can write the psk.
         #[allow(clippy::unnecessary_cast)]
-        let psk_sl = util::from_raw_parts_mut(psk as *mut u8, max_psk_len as usize);
+        let psk_sl = util::zeroed_slice_from_raw_parts_mut(psk as *mut u8, max_psk_len as usize);
         let psk_cap = psk_sl.len();
         match (*callback)(ssl, identity, psk_sl) {
             Ok(psk_len) if psk_len <= psk_cap => psk_len as u32,

@@ -4,6 +4,7 @@ use foreign_types::{ForeignType, ForeignTypeRef};
 use libc::{c_char, c_int, c_void};
 use std::any::Any;
 use std::panic::{self, AssertUnwindSafe};
+use std::ptr;
 use std::slice;
 
 /// Wraps a user-supplied callback and a slot for panics thrown inside the callback (while FFI
@@ -50,7 +51,7 @@ where
     let callback = &mut *(cb_state as *mut CallbackState<F>);
 
     let result = panic::catch_unwind(AssertUnwindSafe(|| {
-        let pass_slice = util::from_raw_parts_mut(buf as *mut u8, size as usize);
+        let pass_slice = util::zeroed_slice_from_raw_parts_mut(buf as *mut u8, size as usize);
         callback.cb.take().unwrap()(pass_slice)
     }));
 
@@ -116,6 +117,17 @@ pub unsafe fn from_raw_parts_mut<'a, T>(data: *mut T, len: usize) -> &'a mut [T]
         #[allow(clippy::disallowed_methods)]
         slice::from_raw_parts_mut(data, len)
     }
+}
+
+/// Zeroes `len` bytes at `data`, then returns them as a slice. `data` may be `NULL` if `len` is 0.
+///
+/// This is used for output buffers which OpenSSL passes to callbacks, as these are often
+/// uninitialized and must not be exposed to safe code as a `&mut [u8]` in that state.
+pub unsafe fn zeroed_slice_from_raw_parts_mut<'a>(data: *mut u8, len: usize) -> &'a mut [u8] {
+    if len != 0 {
+        ptr::write_bytes(data, 0, len);
+    }
+    from_raw_parts_mut(data, len)
 }
 
 /// Checks the return value of an OpenSSL `*_up_ref` function, aborting the process on failure.
