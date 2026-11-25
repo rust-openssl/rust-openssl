@@ -1142,6 +1142,35 @@ mod tests {
     }
 
     #[test]
+    fn test_password_callback_buffer_zeroed() {
+        let pkey = PKey::from_rsa(Rsa::generate(2048).unwrap()).unwrap();
+        let pem = pkey
+            .private_key_to_pem_pkcs8_passphrase(Cipher::aes_128_cbc(), b"mypass")
+            .unwrap();
+        let der = pkey
+            .private_key_to_pkcs8_passphrase(Cipher::aes_128_cbc(), b"mypass")
+            .unwrap();
+
+        let mut zeroed = false;
+        PKey::private_key_from_pem_callback(&pem, |buf| {
+            zeroed = buf.iter().all(|b| *b == 0);
+            buf[..6].copy_from_slice(b"mypass");
+            Ok(6)
+        })
+        .unwrap();
+        assert!(zeroed);
+
+        let mut zeroed = false;
+        PKey::private_key_from_pkcs8_callback(&der, |buf| {
+            zeroed = buf.iter().all(|b| *b == 0);
+            buf[..6].copy_from_slice(b"mypass");
+            Ok(6)
+        })
+        .unwrap();
+        assert!(zeroed);
+    }
+
+    #[test]
     fn test_encrypted_pkcs8_callback() {
         let mut password_queried = false;
         let key = include_bytes!("../test/pkcs8.der");

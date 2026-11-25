@@ -1480,6 +1480,49 @@ fn psk_ciphers() {
     assert!(CLIENT_CALLED.load(Ordering::SeqCst));
 }
 
+// Regression test: the PSK trampolines used to expose OpenSSL's uninitialized
+// stack buffers to the callbacks.
+#[cfg(not(osslconf = "OPENSSL_NO_PSK"))]
+#[test]
+fn psk_callback_buffers_zeroed() {
+    const CIPHER: &str = "PSK-AES256-CBC-SHA";
+    const PSK: &[u8] = b"thisisaverysecurekey";
+    const CLIENT_IDENT: &[u8] = b"thisisaclient";
+
+    static CLIENT_ZEROED: AtomicBool = AtomicBool::new(false);
+    static SERVER_ZEROED: AtomicBool = AtomicBool::new(false);
+
+    let mut server = Server::builder();
+    server.ctx().set_cipher_list(CIPHER).unwrap();
+    server.ctx().set_psk_server_callback(|_, _identity, psk| {
+        SERVER_ZEROED.store(psk.iter().all(|b| *b == 0), Ordering::SeqCst);
+        psk[..PSK.len()].copy_from_slice(PSK);
+        Ok(PSK.len())
+    });
+    let server = server.build();
+
+    let mut client = server.client();
+    // This test relies on TLS 1.2 suites
+    #[cfg(any(boringssl, ossl111, awslc))]
+    client.ctx().set_options(SslOptions::NO_TLSV1_3);
+    client.ctx().set_cipher_list(CIPHER).unwrap();
+    client.ctx().set_psk_client_callback(|_, _, identity, psk| {
+        CLIENT_ZEROED.store(
+            identity.iter().chain(psk.iter()).all(|b| *b == 0),
+            Ordering::SeqCst,
+        );
+        identity[..CLIENT_IDENT.len()].copy_from_slice(CLIENT_IDENT);
+        identity[CLIENT_IDENT.len()] = 0;
+        psk[..PSK.len()].copy_from_slice(PSK);
+        Ok(PSK.len())
+    });
+
+    client.connect();
+
+    assert!(CLIENT_ZEROED.load(Ordering::SeqCst));
+    assert!(SERVER_ZEROED.load(Ordering::SeqCst));
+}
+
 // Regression tests: the PSK/cookie trampolines used to forward the callback's
 // returned `usize` to OpenSSL without checking it against the slice length.
 
