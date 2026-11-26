@@ -10,6 +10,7 @@ use crate::nid::Nid;
 use cfg_if::cfg_if;
 use foreign_types::{ForeignTypeRef, Opaque};
 use openssl_macros::corresponds;
+use std::borrow::Borrow;
 #[cfg(ossl300)]
 use std::ffi::CString;
 use std::ops::{Deref, DerefMut};
@@ -93,6 +94,12 @@ pub struct Cipher(Inner);
 
 unsafe impl Sync for Cipher {}
 unsafe impl Send for Cipher {}
+
+impl Borrow<CipherRef> for Cipher {
+    fn borrow(&self) -> &CipherRef {
+        self
+    }
+}
 
 impl Cipher {
     /// Looks up the cipher for a certain nid.
@@ -542,6 +549,18 @@ impl ForeignTypeRef for CipherRef {
 unsafe impl Sync for CipherRef {}
 unsafe impl Send for CipherRef {}
 
+#[cfg(ossl300)]
+impl ToOwned for CipherRef {
+    type Owned = Cipher;
+
+    fn to_owned(&self) -> Cipher {
+        unsafe {
+            ffi::EVP_CIPHER_up_ref(self.as_ptr());
+            Cipher::from_ptr(self.as_ptr())
+        }
+    }
+}
+
 impl CipherRef {
     /// Returns the cipher's Nid.
     #[corresponds(EVP_CIPHER_nid)]
@@ -586,5 +605,16 @@ mod test {
     #[cfg(ossl300)]
     fn test_cipher_fetch_properties() {
         assert!(Cipher::fetch(None, "AES-128-GCM", Some("provider=gibberish")).is_err());
+    }
+
+    #[test]
+    #[cfg(ossl300)]
+    fn test_to_owned() {
+        let cipher: Cipher;
+        {
+            let aes = Cipher::fetch(None, "AES-256-GCM", None).unwrap();
+            cipher = aes.to_owned();
+        }
+        assert_eq!(cipher.nid(), Cipher::aes_256_gcm().nid());
     }
 }
