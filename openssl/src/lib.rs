@@ -45,7 +45,7 @@
 //! $ sudo apt-get install pkg-config libssl-dev
 //!
 //! # Fedora
-//! $ sudo dnf install pkgconf perl-FindBin perl-IPC-Cmd openssl-devel
+//! $ sudo dnf install pkgconf perl-FindBin perl-IPC-Cmd perl-File-Compare openssl-devel
 //!
 //! # Alpine Linux
 //! $ apk add pkgconf openssl-dev
