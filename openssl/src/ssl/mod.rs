@@ -3981,21 +3981,33 @@ impl<S> SslStream<S> {
     fn make_error(&mut self, ret: c_int) -> Error {
         self.check_panic();
 
-        let code = self.ssl.get_error(ret);
+        let mut code = self.ssl.get_error(ret);
 
         let cause = match code {
             ErrorCode::SSL => Some(InnerError::Ssl(ErrorStack::get())),
             ErrorCode::SYSCALL => {
                 let errs = ErrorStack::get();
                 if errs.errors().is_empty() {
-                    self.get_bio_error().map(InnerError::Io)
+                    self.get_bio_error().map(|error| {
+                        // Some buffering BIOs do not propagate retry flags from flush.
+                        if error.is_flush && bio::retriable_error(&error.error) {
+                            code = ErrorCode::WANT_WRITE;
+                        }
+                        InnerError::Io(error.error)
+                    })
                 } else {
                     Some(InnerError::Ssl(errs))
                 }
             }
             ErrorCode::ZERO_RETURN => None,
             ErrorCode::WANT_READ | ErrorCode::WANT_WRITE => {
-                self.get_bio_error().map(InnerError::Io)
+                self.get_bio_error().map(|error| {
+                    // A buffering BIO may retain a retry flag after a later flush fails.
+                    if error.is_flush && !bio::retriable_error(&error.error) {
+                        code = ErrorCode::SYSCALL;
+                    }
+                    InnerError::Io(error.error)
+                })
             }
             _ => None,
         };
@@ -4009,7 +4021,7 @@ impl<S> SslStream<S> {
         }
     }
 
-    fn get_bio_error(&mut self) -> Option<io::Error> {
+    fn get_bio_error(&mut self) -> Option<bio::IoError> {
         unsafe { bio::take_error::<S>(self.ssl.get_raw_rbio()) }
     }
 
