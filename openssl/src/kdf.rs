@@ -30,6 +30,16 @@ pub enum HkdfMode {
     ExpandOnly,
 }
 
+/// A version of the Argon2 algorithm.
+#[cfg(all(ossl320, not(osslconf = "OPENSSL_NO_ARGON2")))]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub enum Argon2Version {
+    /// Version 0x10.
+    V10,
+    /// Version 0x13, the version in RFC 9106. This is the default.
+    V13,
+}
+
 cfg_if::cfg_if! {
     if #[cfg(ossl300)] {
         use std::ffi::CStr;
@@ -116,6 +126,7 @@ cfg_if::cfg_if! {
         const OSSL_KDF_PARAM_ARGON2_AD: &CStr = c"ad";
         const OSSL_KDF_PARAM_ARGON2_LANES: &CStr = c"lanes";
         const OSSL_KDF_PARAM_ARGON2_MEMCOST: &CStr = c"memcost";
+        const OSSL_KDF_PARAM_ARGON2_VERSION: &CStr = c"version";
 
         #[allow(clippy::too_many_arguments)]
         pub fn argon2d(
@@ -129,7 +140,26 @@ cfg_if::cfg_if! {
             memcost: u32,
             out: &mut [u8],
         ) -> Result<(), ErrorStack> {
-            argon2_helper(c"ARGON2D", ctx, pass, salt, ad, secret, iter, lanes, memcost, out)
+            argon2_helper(c"ARGON2D", ctx, pass, salt, ad, secret, iter, lanes, memcost, None, out)
+        }
+
+        /// Like [`argon2d`], but uses the given version of the algorithm.
+        ///
+        /// Requires OpenSSL 3.2.0 or newer.
+        #[allow(clippy::too_many_arguments)]
+        pub fn argon2d_with_version(
+            ctx: Option<&LibCtxRef>,
+            pass: &[u8],
+            salt: &[u8],
+            ad: Option<&[u8]>,
+            secret: Option<&[u8]>,
+            iter: u32,
+            lanes: u32,
+            memcost: u32,
+            version: Argon2Version,
+            out: &mut [u8],
+        ) -> Result<(), ErrorStack> {
+            argon2_helper(c"ARGON2D", ctx, pass, salt, ad, secret, iter, lanes, memcost, Some(version), out)
         }
 
         #[allow(clippy::too_many_arguments)]
@@ -144,7 +174,26 @@ cfg_if::cfg_if! {
             memcost: u32,
             out: &mut [u8],
         ) -> Result<(), ErrorStack> {
-            argon2_helper(c"ARGON2I", ctx, pass, salt, ad, secret, iter, lanes, memcost, out)
+            argon2_helper(c"ARGON2I", ctx, pass, salt, ad, secret, iter, lanes, memcost, None, out)
+        }
+
+        /// Like [`argon2i`], but uses the given version of the algorithm.
+        ///
+        /// Requires OpenSSL 3.2.0 or newer.
+        #[allow(clippy::too_many_arguments)]
+        pub fn argon2i_with_version(
+            ctx: Option<&LibCtxRef>,
+            pass: &[u8],
+            salt: &[u8],
+            ad: Option<&[u8]>,
+            secret: Option<&[u8]>,
+            iter: u32,
+            lanes: u32,
+            memcost: u32,
+            version: Argon2Version,
+            out: &mut [u8],
+        ) -> Result<(), ErrorStack> {
+            argon2_helper(c"ARGON2I", ctx, pass, salt, ad, secret, iter, lanes, memcost, Some(version), out)
         }
 
         #[allow(clippy::too_many_arguments)]
@@ -159,7 +208,26 @@ cfg_if::cfg_if! {
             memcost: u32,
             out: &mut [u8],
         ) -> Result<(), ErrorStack> {
-            argon2_helper(c"ARGON2ID", ctx, pass, salt, ad, secret, iter, lanes, memcost, out)
+            argon2_helper(c"ARGON2ID", ctx, pass, salt, ad, secret, iter, lanes, memcost, None, out)
+        }
+
+        /// Like [`argon2id`], but uses the given version of the algorithm.
+        ///
+        /// Requires OpenSSL 3.2.0 or newer.
+        #[allow(clippy::too_many_arguments)]
+        pub fn argon2id_with_version(
+            ctx: Option<&LibCtxRef>,
+            pass: &[u8],
+            salt: &[u8],
+            ad: Option<&[u8]>,
+            secret: Option<&[u8]>,
+            iter: u32,
+            lanes: u32,
+            memcost: u32,
+            version: Argon2Version,
+            out: &mut [u8],
+        ) -> Result<(), ErrorStack> {
+            argon2_helper(c"ARGON2ID", ctx, pass, salt, ad, secret, iter, lanes, memcost, Some(version), out)
         }
 
         /// Derives a key using the argon2* algorithms.
@@ -180,6 +248,7 @@ cfg_if::cfg_if! {
             iter: u32,
             lanes: u32,
             memcost: u32,
+            version: Option<Argon2Version>,
             out: &mut [u8],
         ) -> Result<(), ErrorStack> {
             let libctx = ctx.map_or(ptr::null_mut(), ForeignTypeRef::as_ptr);
@@ -208,6 +277,13 @@ cfg_if::cfg_if! {
             }
             if let Some(secret) = secret {
                 bld.add_octet_string(OSSL_KDF_PARAM_SECRET, secret)?;
+            }
+            if let Some(version) = version {
+                let version = match version {
+                    Argon2Version::V10 => 0x10,
+                    Argon2Version::V13 => 0x13,
+                };
+                bld.add_uint(OSSL_KDF_PARAM_ARGON2_VERSION, version)?;
             }
             let params = bld.to_param()?;
             kdf_digest(kdf_identifier, ctx, &params, out)
@@ -537,5 +613,90 @@ mod tests {
         let mut actual = [0u8; 32];
         super::argon2id(None, pass, &salt, None, None, 3, 4, 32, &mut actual).unwrap();
         assert_eq!(hex::encode(&actual[..]), expected);
+    }
+
+    #[cfg(all(ossl320, not(osslconf = "OPENSSL_NO_ARGON2")))]
+    type Argon2WithVersionFn = fn(
+        Option<&crate::lib_ctx::LibCtxRef>,
+        &[u8],
+        &[u8],
+        Option<&[u8]>,
+        Option<&[u8]>,
+        u32,
+        u32,
+        u32,
+        super::Argon2Version,
+        &mut [u8],
+    ) -> Result<(), crate::error::ErrorStack>;
+
+    #[cfg(all(ossl320, not(osslconf = "OPENSSL_NO_ARGON2")))]
+    fn argon2_with_version_test_helper(
+        f: Argon2WithVersionFn,
+        version: super::Argon2Version,
+        expected: &str,
+    ) {
+        // RFC 9106 test vector inputs
+        let pass = hex::decode("0101010101010101010101010101010101010101010101010101010101010101")
+            .unwrap();
+        let salt = hex::decode("02020202020202020202020202020202").unwrap();
+        let secret = hex::decode("0303030303030303").unwrap();
+        let ad = hex::decode("040404040404040404040404").unwrap();
+
+        let mut actual = [0u8; 32];
+        f(
+            None,
+            &pass,
+            &salt,
+            Some(&ad),
+            Some(&secret),
+            3,
+            4,
+            32,
+            version,
+            &mut actual,
+        )
+        .unwrap();
+        assert_eq!(hex::encode(&actual[..]), expected);
+    }
+
+    #[test]
+    #[cfg(all(ossl320, not(osslconf = "OPENSSL_NO_ARGON2")))]
+    fn argon2_with_version() {
+        use super::Argon2Version::{V10, V13};
+
+        // Version 0x13 gives the RFC 9106 test vectors
+        argon2_with_version_test_helper(
+            super::argon2d_with_version,
+            V13,
+            "512b391b6f1162975371d30919734294f868e3be3984f3c1a13a4db9fabe4acb",
+        );
+        argon2_with_version_test_helper(
+            super::argon2i_with_version,
+            V13,
+            "c814d9d1dc7f37aa13f0d77f2494bda1c8de6b016dd388d29952a4c4672b6ce8",
+        );
+        argon2_with_version_test_helper(
+            super::argon2id_with_version,
+            V13,
+            "0d640df58d78766c08c037a34a8b53c9d01ef0452d75b65eb52520e96b01e659",
+        );
+
+        // Version 0x10 vectors for the same inputs, from the reference
+        // implementation (https://github.com/P-H-C/phc-winner-argon2)
+        argon2_with_version_test_helper(
+            super::argon2d_with_version,
+            V10,
+            "96a9d4e5a1734092c85e29f410a45914a5dd1f5cbf08b2670da68a0285abf32b",
+        );
+        argon2_with_version_test_helper(
+            super::argon2i_with_version,
+            V10,
+            "87aeedd6517ab830cd9765cd8231abb2e647a5dee08f7c05e02fcb763335d0fd",
+        );
+        argon2_with_version_test_helper(
+            super::argon2id_with_version,
+            V10,
+            "b64615f07789b66b645b67ee9ed3b377ae350b6bfcbb0fc95141ea8f322613c0",
+        );
     }
 }

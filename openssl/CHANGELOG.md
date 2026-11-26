@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+* Added `argon2d_with_version`, `argon2i_with_version`, and `argon2id_with_version`, along with `Argon2Version`, to select version 0x10 of Argon2.
+
 ## [v0.10.82] - 2026-11-01
 
 ### Fixed
