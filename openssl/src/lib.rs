@@ -152,6 +152,8 @@ pub mod base64;
 pub mod bn;
 pub mod cipher;
 pub mod cipher_ctx;
+#[cfg(any(boringssl, awslc))]
+pub mod cmac;
 #[cfg(all(not(libressl), not(osslconf = "OPENSSL_NO_CMS")))]
 pub mod cms;
 pub mod conf;
