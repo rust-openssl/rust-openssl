@@ -61,6 +61,8 @@
 use crate::cvt_long;
 use crate::dh::{Dh, DhRef};
 use crate::ec::EcKeyRef;
+#[cfg(ossl400)]
+use crate::ech::{EchConnectionStatus, EchStatus, EchStore, EchStoreRef};
 use crate::error::ErrorStack;
 use crate::ex_data::Index;
 #[cfg(ossl111)]
@@ -1563,6 +1565,41 @@ impl SslContextBuilder {
         }
     }
 
+    /// Sets the ECH store for connections made with this context, enabling
+    /// Encrypted Client Hello (ECH, RFC 9849) acceptance.
+    ///
+    /// The store is copied into the context, so the store itself remains
+    /// usable afterwards.
+    ///
+    /// Requires OpenSSL 4.0 or newer.
+    #[corresponds(SSL_CTX_set1_echstore)]
+    #[cfg(ossl400)]
+    pub fn set_echstore(&mut self, store: &EchStoreRef) -> Result<(), ErrorStack> {
+        unsafe { cvt(ffi::SSL_CTX_set1_echstore(self.as_ptr(), store.as_ptr())).map(|_| ()) }
+    }
+
+    /// Sets the ECH status callback for connections made with this context.
+    ///
+    /// The callback is invoked as each connection's ECH outcome is
+    /// determined, with a log string describing it. Branch on the
+    /// [`EchStatus`] reported by
+    /// [`SslRef::ech_status`], never on the contents of the string.
+    /// Returning `false` aborts the handshake with an internal-error
+    /// alert; return `true` to let it proceed.
+    ///
+    /// Requires OpenSSL 4.0 or newer.
+    #[corresponds(SSL_CTX_ech_set_callback)]
+    #[cfg(ossl400)]
+    pub fn set_ech_callback<F>(&mut self, callback: F)
+    where
+        F: Fn(&SslRef, &str) -> bool + 'static + Sync + Send,
+    {
+        unsafe {
+            self.set_ex_data(SslContext::cached_ex_index::<F>(), callback);
+            ffi::SSL_CTX_ech_set_callback(self.as_ptr(), Some(callbacks::raw_ech_callback::<F>));
+        }
+    }
+
     /// Sets the session caching mode use for connections made with the context.
     ///
     /// Returns the previous session caching mode.
@@ -1941,6 +1978,24 @@ impl SslContextRef {
         unsafe {
             let ptr = ffi::SSL_CTX_get0_privatekey(self.as_ptr());
             PKeyRef::from_const_ptr_opt(ptr)
+        }
+    }
+
+    /// Returns the ECH store attached to this context, if any.
+    ///
+    /// The returned store is a new copy owned by the caller.
+    ///
+    /// Requires OpenSSL 4.0 or newer.
+    #[corresponds(SSL_CTX_get1_echstore)]
+    #[cfg(ossl400)]
+    pub fn echstore(&self) -> Option<EchStore> {
+        unsafe {
+            let p = ffi::SSL_CTX_get1_echstore(self.as_ptr());
+            if p.is_null() {
+                None
+            } else {
+                Some(EchStore::from_ptr(p))
+            }
         }
     }
 
@@ -2823,6 +2878,97 @@ impl SslRef {
         unsafe {
             let ssl_ctx = ffi::SSL_get_SSL_CTX(self.as_ptr());
             SslContextRef::from_ptr(ssl_ctx)
+        }
+    }
+
+    /// Sets the ECH store for this connection, enabling Encrypted Client
+    /// Hello (ECH, RFC 9849) acceptance for it.
+    ///
+    /// The store is copied into the connection, so the store itself
+    /// remains usable afterwards.
+    ///
+    /// Requires OpenSSL 4.0 or newer.
+    #[corresponds(SSL_set1_echstore)]
+    #[cfg(ossl400)]
+    pub fn set_echstore(&mut self, store: &EchStoreRef) -> Result<(), ErrorStack> {
+        unsafe { cvt(ffi::SSL_set1_echstore(self.as_ptr(), store.as_ptr())).map(|_| ()) }
+    }
+
+    /// Returns the ECH store attached to this connection, if any.
+    ///
+    /// The returned store is a new copy owned by the caller.
+    ///
+    /// Requires OpenSSL 4.0 or newer.
+    #[corresponds(SSL_get1_echstore)]
+    #[cfg(ossl400)]
+    pub fn echstore(&self) -> Option<EchStore> {
+        unsafe {
+            let p = ffi::SSL_get1_echstore(self.as_ptr());
+            if p.is_null() {
+                None
+            } else {
+                Some(EchStore::from_ptr(p))
+            }
+        }
+    }
+
+    /// Sets the ECHConfigList this client will use for ECH, in wire
+    /// form, e.g. as published in the `ech` SvcParam of a DNS HTTPS
+    /// record.
+    ///
+    /// Requires OpenSSL 4.0 or newer.
+    #[corresponds(SSL_set1_ech_config_list)]
+    #[cfg(ossl400)]
+    pub fn set_ech_config_list(&mut self, config_list: &[u8]) -> Result<(), ErrorStack> {
+        unsafe {
+            cvt(ffi::SSL_set1_ech_config_list(
+                self.as_ptr(),
+                config_list.as_ptr(),
+                config_list.len(),
+            ))
+            .map(|_| ())
+        }
+    }
+
+    /// Returns the outcome of this connection's ECH attempt, with the
+    /// inner and outer server names when the handshake determined them.
+    ///
+    /// Requires OpenSSL 4.0 or newer.
+    #[corresponds(SSL_ech_get1_status)]
+    #[cfg(ossl400)]
+    pub fn ech_status(&mut self) -> EchConnectionStatus {
+        let mut inner: *mut c_char = std::ptr::null_mut();
+        let mut outer: *mut c_char = std::ptr::null_mut();
+        let code = unsafe { ffi::SSL_ech_get1_status(self.as_ptr(), &mut inner, &mut outer) };
+        EchConnectionStatus::new(
+            EchStatus::from_raw(code),
+            unsafe { crate::ech::take_openssl_string(inner) },
+            unsafe { crate::ech::take_openssl_string(outer) },
+        )
+    }
+
+    /// Returns the retry-configs the peer supplied for this connection
+    /// (a binary ECHConfigList), when an ECH attempt failed and the
+    /// peer offered them. Empty when none were supplied.
+    ///
+    /// Requires OpenSSL 4.0 or newer.
+    #[corresponds(SSL_ech_get1_retry_config)]
+    #[cfg(ossl400)]
+    pub fn ech_retry_config(&mut self) -> Result<Vec<u8>, ErrorStack> {
+        let mut ec: *mut c_uchar = std::ptr::null_mut();
+        let mut eclen: usize = 0;
+        unsafe {
+            cvt(ffi::SSL_ech_get1_retry_config(
+                self.as_ptr(),
+                &mut ec,
+                &mut eclen,
+            ))?;
+            if ec.is_null() || eclen == 0 {
+                return Ok(Vec::new());
+            }
+            let bytes = util::from_raw_parts(ec, eclen).to_vec();
+            ffi::OPENSSL_free(ec as *mut c_void);
+            Ok(bytes)
         }
     }
 
