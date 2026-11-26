@@ -189,6 +189,8 @@ pub mod pkey_ctx;
 pub mod provider;
 pub mod rand;
 pub mod rsa;
+#[cfg(ossl110)]
+pub mod rsa_meth;
 pub mod sha;
 pub mod sign;
 pub mod srtp;
