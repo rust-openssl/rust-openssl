@@ -59,7 +59,9 @@
 //! ```
 #[cfg(ossl300)]
 use crate::cvt_long;
+#[cfg(not(osslconf = "OPENSSL_NO_DEPRECATED_3_0"))]
 use crate::dh::{Dh, DhRef};
+#[cfg(not(osslconf = "OPENSSL_NO_DEPRECATED_3_0"))]
 use crate::ec::EcKeyRef;
 use crate::error::ErrorStack;
 use crate::ex_data::Index;
@@ -67,7 +69,9 @@ use crate::ex_data::Index;
 use crate::hash::MessageDigest;
 #[cfg(any(ossl110, libressl))]
 use crate::nid::Nid;
-use crate::pkey::{HasPrivate, PKeyRef, Params, Private};
+#[cfg(not(osslconf = "OPENSSL_NO_DEPRECATED_3_0"))]
+use crate::pkey::Params;
+use crate::pkey::{HasPrivate, PKeyRef, Private};
 #[cfg(ossl300)]
 use crate::pkey::{PKey, Public};
 #[cfg(not(osslconf = "OPENSSL_NO_SRTP"))]
@@ -111,7 +115,7 @@ mod bio;
 mod callbacks;
 mod connector;
 mod error;
-#[cfg(test)]
+#[cfg(all(test, not(osslconf = "OPENSSL_NO_DEPRECATED_3_0")))]
 mod test;
 
 /// Returns the OpenSSL name of a cipher corresponding to an RFC-standard cipher name.
@@ -954,8 +958,19 @@ impl SslContextBuilder {
 
     /// Sets the parameters to be used during ephemeral Diffie-Hellman key exchange.
     #[corresponds(SSL_CTX_set_tmp_dh)]
+    #[cfg(not(osslconf = "OPENSSL_NO_DEPRECATED_3_0"))]
     pub fn set_tmp_dh(&mut self, dh: &DhRef<Params>) -> Result<(), ErrorStack> {
         unsafe { cvt(ffi::SSL_CTX_set_tmp_dh(self.as_ptr(), dh.as_ptr()) as c_int).map(|_| ()) }
+    }
+
+    /// Enables automatic selection of Diffie-Hellman parameters.
+    ///
+    /// This is the non-deprecated replacement for configuring temporary DH
+    /// parameters on OpenSSL 3.0 and newer.
+    #[corresponds(SSL_CTX_set_dh_auto)]
+    #[cfg(ossl300)]
+    pub fn set_dh_auto(&mut self, onoff: bool) -> Result<(), ErrorStack> {
+        unsafe { cvt(ffi::SSL_CTX_set_dh_auto(self.as_ptr(), onoff as c_int) as c_int).map(|_| ()) }
     }
 
     /// Sets the callback which will generate parameters to be used during ephemeral Diffie-Hellman
@@ -965,6 +980,7 @@ impl SslContextBuilder {
     /// indicating if the selected cipher is export-grade, and the key length. The export and key
     /// length options are archaic and should be ignored in almost all cases.
     #[corresponds(SSL_CTX_set_tmp_dh_callback)]
+    #[cfg(not(osslconf = "OPENSSL_NO_DEPRECATED_3_0"))]
     pub fn set_tmp_dh_callback<F>(&mut self, callback: F)
     where
         F: Fn(&mut SslRef, bool, u32) -> Result<Dh<Params>, ErrorStack> + 'static + Sync + Send,
@@ -981,6 +997,7 @@ impl SslContextBuilder {
 
     /// Sets the parameters to be used during ephemeral elliptic curve Diffie-Hellman key exchange.
     #[corresponds(SSL_CTX_set_tmp_ecdh)]
+    #[cfg(not(osslconf = "OPENSSL_NO_DEPRECATED_3_0"))]
     pub fn set_tmp_ecdh(&mut self, key: &EcKeyRef<Params>) -> Result<(), ErrorStack> {
         unsafe { cvt(ffi::SSL_CTX_set_tmp_ecdh(self.as_ptr(), key.as_ptr()) as c_int).map(|_| ()) }
     }
@@ -2503,6 +2520,7 @@ impl SslRef {
     ///
     /// [`SslContextBuilder::set_tmp_dh`]: struct.SslContextBuilder.html#method.set_tmp_dh
     #[corresponds(SSL_set_tmp_dh)]
+    #[cfg(not(osslconf = "OPENSSL_NO_DEPRECATED_3_0"))]
     pub fn set_tmp_dh(&mut self, dh: &DhRef<Params>) -> Result<(), ErrorStack> {
         unsafe { cvt(ffi::SSL_set_tmp_dh(self.as_ptr(), dh.as_ptr()) as c_int).map(|_| ()) }
     }
@@ -2511,6 +2529,7 @@ impl SslRef {
     ///
     /// [`SslContextBuilder::set_tmp_dh_callback`]: struct.SslContextBuilder.html#method.set_tmp_dh_callback
     #[corresponds(SSL_set_tmp_dh_callback)]
+    #[cfg(not(osslconf = "OPENSSL_NO_DEPRECATED_3_0"))]
     pub fn set_tmp_dh_callback<F>(&mut self, callback: F)
     where
         F: Fn(&mut SslRef, bool, u32) -> Result<Dh<Params>, ErrorStack> + 'static + Sync + Send,
@@ -2528,6 +2547,7 @@ impl SslRef {
     /// Like [`SslContextBuilder::set_tmp_ecdh`].
     ///
     /// [`SslContextBuilder::set_tmp_ecdh`]: struct.SslContextBuilder.html#method.set_tmp_ecdh
+    #[cfg(not(osslconf = "OPENSSL_NO_DEPRECATED_3_0"))]
     #[corresponds(SSL_set_tmp_ecdh)]
     pub fn set_tmp_ecdh(&mut self, key: &EcKeyRef<Params>) -> Result<(), ErrorStack> {
         unsafe { cvt(ffi::SSL_set_tmp_ecdh(self.as_ptr(), key.as_ptr()) as c_int).map(|_| ()) }

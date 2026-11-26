@@ -2,6 +2,7 @@ use cfg_if::cfg_if;
 use std::io::{Read, Write};
 use std::ops::{Deref, DerefMut};
 
+#[cfg(not(osslconf = "OPENSSL_NO_DEPRECATED_3_0"))]
 use crate::dh::Dh;
 use crate::error::ErrorStack;
 #[cfg(any(ossl111, libressl))]
@@ -13,6 +14,7 @@ use crate::ssl::{
 use crate::version;
 use std::net::IpAddr;
 
+#[cfg(not(osslconf = "OPENSSL_NO_DEPRECATED_3_0"))]
 const FFDHE_2048: &str = "
 -----BEGIN DH PARAMETERS-----
 MIIBCAKCAQEA//////////+t+FRYortKmq/cViAnPTzx2LnFg84tNpWp4TZBFGQz
@@ -231,8 +233,13 @@ impl SslAcceptor {
     pub fn mozilla_intermediate_v5(method: SslMethod) -> Result<SslAcceptorBuilder, ErrorStack> {
         let mut ctx = ctx(method)?;
         ctx.set_options(SslOptions::NO_TLSV1 | SslOptions::NO_TLSV1_1);
-        let dh = Dh::params_from_pem(FFDHE_2048.as_bytes())?;
-        ctx.set_tmp_dh(&dh)?;
+        #[cfg(ossl300)]
+        ctx.set_dh_auto(true)?;
+        #[cfg(not(ossl300))]
+        {
+            let dh = Dh::params_from_pem(FFDHE_2048.as_bytes())?;
+            ctx.set_tmp_dh(&dh)?;
+        }
         setup_curves(&mut ctx)?;
         ctx.set_cipher_list(
             "ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:\
@@ -272,6 +279,7 @@ impl SslAcceptor {
     ///
     /// [docs]: https://wiki.mozilla.org/Security/Server_Side_TLS
     // FIXME remove in next major version
+    #[cfg(not(osslconf = "OPENSSL_NO_DEPRECATED_3_0"))]
     pub fn mozilla_intermediate(method: SslMethod) -> Result<SslAcceptorBuilder, ErrorStack> {
         let mut ctx = ctx(method)?;
         ctx.set_options(SslOptions::CIPHER_SERVER_PREFERENCE);

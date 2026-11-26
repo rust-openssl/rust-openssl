@@ -146,6 +146,7 @@ mod macros;
 mod bio;
 #[macro_use]
 mod util;
+#[cfg(not(osslconf = "OPENSSL_NO_DEPRECATED_3_0"))]
 pub mod aes;
 pub mod asn1;
 pub mod base64;
@@ -156,6 +157,7 @@ pub mod cipher_ctx;
 pub mod cms;
 pub mod conf;
 pub mod derive;
+#[cfg(not(osslconf = "OPENSSL_NO_DEPRECATED_3_0"))]
 pub mod dh;
 pub mod dsa;
 pub mod ec;

@@ -43,14 +43,18 @@
 use crate::bio::{MemBio, MemBioSlice};
 #[cfg(ossl110)]
 use crate::cipher::CipherRef;
+#[cfg(not(osslconf = "OPENSSL_NO_DEPRECATED_3_0"))]
 use crate::dh::Dh;
+#[cfg(not(osslconf = "OPENSSL_NO_DEPRECATED_3_0"))]
 use crate::dsa::Dsa;
+#[cfg(not(osslconf = "OPENSSL_NO_DEPRECATED_3_0"))]
 use crate::ec::EcKey;
 use crate::error::ErrorStack;
 #[cfg(ossl300)]
 use crate::lib_ctx::LibCtxRef;
 #[cfg(any(ossl110, boringssl, libressl370, awslc))]
 use crate::pkey_ctx::PkeyCtx;
+#[cfg(not(osslconf = "OPENSSL_NO_DEPRECATED_3_0"))]
 use crate::rsa::Rsa;
 use crate::symm::Cipher;
 use crate::util::{invoke_passwd_cb, CallbackState};
@@ -58,10 +62,16 @@ use crate::{cvt, cvt_p};
 use foreign_types::{ForeignType, ForeignTypeRef};
 use libc::{c_int, c_long};
 use openssl_macros::corresponds;
-use std::convert::{TryFrom, TryInto};
+#[cfg(not(osslconf = "OPENSSL_NO_DEPRECATED_3_0"))]
+use std::convert::TryFrom;
+use std::convert::TryInto;
 use std::ffi::{CStr, CString};
 use std::fmt;
-#[cfg(all(not(any(boringssl, awslc)), ossl110))]
+#[cfg(all(
+    not(any(boringssl, awslc)),
+    ossl110,
+    not(osslconf = "OPENSSL_NO_DEPRECATED_3_0")
+))]
 use std::mem;
 use std::ptr;
 
@@ -199,6 +209,7 @@ impl<T> ToOwned for PKeyRef<T> {
 impl<T> PKeyRef<T> {
     /// Returns a copy of the internal RSA key.
     #[corresponds(EVP_PKEY_get1_RSA)]
+    #[cfg(not(osslconf = "OPENSSL_NO_DEPRECATED_3_0"))]
     pub fn rsa(&self) -> Result<Rsa<T>, ErrorStack> {
         unsafe {
             let rsa = cvt_p(ffi::EVP_PKEY_get1_RSA(self.as_ptr()))?;
@@ -208,6 +219,7 @@ impl<T> PKeyRef<T> {
 
     /// Returns a copy of the internal DSA key.
     #[corresponds(EVP_PKEY_get1_DSA)]
+    #[cfg(not(osslconf = "OPENSSL_NO_DEPRECATED_3_0"))]
     pub fn dsa(&self) -> Result<Dsa<T>, ErrorStack> {
         unsafe {
             let dsa = cvt_p(ffi::EVP_PKEY_get1_DSA(self.as_ptr()))?;
@@ -217,6 +229,7 @@ impl<T> PKeyRef<T> {
 
     /// Returns a copy of the internal DH key.
     #[corresponds(EVP_PKEY_get1_DH)]
+    #[cfg(not(osslconf = "OPENSSL_NO_DEPRECATED_3_0"))]
     pub fn dh(&self) -> Result<Dh<T>, ErrorStack> {
         unsafe {
             let dh = cvt_p(ffi::EVP_PKEY_get1_DH(self.as_ptr()))?;
@@ -226,6 +239,7 @@ impl<T> PKeyRef<T> {
 
     /// Returns a copy of the internal elliptic curve key.
     #[corresponds(EVP_PKEY_get1_EC_KEY)]
+    #[cfg(not(osslconf = "OPENSSL_NO_DEPRECATED_3_0"))]
     pub fn ec_key(&self) -> Result<EcKey<T>, ErrorStack> {
         unsafe {
             let ec_key = cvt_p(ffi::EVP_PKEY_get1_EC_KEY(self.as_ptr()))?;
@@ -302,6 +316,7 @@ where
 
     /// Compares the public component of this key with another.
     #[corresponds(EVP_PKEY_cmp)]
+    #[cfg(not(osslconf = "OPENSSL_NO_DEPRECATED_3_0"))]
     pub fn public_eq<U>(&self, other: &PKeyRef<U>) -> bool
     where
         U: HasPublic,
@@ -512,6 +527,7 @@ impl<T> Clone for PKey<T> {
 impl<T> PKey<T> {
     /// Creates a new `PKey` containing an RSA key.
     #[corresponds(EVP_PKEY_set1_RSA)]
+    #[cfg(not(osslconf = "OPENSSL_NO_DEPRECATED_3_0"))]
     pub fn from_rsa(rsa: Rsa<T>) -> Result<PKey<T>, ErrorStack> {
         // TODO: Next time we make backwards incompatible changes, this could
         // become an `&RsaRef<T>`. Same for all the other `from_*` methods.
@@ -525,6 +541,7 @@ impl<T> PKey<T> {
 
     /// Creates a new `PKey` containing a DSA key.
     #[corresponds(EVP_PKEY_set1_DSA)]
+    #[cfg(not(osslconf = "OPENSSL_NO_DEPRECATED_3_0"))]
     pub fn from_dsa(dsa: Dsa<T>) -> Result<PKey<T>, ErrorStack> {
         unsafe {
             let evp = cvt_p(ffi::EVP_PKEY_new())?;
@@ -536,7 +553,7 @@ impl<T> PKey<T> {
 
     /// Creates a new `PKey` containing a Diffie-Hellman key.
     #[corresponds(EVP_PKEY_set1_DH)]
-    #[cfg(not(boringssl))]
+    #[cfg(all(not(boringssl), not(osslconf = "OPENSSL_NO_DEPRECATED_3_0")))]
     pub fn from_dh(dh: Dh<T>) -> Result<PKey<T>, ErrorStack> {
         unsafe {
             let evp = cvt_p(ffi::EVP_PKEY_new())?;
@@ -547,7 +564,11 @@ impl<T> PKey<T> {
     }
 
     /// Creates a new `PKey` containing a Diffie-Hellman key with type DHX.
-    #[cfg(all(not(any(boringssl, awslc)), ossl110))]
+    #[cfg(all(
+        not(any(boringssl, awslc)),
+        ossl110,
+        not(osslconf = "OPENSSL_NO_DEPRECATED_3_0")
+    ))]
     pub fn from_dhx(dh: Dh<T>) -> Result<PKey<T>, ErrorStack> {
         unsafe {
             let evp = cvt_p(ffi::EVP_PKEY_new())?;
@@ -564,6 +585,7 @@ impl<T> PKey<T> {
 
     /// Creates a new `PKey` containing an elliptic curve key.
     #[corresponds(EVP_PKEY_set1_EC_KEY)]
+    #[cfg(not(osslconf = "OPENSSL_NO_DEPRECATED_3_0"))]
     pub fn from_ec_key(ec_key: EcKey<T>) -> Result<PKey<T>, ErrorStack> {
         unsafe {
             let evp = cvt_p(ffi::EVP_PKEY_new())?;
@@ -1017,6 +1039,7 @@ impl PKey<Public> {
 
 use ffi::EVP_PKEY_up_ref;
 
+#[cfg(not(osslconf = "OPENSSL_NO_DEPRECATED_3_0"))]
 impl<T> TryFrom<EcKey<T>> for PKey<T> {
     type Error = ErrorStack;
 
@@ -1025,6 +1048,7 @@ impl<T> TryFrom<EcKey<T>> for PKey<T> {
     }
 }
 
+#[cfg(not(osslconf = "OPENSSL_NO_DEPRECATED_3_0"))]
 impl<T> TryFrom<PKey<T>> for EcKey<T> {
     type Error = ErrorStack;
 
@@ -1033,6 +1057,7 @@ impl<T> TryFrom<PKey<T>> for EcKey<T> {
     }
 }
 
+#[cfg(not(osslconf = "OPENSSL_NO_DEPRECATED_3_0"))]
 impl<T> TryFrom<Rsa<T>> for PKey<T> {
     type Error = ErrorStack;
 
@@ -1041,6 +1066,7 @@ impl<T> TryFrom<Rsa<T>> for PKey<T> {
     }
 }
 
+#[cfg(not(osslconf = "OPENSSL_NO_DEPRECATED_3_0"))]
 impl<T> TryFrom<PKey<T>> for Rsa<T> {
     type Error = ErrorStack;
 
@@ -1049,6 +1075,7 @@ impl<T> TryFrom<PKey<T>> for Rsa<T> {
     }
 }
 
+#[cfg(not(osslconf = "OPENSSL_NO_DEPRECATED_3_0"))]
 impl<T> TryFrom<Dsa<T>> for PKey<T> {
     type Error = ErrorStack;
 
@@ -1057,6 +1084,7 @@ impl<T> TryFrom<Dsa<T>> for PKey<T> {
     }
 }
 
+#[cfg(not(osslconf = "OPENSSL_NO_DEPRECATED_3_0"))]
 impl<T> TryFrom<PKey<T>> for Dsa<T> {
     type Error = ErrorStack;
 
@@ -1065,7 +1093,7 @@ impl<T> TryFrom<PKey<T>> for Dsa<T> {
     }
 }
 
-#[cfg(not(boringssl))]
+#[cfg(all(not(boringssl), not(osslconf = "OPENSSL_NO_DEPRECATED_3_0")))]
 impl<T> TryFrom<Dh<T>> for PKey<T> {
     type Error = ErrorStack;
 
@@ -1074,6 +1102,7 @@ impl<T> TryFrom<Dh<T>> for PKey<T> {
     }
 }
 
+#[cfg(not(osslconf = "OPENSSL_NO_DEPRECATED_3_0"))]
 impl<T> TryFrom<PKey<T>> for Dh<T> {
     type Error = ErrorStack;
 
@@ -1082,7 +1111,7 @@ impl<T> TryFrom<PKey<T>> for Dh<T> {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, not(osslconf = "OPENSSL_NO_DEPRECATED_3_0")))]
 mod tests {
     use std::convert::TryInto;
 
