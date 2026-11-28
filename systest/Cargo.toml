@@ -10,7 +10,7 @@ libc = "0.2"
 openssl-sys = { path = "../openssl-sys" }
 
 [build-dependencies]
-ctest = "0.5"
+ctest = "0.5.2"
 
 [features]
 vendored = ['openssl-sys/vendored']
