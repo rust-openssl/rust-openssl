@@ -193,6 +193,5 @@ fn main() {
         }
     });
     cfg.rename_fn(|f| f.link_name().map(|s| s.to_string()));
-    ctest::generate_test(&mut cfg, "../openssl-sys/src/lib.rs", "all.rs")
-        .expect("generate_test failed");
+    cfg.build_test("../openssl-sys/src/lib.rs", "all.rs");
 }
